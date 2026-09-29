@@ -6,7 +6,7 @@ A personal Italian voice server for Xiaozhi ESP32 devices, built as a fork of [h
 
 ## Fork of upstream
 
-This repository is a fork of [hackers365/xiaozhi-esp32-server-golang](https://github.com/hackers365/xiaozhi-esp32-server-golang). It keeps upstream history and authorship. To pull later upstream fixes, see [`docs/upstream-sync.md`](docs/upstream-sync.md).
+This repository is a fork of [hackers365/xiaozhi-esp32-server-golang](https://github.com/hackers365/xiaozhi-esp32-server-golang). It keeps upstream history and authorship. The original project README (Chinese, at the imported commit) is [here](https://github.com/hackers365/xiaozhi-esp32-server-golang/blob/21f1a2e71ff383723f1464ea9b137016e6feab8d/README.md). To pull later upstream fixes, see [`docs/upstream-sync.md`](docs/upstream-sync.md).
 
 ## What it is
 
