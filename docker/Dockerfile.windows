@@ -1,14 +1,5 @@
 ﻿# syntax=docker/dockerfile:1
 ARG UBUNTU_VERSION=22.04
-ARG NODE_VERSION=20
-FROM node:${NODE_VERSION}-bullseye AS frontend
-
-WORKDIR /src/manager/frontend
-COPY manager/frontend/package*.json ./
-RUN npm ci
-COPY manager/frontend ./
-RUN npm run build
-
 FROM ubuntu:${UBUNTU_VERSION} AS builder
 
 ARG GO_VERSION=1.24.4
@@ -33,9 +24,6 @@ ENV PATH=/usr/local/go/bin:$PATH
 
 WORKDIR /src
 COPY . .
-
-RUN mkdir -p manager/backend/static/dist
-COPY --from=frontend /src/manager/frontend/dist /src/manager/backend/static/dist
 
 RUN test -f asr_server/server/setup.go
 
@@ -73,7 +61,7 @@ ENV LIBRARY_PATH=/opt/onnxruntime-win/lib
 ENV CGO_LDFLAGS="-L/opt/onnxruntime-win/lib"
 
 RUN go mod tidy \
-    && go build -v -tags "nolibopusfile asr_server manager embed_ui" \
+    && go build -v -tags "nolibopusfile asr_server" \
        -ldflags "-s -w" \
        -o xiaozhi_server.exe ./cmd/server
 
@@ -82,7 +70,7 @@ RUN upx --lzma xiaozhi_server.exe || true
 RUN PACK_DIR="/out/windows-amd64/xiaozhi-server-windows-amd64" \
     && mkdir -p "$PACK_DIR/data" "$PACK_DIR/logs" \
     && cp xiaozhi_server.exe "$PACK_DIR/" \
-    && cp build/common/main_config.yaml build/common/manager.json build/common/asr_server.json "$PACK_DIR/" \
+    && cp build/common/main_config.yaml build/common/asr_server.json "$PACK_DIR/" \
     && cp -r build/common/models "$PACK_DIR/" \
     && cp -r build/common/data/* "$PACK_DIR/data/" \
     && cp build/windows/start.bat "$PACK_DIR/" \

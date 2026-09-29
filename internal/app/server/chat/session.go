@@ -1855,13 +1855,6 @@ func (s *ChatSession) switchTTSForSpeaker(speakerResult *speaker.IdentifyResult)
 		}
 		log.Debugf("为说话人 %s 设置音色: %s", speakerResult.SpeakerName, *speakerGroupInfo.Voice)
 	}
-	if targetTTSConfig.Provider == "aliyun_qwen" &&
-		speakerGroupInfo.VoiceModelOverride != nil &&
-		strings.TrimSpace(*speakerGroupInfo.VoiceModelOverride) != "" {
-		overrideModel := strings.TrimSpace(*speakerGroupInfo.VoiceModelOverride)
-		ttsConfig["model"] = overrideModel
-		log.Debugf("为说话人 %s 覆盖千问模型: %s", speakerResult.SpeakerName, overrideModel)
-	}
 
 	// 7. 保存完整的 TTS 配置（深拷贝）
 	s.clientState.SpeakerTTSConfig = make(map[string]interface{})

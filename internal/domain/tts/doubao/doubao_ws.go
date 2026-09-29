@@ -111,7 +111,7 @@ func (p *DoubaoWSProvider) TextToSpeechStream(ctx context.Context, text string, 
 	if sampleRate <= 0 {
 		sampleRate = defaultDoubaoSampleHz
 	}
-	tryResolved := buildDoubaoWSAttemptModels(derivedResolved, explicitResourceID, voice)
+	tryResolved := buildDoubaoWSAttemptModels(derivedResolved, explicitResourceID)
 	attemptedResources := make([]string, 0, len(tryResolved))
 	attemptErrors := make([]error, 0, len(tryResolved))
 
@@ -500,10 +500,7 @@ func extractDoubaoWSFlag4Payload(payload []byte) (int32, string, []byte, error) 
 	return marker, requestID, body, nil
 }
 
-func buildDoubaoPublicFallbackModel(resolved resolvedTTSModel, voice string) *resolvedTTSModel {
-	if isDoubaoCloneVoice(voice) {
-		return nil
-	}
+func buildDoubaoPublicFallbackModel(resolved resolvedTTSModel) *resolvedTTSModel {
 	switch resolved.ResourceID {
 	case resourceSeedTTS10:
 		fallback := resolvedTTSModel{
@@ -526,7 +523,7 @@ func buildDoubaoPublicFallbackModel(resolved resolvedTTSModel, voice string) *re
 	}
 }
 
-func buildDoubaoWSAttemptModels(derived resolvedTTSModel, explicitResourceID, voice string) []resolvedTTSModel {
+func buildDoubaoWSAttemptModels(derived resolvedTTSModel, explicitResourceID string) []resolvedTTSModel {
 	models := make([]resolvedTTSModel, 0, 3)
 	seen := map[string]struct{}{}
 	push := func(candidate resolvedTTSModel) {
@@ -544,7 +541,7 @@ func buildDoubaoWSAttemptModels(derived resolvedTTSModel, explicitResourceID, vo
 		push(override)
 	}
 	push(derived)
-	if fallback := buildDoubaoPublicFallbackModel(derived, voice); fallback != nil {
+	if fallback := buildDoubaoPublicFallbackModel(derived); fallback != nil {
 		push(*fallback)
 	}
 	return models

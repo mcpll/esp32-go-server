@@ -51,15 +51,11 @@ func TestResolveDoubaoTTSModelDefaults(t *testing.T) {
 }
 
 func TestResolveDoubaoTTSModelCloneVoice(t *testing.T) {
-	got, err := resolveDoubaoTTSModel("", "ICL_demo_voice")
-	if err != nil {
-		t.Fatalf("resolveDoubaoTTSModel clone error = %v", err)
+	if _, err := resolveDoubaoTTSModel("", "ICL_demo_voice"); err == nil {
+		t.Fatal("expected clone voice to be rejected")
 	}
-	if got.ResourceID != resourceSeedICL10 {
-		t.Fatalf("ResourceID = %q", got.ResourceID)
-	}
-	if got.ConfigModel != modelSeedICL10 {
-		t.Fatalf("ConfigModel = %q", got.ConfigModel)
+	if _, err := resolveDoubaoTTSModel("seed-icl-1.0", "BV001_streaming"); err == nil {
+		t.Fatal("expected clone model to be rejected")
 	}
 }
 
@@ -102,19 +98,13 @@ func TestResolveDoubaoTTSModelUpgradesLegacyTTS10ForBigTTSVoice(t *testing.T) {
 	}
 }
 
-func TestResolveDoubaoTTSModelRejectsPublicVoiceWithICL(t *testing.T) {
-	if _, err := resolveDoubaoTTSModel(modelSeedICL10, "BV001_streaming"); err == nil {
-		t.Fatal("expected public voice with ICL model to fail")
-	}
-}
-
 func TestBuildDoubaoWSAttemptModelsWithExplicitResourceAddsFallback(t *testing.T) {
 	derived, err := resolveDoubaoTTSModel(modelSeedTTS20Standard, "zh_female_vv_uranus_bigtts")
 	if err != nil {
 		t.Fatalf("resolveDoubaoTTSModel error = %v", err)
 	}
 
-	got := buildDoubaoWSAttemptModels(derived, "TTS-SeedTTS2.02000000628041826146", "zh_female_vv_uranus_bigtts")
+	got := buildDoubaoWSAttemptModels(derived, "TTS-SeedTTS2.02000000628041826146")
 	if len(got) != 3 {
 		t.Fatalf("attempt model len = %d", len(got))
 	}

@@ -20,8 +20,6 @@ import (
 func main() {
 	// 解析命令行参数
 	configFile := flag.String("c", defaultConfigFilePath, "配置文件路径")
-	managerEnable := flag.Bool("manager-enable", defaultManagerEnable, "是否启用内嵌 manager")
-	managerConfig := flag.String("manager-config", "", "manager 配置文件路径，启用时可选，默认 manager/backend/config/config.json")
 	asrEnable := flag.Bool("asr-enable", defaultAsrEnable, "是否启用内嵌 asr_server")
 	asrConfig := flag.String("asr-config", "", "asr_server 配置文件路径，启用时可选，默认 asr_server/config.json")
 	flag.Parse()
@@ -31,10 +29,6 @@ func main() {
 		return
 	}
 
-	// 先启动 manager，再 Init，否则 Init 里 updateConfigFromAPI 会一直连不上 manager 导致卡死
-	if *managerEnable {
-		StartManagerHTTP(*managerConfig)
-	}
 	if *asrEnable {
 		StartAsrServerHTTP(*asrConfig)
 	}
@@ -140,9 +134,6 @@ func main() {
 
 	// 停止周期性配置更新服务
 	StopPeriodicConfigUpdate()
-	if *managerEnable {
-		StopManagerHTTP()
-	}
 	if *asrEnable {
 		StopAsrServerHTTP()
 	}

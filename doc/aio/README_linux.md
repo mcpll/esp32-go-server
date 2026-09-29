@@ -14,7 +14,6 @@ xiaozhi_server-linux-amd64-<version>/
 │       ├── libsherpa-onnx-cxx-api.so
 │       └── libonnxruntime.so   # ONNX Runtime 依赖库
 ├── main_config.yaml            # 主配置文件
-├── manager.json                # 管理后台配置
 ├── asr_server.json             # ASR 服务配置
 ├── models/                     # 模型文件目录
 ├── data/                       # 数据目录
@@ -81,7 +80,6 @@ nohup ./xiaozhi_server > logs/output.log 2>&1 &
 
 | 端口 | 配置来源 | 说明 |
 |------|----------|------|
-| **8080** | `manager.json` → `server.port` | **管理后台**：Web 控制台 + HTTP API |
 | **8989** | `main_config.yaml` → `websocket.port` | **主服务 WebSocket**：设备/客户端连接 |
 | **9000** | `asr_server.json` → `server.port` | **ASR/声纹服务**：语音识别内部接口 |
 | **2883** | 控制台配置 | **MQTT 服务**：设备 MQTT 连接 |
@@ -89,11 +87,6 @@ nohup ./xiaozhi_server > logs/output.log 2>&1 &
 | **6060** | 控制台配置 | **pprof**：性能分析（默认关闭） |
 
 ## 访问地址
-
-### 管理后台
-
-- **本地访问**：`http://localhost:8080/`
-- **局域网访问**：`http://<服务器IP>:8080/`
 
 ### 设备/客户端连接
 
@@ -109,18 +102,12 @@ nohup ./xiaozhi_server > logs/output.log 2>&1 &
 
 | 端口 | 配置文件 | 配置项 |
 |------|----------|--------|
-| 8080 | `manager.json` | `server.port` |
 | 8989 | `main_config.yaml` | `websocket.port` |
 | 9000 | `asr_server.json` | `server.port` |
 
-### 控制台配置
+### 其他配置
 
-以下端口及所有其他配置通过管理后台控制台进行变更：
-
-- **端口配置**：MQTT (2883)、UDP (8990)、pprof (6060)
-- **功能配置**：LLM、TTS、ASR、声纹识别等
-- 访问 `http://localhost:8080/` 进入管理后台
-- 配置变更实时生效，无需重启服务
+MQTT、UDP、pprof 以及 LLM、TTS、ASR 写在 `main_config.yaml`。改端口后需要重启。
 
 ## 生产环境部署（systemd）
 
@@ -168,13 +155,11 @@ sudo journalctl -u xiaozhi -f
 
 ```bash
 # Ubuntu/Debian (ufw)
-sudo ufw allow 8080/tcp  # 管理后台
 sudo ufw allow 8989/tcp  # WebSocket
 sudo ufw allow 2883/tcp  # MQTT
 sudo ufw allow 8990/udp  # UDP
 
 # CentOS/RHEL (firewalld)
-sudo firewall-cmd --permanent --add-port=8080/tcp
 sudo firewall-cmd --permanent --add-port=8989/tcp
 sudo firewall-cmd --permanent --add-port=2883/tcp
 sudo firewall-cmd --permanent --add-port=8990/udp
