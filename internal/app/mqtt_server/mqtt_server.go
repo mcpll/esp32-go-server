@@ -20,7 +20,7 @@ var (
 	serverMu      sync.Mutex
 )
 
-// StartMqttServer 启动 MQTT 服务器（可被 StopMqttServer 后再次调用以热更）
+// StartMqttServer starts the MQTT server (can be called again after StopMqttServer for hot reload)
 func StartMqttServer() error {
 	serverMu.Lock()
 	defer serverMu.Unlock()
@@ -32,7 +32,7 @@ func StartMqttServer() error {
 	})
 
 	if err := srv.AddHook(&AuthHook{}, nil); err != nil {
-		log.Errorf("添加 AuthHook 失败: %v", err)
+		log.Errorf("Failed to add AuthHook: %v", err)
 		return err
 	}
 	deviceHook := &DeviceHook{
@@ -46,7 +46,7 @@ func StartMqttServer() error {
 		},
 	}
 	if err := srv.AddHook(deviceHook, nil); err != nil {
-		log.Errorf("添加 DeviceHook 失败: %v", err)
+		log.Errorf("Failed to add DeviceHook: %v", err)
 		return err
 	}
 
@@ -55,7 +55,7 @@ func StartMqttServer() error {
 		keyFile := viper.GetString("mqtt_server.tls.key")
 		cert, err := tls.LoadX509KeyPair(pemFile, keyFile)
 		if err != nil {
-			log.Errorf("加载证书失败: %v", err)
+			log.Errorf("Failed to load certificate: %v", err)
 			return err
 		}
 		tlsConfig := &tls.Config{Certificates: []tls.Certificate{cert}}
@@ -81,17 +81,17 @@ func StartMqttServer() error {
 	}
 
 	currentServer = srv
-	log.Infof("MQTT 服务器启动，监听 %s 地址...", address)
+	log.Infof("MQTT server starting, listening on %s...", address)
 	go func() {
-		// Serve() 在库内启动 listener 协程后即返回，不会阻塞，故不在此处清 currentServer
+		// Serve() returns after starting listener goroutines and does not block, so do not clear currentServer here
 		if err := srv.Serve(); err != nil {
-			log.Warnf("MQTT Server Serve 退出: %v", err)
+			log.Warnf("MQTT Server Serve exited: %v", err)
 		}
 	}()
 	return nil
 }
 
-// StopMqttServer 停止当前 MQTT 服务器，便于热更后重新 StartMqttServer
+// StopMqttServer stops the current MQTT server so StartMqttServer can run again after hot reload
 func StopMqttServer() error {
 	log.Infof("enter StopMqttServer ")
 	defer log.Infof("exit StopMqttServer ")
@@ -101,12 +101,12 @@ func StopMqttServer() error {
 	if srv == nil {
 		return nil
 	}
-	// 将 Close 纳入同一临界区，避免并发 Stop 对同一实例重复调用 Close。
+	// keep Close in the same critical section so concurrent Stop cannot Close the same instance twice.
 	if err := srv.Close(); err != nil {
 		log.Warnf("StopMqttServer Close: %v", err)
 		return err
 	}
 	currentServer = nil
-	log.Info("MQTT 服务器已停止")
+	log.Info("MQTT server stopped")
 	return nil
 }

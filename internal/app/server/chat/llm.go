@@ -32,7 +32,7 @@ const (
 	McpReadResourceStreamDoneFlag = "[DONE]"
 )
 
-// Context key 类型用于避免冲突
+// Context key type to avoid collisions
 type contextKey int
 
 const (
@@ -53,7 +53,7 @@ const (
 	interruptContentSuffix = " [用户打断]"
 )
 
-// GetLastMessageID 获取最近保存的消息的 MessageID（用于两阶段保存）
+// GetLastMessageID returns the MessageID of the last saved message (two-phase save)
 func (l *LLMManager) GetLastMessageID(role string) (string, bool) {
 	l.lastMessageIDMu.RLock()
 	defer l.lastMessageIDMu.RUnlock()
@@ -95,9 +95,9 @@ func (l *LLMManager) finishTTSTurnWithReason(ctx context.Context, stopErr error,
 	}
 
 	if result.suppressProtocolTtsStop {
-		// 媒体工具会等待播放完成后再回到这里收尾，此时仍需补发协议级 tts_stop，
-		// 否则客户端会停留在“说话中”状态。
-		log.Debugf("媒体输出已完成，沿用常规 TTS 收尾发送 tts stop")
+		// Media tools wait for playback to finish before returning here; still need a protocol-level tts_stop,
+		// otherwise the client stays in the "speaking" state.
+		log.Debugf("Media output finished, send tts stop via normal TTS teardown")
 	}
 
 	l.ttsManager.EnqueueTtsStopWithReason(ctx, reason)
@@ -276,10 +276,10 @@ type LLMManager struct {
 
 	llmResponseQueue *util.Queue[LLMResponseChannelItem]
 
-	// 存储最近保存的消息的 MessageID（用于两阶段保存）
+	// Stores the MessageID of the last saved message (two-phase save)
 	// key: role (user/assistant), value: MessageID
 	lastMessageID   map[string]string
-	lastMessageIDMu sync.RWMutex // 保护 lastMessageID 的并发访问
+	lastMessageIDMu sync.RWMutex // Guards concurrent access to lastMessageID
 }
 
 func NewLLMManager(clientState *ClientState, serverTransport *ServerTransport, ttsManager *TTSManager, session *ChatSession, transformRegistry *streamtransform.Registry) *LLMManager {
@@ -321,14 +321,14 @@ func (l *LLMManager) emitLLMOutputRaw(ctx context.Context, data chathooks.LLMOut
 	return l.session.hookHub.EmitLLMOutputRaw(l.session.hookContext(ctx), data)
 }
 
-// handleLLMWithContextAndTools 使用上下文控制来处理LLM响应（兼容带工具和不带工具）
-// 内部自动管理 LLM 资源的获取和释放
+// handleLLMWithContextAndTools handles LLM responses with context control (with or without tools)
+// Internally manages LLM resource acquire/release
 func (l *LLMManager) handleLLMWithContextAndTools(
 	ctx context.Context,
 	dialogue []*schema.Message,
 	tools []*schema.ToolInfo,
 ) (chan llm_common.LLMResponseStruct, error) {
-	// 获取 LLM 资源
+	// Acquire LLM resource
 	llmWrapper, err := pool.Acquire[llm.LLMProvider](
 		"llm",
 		l.clientState.DeviceConfig.Llm.Provider,
@@ -338,10 +338,10 @@ func (l *LLMManager) handleLLMWithContextAndTools(
 		return nil, fmt.Errorf("获取LLM资源失败: %w", err)
 	}
 
-	// 获取 provider
+	// Get provider
 	llmProvider := llmWrapper.GetProvider()
 
-	// 调用 LLM provider
+	// Call LLM provider
 	msgChan := llmProvider.ResponseWithContext(ctx, l.clientState.SessionID, dialogue, tools)
 
 	pipeline, err := l.openOutputPipeline(ctx)
@@ -350,23 +350,23 @@ func (l *LLMManager) handleLLMWithContextAndTools(
 		return nil, fmt.Errorf("创建LLM输出流变换管线失败: %w", err)
 	}
 
-	// 创建响应 channel
+	// Create response channel
 	responseChannel := make(chan llm_common.LLMResponseStruct, 2)
 	startTs := time.Now().UnixMilli()
 	var firstSegment bool
 	var rawFullText strings.Builder
 
-	// 启动 goroutine 处理响应
+	// Start goroutine to handle the response
 	go func() {
 		defer func() {
 			log.Debugf("full Response with %d tools, fullText: %s", len(tools), rawFullText.String())
 			close(responseChannel)
 			if closeErr := pipeline.Close(); closeErr != nil {
-				log.Warnf("关闭 LLM 输出流变换管线失败: %v", closeErr)
+				log.Warnf("Failed to close LLM output stream transform pipeline: %v", closeErr)
 			}
-			// 释放资源
+			// Release resource
 			pool.Release(llmWrapper)
-			log.Debugf("LLM资源已释放")
+			log.Debugf("LLM resource released")
 		}()
 
 		isFirstOutput := true
@@ -393,7 +393,7 @@ func (l *LLMManager) handleLLMWithContextAndTools(
 						if l.clientState.MarkLlmFirstSentenceAt(firstSentenceTs) && l.session != nil {
 							l.session.TraceLlmFirstSentence(ctx, firstSentenceTs)
 						}
-						log.Infof("耗时统计: llm首句: %d ms", firstSentenceTs-startTs)
+						log.Infof("Latency stats: LLM first sentence: %d ms", firstSentenceTs-startTs)
 					}
 					if isFirstOutput {
 						isFirstOutput = false
@@ -409,7 +409,7 @@ func (l *LLMManager) handleLLMWithContextAndTools(
 
 			select {
 			case <-ctx.Done():
-				log.Infof("上下文已取消，停止LLM响应处理: %v, context done, exit", ctx.Err())
+				log.Infof("Context canceled, stop LLM response handling: %v, context done, exit", ctx.Err())
 				return false
 			case responseChannel <- response:
 				return true
@@ -437,10 +437,10 @@ func (l *LLMManager) handleLLMWithContextAndTools(
 				Err:      errVal,
 			})
 			if hookErr != nil {
-				log.Warnf("LLM_OUTPUT_RAW hook 执行失败: %v", hookErr)
+				log.Warnf("LLM_OUTPUT_RAW hook failed: %v", hookErr)
 			}
 			if stop {
-				log.Infof("LLM_OUTPUT_RAW hook 请求停止当前流程")
+				log.Infof("LLM_OUTPUT_RAW hook requested stopping current flow")
 				return true, nil
 			}
 			if payload.Delta != "" {
@@ -459,10 +459,10 @@ func (l *LLMManager) handleLLMWithContextAndTools(
 				ToolCalls: toolCalls,
 			})
 			if hookErr != nil {
-				log.Warnf("LLM_OUTPUT_RAW hook 执行失败: %v", hookErr)
+				log.Warnf("LLM_OUTPUT_RAW hook failed: %v", hookErr)
 			}
 			if stop {
-				log.Infof("LLM_OUTPUT_RAW hook 请求停止当前流程")
+				log.Infof("LLM_OUTPUT_RAW hook requested stopping current flow")
 				return true, nil
 			}
 			if len(payload.ToolCalls) == 0 {
@@ -477,13 +477,13 @@ func (l *LLMManager) handleLLMWithContextAndTools(
 		for {
 			select {
 			case <-ctx.Done():
-				log.Infof("上下文已取消，停止LLM响应处理: %v, context done, exit", ctx.Err())
+				log.Infof("Context canceled, stop LLM response handling: %v, context done, exit", ctx.Err())
 				return
 			case message, ok := <-msgChan:
 				if !ok {
 					stop, pushErr := pushRawText("", true, nil)
 					if pushErr != nil {
-						log.Errorf("处理 LLM 结束流失败: %v", pushErr)
+						log.Errorf("Failed to handle LLM end stream: %v", pushErr)
 					}
 					if stop || pushErr != nil {
 						return
@@ -495,10 +495,10 @@ func (l *LLMManager) handleLLMWithContextAndTools(
 				}
 				if llm.IsLLMErrorMessage(message) {
 					errMsg := llm.LLMErrorMessage(message)
-					log.Warnf("LLM 返回错误: %s", errMsg)
+					log.Warnf("LLM returned error: %s", errMsg)
 					stop, pushErr := pushRawText(errMsg, true, nil)
 					if pushErr != nil {
-						log.Errorf("处理 LLM 错误输出失败: %v", pushErr)
+						log.Errorf("Failed to handle LLM error output: %v", pushErr)
 					}
 					if stop || pushErr != nil {
 						return
@@ -516,7 +516,7 @@ func (l *LLMManager) handleLLMWithContextAndTools(
 					}
 					stop, pushErr := pushRawText(message.Content, false, nil)
 					if pushErr != nil {
-						log.Errorf("处理 LLM 文本流失败: %v", pushErr)
+						log.Errorf("Failed to handle LLM text stream: %v", pushErr)
 						return
 					}
 					if stop {
@@ -524,10 +524,10 @@ func (l *LLMManager) handleLLMWithContextAndTools(
 					}
 				}
 				if len(message.ToolCalls) > 0 {
-					log.Infof("处理工具调用: %+v", message.ToolCalls)
+					log.Infof("Handling tool call: %+v", message.ToolCalls)
 					stop, pushErr := pushRawToolCalls(message.ToolCalls)
 					if pushErr != nil {
-						log.Errorf("处理 LLM 工具流失败: %v", pushErr)
+						log.Errorf("Failed to handle LLM tool stream: %v", pushErr)
 						return
 					}
 					if stop {
@@ -547,12 +547,12 @@ func (l *LLMManager) Start(ctx context.Context) {
 
 func (l *LLMManager) processLLMResponseQueue(ctx context.Context) {
 	for {
-		item, err := l.llmResponseQueue.Pop(ctx, 0) // 阻塞式
+		item, err := l.llmResponseQueue.Pop(ctx, 0) // Blocking
 		if err != nil {
 			if err == util.ErrQueueCtxDone {
 				return
 			}
-			// 其他错误
+			// Other errors
 			continue
 		}
 
@@ -561,7 +561,7 @@ func (l *LLMManager) processLLMResponseQueue(ctx context.Context) {
 			item.onStartFunc()
 		}
 
-		// 调用 handleLLMResponse，它会从 context 中获取 fullText 和 toolCalls 并填充
+		// Call handleLLMResponse; it fills fullText and toolCalls from context
 		result, err := l.handleLLMResponse(item.ctx, item.userMessage, item.responseChan)
 		if waitErr := waitForTTSTurnDrainIfRoot(item.ctx); err == nil && waitErr != nil {
 			err = waitErr
@@ -668,16 +668,16 @@ func (l *LLMManager) handleLLMResponseChannelAsync(ctx context.Context, userMess
 		needSendTtsCmd = false
 	}
 
-	// 在 context 中初始化或复用 fullText（用于聊天历史）
-	// 如果 context 中已有 fullText（工具调用后继续LLM请求），则复用；否则创建新的
+	// Init or reuse fullText in context (for chat history)
+	// If context already has fullText (LLM continue after tools), reuse; else create new
 	var fullText *strings.Builder
 	if existingFullText, ok := ctx.Value(fullTextKey).(*strings.Builder); ok && existingFullText != nil {
 		fullText = existingFullText
-		log.Debugf("复用已有的 fullText，当前长度: %d", fullText.Len())
+		log.Debugf("Reusing existing fullText, current length: %d", fullText.Len())
 	} else {
 		fullText = &strings.Builder{}
 		ctx = context.WithValue(ctx, fullTextKey, fullText)
-		log.Debugf("创建新的 fullText")
+		log.Debugf("Creating new fullText")
 	}
 
 	var onStartFunc func(...any)
@@ -685,12 +685,12 @@ func (l *LLMManager) handleLLMResponseChannelAsync(ctx context.Context, userMess
 
 	if needSendTtsCmd {
 		onStartFunc = func(...any) {
-			// 判断是否为首次LLM调用（通过context的nest值），仅首次调用时清空TTS音频缓存
+			// Detect first LLM call via context nest; clear TTS audio cache only on first call
 			val := ctx.Value("nest")
 			if nest, ok := val.(int); !ok || nest <= 1 {
-				// 首次调用或没有nest值，清空TTS音频缓存
+				// First call or no nest value: clear TTS audio cache
 				l.ttsManager.ClearAudioHistory()
-				log.Debugf("onStartFunc 首次调用，已清空TTS音频缓存")
+				log.Debugf("onStartFunc first call, TTS audio cache cleared")
 			}
 			l.ttsManager.EnqueueTtsStartWithReason(ctx, "LLMManager.handleLLMResponseChannelAsync onStart")
 		}
@@ -704,37 +704,37 @@ func (l *LLMManager) handleLLMResponseChannelAsync(ctx context.Context, userMess
 
 			l.finishTTSTurnWithReason(ctx, err, handleResult, "LLMManager.handleLLMResponseChannelAsync onEnd")
 
-			// 从 closure 中获取 fullText
+			// Get fullText from closure
 			audioData := l.ttsManager.GetAndClearAudioHistory()
 
-			// 计算总音频大小（所有帧的字节数之和）
+			// Compute total audio size (sum of all frame byte lengths)
 			audioSize := 0
 			for _, frame := range audioData {
 				audioSize += len(frame)
 			}
 
-			// 只有在首次调用（nest<=1）时才发送事件
+			// Send event only on the first call (nest<=1)
 			if nest <= 1 {
-				// 从 LLMManager 中获取 MessageID（Assistant 角色）
-				// 如果没有找到 MessageID，说明第一阶段保存未完成，不进行第二阶段更新
+				// Get MessageID from LLMManager (Assistant role)
+				// If MessageID is missing, phase-1 save is incomplete; skip phase-2 update
 				messageID, ok := l.GetLastMessageID(string(schema.Assistant))
 				if !ok {
-					log.Warnf("TTS 完成时未找到 MessageID，跳过第二阶段音频更新")
+					log.Warnf("MessageID not found when TTS finished, skip second-stage audio update")
 					return
 				}
 
-				// 发布事件：第二阶段（更新音频）
+				// Publish event: phase 2 (update audio)
 				assistantMsg := schema.AssistantMessage(strFullText, nil)
 				eventbus.Get().Publish(eventbus.TopicAddMessage, &eventbus.AddMessageEvent{
 					ClientState: l.clientState,
 					Msg:         *assistantMsg,
 					MessageID:   messageID,
-					AudioData:   audioData, // 第二阶段：有音频
+					AudioData:   audioData, // Phase 2: with audio
 					AudioSize:   audioSize,
 					SampleRate:  l.clientState.OutputAudioFormat.SampleRate,
 					Channels:    l.clientState.OutputAudioFormat.Channels,
 					Timestamp:   time.Now(),
-					IsUpdate:    true, // 更新消息
+					IsUpdate:    true, // Update message
 				})
 			}
 		}
@@ -753,7 +753,7 @@ func (l *LLMManager) handleLLMResponseChannelAsync(ctx context.Context, userMess
 
 	err := l.llmResponseQueue.Push(item)
 	if err != nil {
-		log.Warnf("llmResponseQueue 已满或已关闭, 丢弃消息")
+		log.Warnf("llmResponseQueue full or closed, drop message")
 		return fmt.Errorf("llmResponseQueue 已满或已关闭, 丢弃消息")
 	}
 	return nil
@@ -773,24 +773,24 @@ func (l *LLMManager) HandleLLMResponseChannelSync(ctx context.Context, userMessa
 		}
 	}
 
-	// 在 context 中初始化或复用 fullText（用于聊天历史）
-	// 如果 context 中已有 fullText（工具调用后继续LLM请求），则复用；否则创建新的
+	// Init or reuse fullText in context (for chat history)
+	// If context already has fullText (LLM continue after tools), reuse; else create new
 	var fullText *strings.Builder
 	if existingFullText, ok := ctx.Value(fullTextKey).(*strings.Builder); ok && existingFullText != nil {
 		fullText = existingFullText
-		log.Debugf("复用已有的 fullText，当前长度: %d", fullText.Len())
+		log.Debugf("Reusing existing fullText, current length: %d", fullText.Len())
 	} else {
 		fullText = &strings.Builder{}
 		ctx = context.WithValue(ctx, fullTextKey, fullText)
-		log.Debugf("创建新的 fullText")
+		log.Debugf("Creating new fullText")
 	}
 
 	if needSendTtsCmd {
-		// 判断是否为首次LLM调用（通过context的nest值），仅首次调用时清空TTS音频缓存
+		// Detect first LLM call via context nest; clear TTS audio cache only on first call
 		if nest <= 1 {
-			// 首次调用或没有nest值，清空TTS音频缓存
+			// First call or no nest value: clear TTS audio cache
 			l.ttsManager.ClearAudioHistory()
-			log.Debugf("HandleLLMResponseChannelSync 首次调用，已清空TTS音频缓存")
+			log.Debugf("HandleLLMResponseChannelSync first call, TTS audio cache cleared")
 		}
 		l.ttsManager.EnqueueTtsStartWithReason(ctx, "LLMManager.HandleLLMResponseChannelSync start")
 	}
@@ -808,34 +808,34 @@ func (l *LLMManager) HandleLLMResponseChannelSync(ctx context.Context, userMessa
 	if needSendTtsCmd {
 		l.finishTTSTurnWithReason(ctx, err, result, "LLMManager.HandleLLMResponseChannelSync end")
 
-		// 收集TTS音频并发送聊天历史事件
-		// 注意：工具调用后的LLM响应（nest > 1）也会累积音频到缓存中，但不会清空
-		// 只有在首次调用（nest<=1）时才清空缓存并发送事件
+		// Collect TTS audio and send chat-history event
+		// Note: LLM responses after tools (nest > 1) also accumulate audio but do not clear the cache
+		// Clear cache and send event only on the first call (nest<=1)
 		audioData := l.ttsManager.GetAndClearAudioHistory()
 
-		// 计算总音频大小（所有帧的字节数之和）
+		// Compute total audio size (sum of all frame byte lengths)
 		audioSize := 0
 		for _, frame := range audioData {
 			audioSize += len(frame)
 		}
 
-		// 只有在首次调用（nest<=1）时才发送事件
+		// Send event only on the first call (nest<=1)
 		if nest <= 1 {
-			// 从 LLMManager 中获取 MessageID（Assistant 角色）
-			// 如果没有找到 MessageID，说明第一阶段保存未完成，不进行第二阶段更新
+			// Get MessageID from LLMManager (Assistant role)
+			// If MessageID is missing, phase-1 save is incomplete; skip phase-2 update
 			messageID, ok := l.GetLastMessageID(string(schema.Assistant))
 			if !ok {
-				log.Warnf("TTS 完成时未找到 MessageID，跳过第二阶段音频更新")
+				log.Warnf("MessageID not found when TTS finished, skip second-stage audio update")
 				return result.ok, err
 			}
 
-			// 发布事件：第二阶段（更新音频）
+			// Publish event: phase 2 (update audio)
 			assistantMsg := schema.AssistantMessage(strFullText, nil)
 			eventbus.Get().Publish(eventbus.TopicAddMessage, &eventbus.AddMessageEvent{
 				ClientState: l.clientState,
 				Msg:         *assistantMsg,
 				MessageID:   messageID,
-				AudioData:   audioData, // 第二阶段：有音频
+				AudioData:   audioData, // Phase 2: with audio
 				AudioSize:   audioSize,
 				SampleRate:  l.clientState.OutputAudioFormat.SampleRate,
 				Channels:    l.clientState.OutputAudioFormat.Channels,
@@ -843,23 +843,23 @@ func (l *LLMManager) HandleLLMResponseChannelSync(ctx context.Context, userMessa
 			})
 		}
 	} else {
-		// nest > 1 的情况：虽然不发送TTS命令，但音频数据仍然会累积到缓存中
-		// 这些音频会在首次响应结束时（nest <= 1）一起收集
-		log.Debugf("工具调用后的LLM响应（nest=%d），音频数据将累积到缓存中", nest)
+		// When nest > 1: TTS commands are not sent, but audio still accumulates in the cache
+		// That audio is collected together when the first response ends (nest <= 1)
+		log.Debugf("LLM response after tool call (nest=%d), audio will accumulate in cache", nest)
 	}
 
 	return result.ok, err
 }
 
-// handleLLMResponse 处理LLM响应
+// handleLLMResponse handles the LLM response
 func (l *LLMManager) handleLLMResponse(ctx context.Context, userMessage *schema.Message, llmResponseChannel chan llm_common.LLMResponseStruct) (llmHandleResult, error) {
 	log.Debugf("handleLLMResponse start")
 	defer log.Debugf("handleLLMResponse end")
 
-	// 从 context 中获取 fullText（用于聊天历史）
+	// Get fullText from context (for chat history)
 	fullText := ctx.Value(fullTextKey).(*strings.Builder)
 	state := l.clientState
-	// toolCalls 使用局部变量（内部工具调用逻辑，不涉及聊天历史）
+	// toolCalls is local (internal tool-call logic; not chat history)
 	var toolCalls []schema.ToolCall
 	toolExecCtx := context.WithValue(ctx, "nest", 2)
 	toolExecCtx = context.WithValue(toolExecCtx, fullTextKey, fullText)
@@ -897,7 +897,7 @@ func (l *LLMManager) handleLLMResponse(ctx context.Context, userMessage *schema.
 			interruptStageExtraKey: "llm",
 		}
 		if err := l.AddLlmMessage(ctx, msg); err != nil {
-			log.Errorf("保存打断助手消息失败: %v", err)
+			log.Errorf("Failed to save interrupted assistant message: %v", err)
 			return
 		}
 		assistantSaved = true
@@ -914,37 +914,37 @@ func (l *LLMManager) handleLLMResponse(ctx context.Context, userMessage *schema.
 	for {
 		select {
 		case <-ctx.Done():
-			// 上下文已取消，优先处理取消逻辑
+			// Context canceled; handle cancel first
 			saveInterruptedAssistant()
-			log.Infof("%s 上下文已取消，停止处理LLM响应, context done, exit", state.DeviceID)
+			log.Infof("%s context canceled, stop processing LLM response, context done, exit", state.DeviceID)
 			return result, nil
 		default:
-			// 非阻塞检查，如果ctx没有Done，继续处理LLM响应
+			// Non-blocking check; if ctx is not Done, continue handling the LLM response
 			select {
 			case llmResponse, ok := <-llmResponseChannel:
 				if !ok {
-					// 通道已关闭，退出协程
-					log.Infof("LLM 响应通道已关闭，退出协程")
+					// Channel closed; exit goroutine
+					log.Infof("LLM response channel closed, exit goroutine")
 					result.ok = true
 					return result, nil
 				}
 				if ctx.Err() != nil {
 					saveInterruptedAssistant()
-					log.Infof("%s LLM分片到达时上下文已取消，丢弃晚到响应并退出", state.DeviceID)
+					log.Infof("%s LLM chunk arrived after context canceled, drop late response and exit", state.DeviceID)
 					return result, nil
 				}
 
-				log.Debugf("LLM 响应: %+v", llmResponse)
+				log.Debugf("LLM response: %+v", llmResponse)
 
 				if len(llmResponse.ToolCalls) > 0 {
-					log.Debugf("获取到工具: %+v", llmResponse.ToolCalls)
+					log.Debugf("Got tools: %+v", llmResponse.ToolCalls)
 					toolCalls = append(toolCalls, llmResponse.ToolCalls...)
 					toolExecutor.Submit(llmResponse.ToolCalls)
 				}
 
 				hasText := strings.TrimSpace(llmResponse.Text) != ""
 				if hasText || llmResponse.IsStart || llmResponse.IsEnd {
-					// 双流式收尾依赖空文本的 IsEnd 信号，不能只在有文本时才传给 TTS。
+					// Dual-stream wrap-up needs an empty-text IsEnd; do not pass to TTS only when text is present.
 					if err := l.ttsManager.handleTextResponseWithHooks(ctx, llmResponse, false, onTTSItemEnqueued, onTTSPlaybackStart); err != nil {
 						result.ok = true
 						return result, err
@@ -956,24 +956,24 @@ func (l *LLMManager) handleLLMResponse(ctx context.Context, userMessage *schema.
 
 				if llmResponse.IsEnd {
 					if len(toolCalls) == 0 {
-						//写到redis中
+						// Write to Redis
 						if userMessage != nil {
 							if userMessage.Role == schema.User {
-								// 检查用户消息是否已经保存过（ASR 处理时已经保存）
-								// 通过检查最后一条消息是否是用户消息且内容匹配来判断
+								// Check whether the user message was already saved (saved during ASR)
+								// Decide by whether the last message is a matching user message
 								/*messages := l.clientState.GetMessages(1)
 								shouldSave := true
 								if len(messages) > 0 {
 									lastMsg := messages[len(messages)-1]
 									if lastMsg.Role == schema.User && lastMsg.Content == userMessage.Content {
-										// 用户消息已经保存过了（ASR 处理时保存的），跳过
+										// User message already saved (during ASR); skip
 										shouldSave = false
-										log.Debugf("用户消息已在 ASR 处理时保存，跳过重复保存: %s", userMessage.Content)
+										log.Debugf("User message already saved during ASR handling, skip duplicate save: %s", userMessage.Content)
 									}
 								}
 								if shouldSave {
 									if err := l.AddLlmMessage(ctx, userMessage); err != nil {
-										log.Errorf("保存用户消息失败: %v", err)
+										log.Errorf("Failed to save user message: %v", err)
 									}
 								}*/
 							}
@@ -981,7 +981,7 @@ func (l *LLMManager) handleLLMResponse(ctx context.Context, userMessage *schema.
 						strFullText := fullText.String()
 						if strings.TrimSpace(strFullText) != "" || len(toolCalls) > 0 {
 							if err := l.AddLlmMessage(ctx, schema.AssistantMessage(strFullText, toolCalls)); err != nil {
-								log.Errorf("保存助手消息失败: %v", err)
+								log.Errorf("Failed to save assistant message: %v", err)
 							} else {
 								assistantSaved = true
 							}
@@ -990,7 +990,7 @@ func (l *LLMManager) handleLLMResponse(ctx context.Context, userMessage *schema.
 					if len(toolCalls) > 0 {
 						toolSummary, err := l.handleToolCallResponse(toolExecCtx, schema.AssistantMessage(fullText.String(), toolCalls), toolCalls, toolExecutor)
 						if err != nil {
-							log.Errorf("处理工具调用响应失败: %v", err)
+							log.Errorf("Failed to handle tool call response: %v", err)
 							result.ok = true
 							return result, fmt.Errorf("处理工具调用响应失败: %v", err)
 						}
@@ -1008,9 +1008,9 @@ func (l *LLMManager) handleLLMResponse(ctx context.Context, userMessage *schema.
 					return result, nil
 				}
 			case <-ctx.Done():
-				// 上下文已取消，退出协程
+				// Context canceled; exit goroutine
 				saveInterruptedAssistant()
-				log.Infof("%s 上下文已取消，停止处理LLM响应, context done, exit", state.DeviceID)
+				log.Infof("%s context canceled, stop processing LLM response, context done, exit", state.DeviceID)
 				return result, nil
 			}
 		}
@@ -1018,12 +1018,12 @@ func (l *LLMManager) handleLLMResponse(ctx context.Context, userMessage *schema.
 }
 
 func (l *LLMManager) DoLLmRequest(ctx context.Context, userMessage *schema.Message, einoTools []*schema.ToolInfo, isSync bool, speakerResult *speaker.IdentifyResult) error {
-	log.Debugf("发送带工具的 LLM 请求, seesionID: %s, requestEinoMessages: %+v", l.clientState.SessionID, userMessage)
+	log.Debugf("Sending LLM request with tools, seesionID: %s, requestEinoMessages: %+v", l.clientState.SessionID, userMessage)
 	clientState := l.clientState
 
 	l.einoTools = einoTools
 
-	//组装历史消息和当前用户的消息
+	// Assemble history and the current user message
 	requestMessages := l.GetMessages(ctx, userMessage, MaxMessageCount, speakerResult)
 
 	if l.session != nil {
@@ -1033,13 +1033,13 @@ func (l *LLMManager) DoLLmRequest(ctx context.Context, userMessage *schema.Messa
 			Tools:           einoTools,
 		})
 		if hookErr != nil {
-			log.Warnf("LLM_INPUT hook 执行失败: %v", hookErr)
+			log.Warnf("LLM_INPUT hook failed: %v", hookErr)
 		}
 		userMessage = payload.UserMessage
 		requestMessages = payload.RequestMessages
 		einoTools = payload.Tools
 		if stop {
-			log.Infof("LLM_INPUT hook 请求停止当前流程")
+			log.Infof("LLM_INPUT hook requested stopping current flow")
 			return nil
 		}
 	}
@@ -1050,100 +1050,100 @@ func (l *LLMManager) DoLLmRequest(ctx context.Context, userMessage *schema.Messa
 	}
 	clientState.SetStatus(ClientStatusLLMStart)
 
-	// 调用内部方法处理 LLM 响应，资源在方法内部管理
+	// Call internal method to handle LLM response; resources are managed inside
 	responseSentences, err := l.handleLLMWithContextAndTools(
 		ctx,
 		requestMessages,
 		einoTools,
 	)
 	if err != nil {
-		log.Errorf("发送带工具的 LLM 请求失败, seesionID: %s, error: %v", l.clientState.SessionID, err)
+		log.Errorf("Failed to send LLM request with tools, seesionID: %s, error: %v", l.clientState.SessionID, err)
 		return fmt.Errorf("发送带工具的 LLM 请求失败: %v", err)
 	}
 
-	log.Debugf("DoLLmRequest goroutine开始 - SessionID: %s, context状态: %v", l.clientState.SessionID, ctx.Err())
+	log.Debugf("DoLLmRequest goroutine started - SessionID: %s, context status: %v", l.clientState.SessionID, ctx.Err())
 
 	if isSync {
-		// 同步处理：资源会在 handleLLMWithContextAndTools 的 defer 中自动释放
+		// Sync path: resources are released in handleLLMWithContextAndTools defer
 		_, err := l.HandleLLMResponseChannelSync(ctx, userMessage, responseSentences, einoTools)
 		if err != nil {
-			log.Errorf("处理 LLM 响应失败, seesionID: %s, error: %v", l.clientState.SessionID, err)
+			log.Errorf("Failed to handle LLM response, seesionID: %s, error: %v", l.clientState.SessionID, err)
 			return err
 		}
 	} else {
-		// 异步处理：资源会在 handleLLMWithContextAndTools 的 defer 中自动释放
+		// Async path: resources are released in handleLLMWithContextAndTools defer
 		err = l.HandleLLMResponseChannelAsync(ctx, userMessage, responseSentences)
 		if err != nil {
-			log.Errorf("处理 LLM 响应失败, seesionID: %s, error: %v", l.clientState.SessionID, err)
+			log.Errorf("Failed to handle LLM response, seesionID: %s, error: %v", l.clientState.SessionID, err)
 		}
 	}
 
-	log.Debugf("DoLLmRequest 结束 - SessionID: %s", l.clientState.SessionID)
+	log.Debugf("DoLLmRequest finished - SessionID: %s", l.clientState.SessionID)
 
 	return nil
 }
 
-// AddMessage 添加消息到聊天历史（统一入口，适用于所有消息类型）
+// AddMessage adds a message to chat history (unified entry for all message types)
 func (l *LLMManager) AddMessage(ctx context.Context, msg *schema.Message) error {
 	if msg == nil {
-		log.Warnf("尝试添加 nil 消息到聊天历史")
+		log.Warnf("Tried to add nil message to chat history")
 		return fmt.Errorf("消息不能为 nil")
 	}
 
-	// 生成 MessageID（使用 MD5 哈希缩短长度，避免超过数据库 varchar(64) 限制）
-	// 原始格式：{SessionID}-{Role}-{Timestamp}
+	// Generate MessageID (MD5-shortened to fit DB varchar(64))
+	// Original format: {SessionID}-{Role}-{Timestamp}
 	rawMessageID := fmt.Sprintf("%s-%s-%d",
 		l.clientState.SessionID,
 		msg.Role,
 		time.Now().UnixMilli())
-	// 使用 MD5 哈希生成固定32字符的十六进制字符串
+	// Use MD5 to produce a fixed 32-char hex string
 	hash := md5.Sum([]byte(rawMessageID))
 	messageID := hex.EncodeToString(hash[:])
 
-	// 同步添加到内存中
+	// Add to in-memory store synchronously
 	l.clientState.AddMessage(msg)
 
-	// Tool 角色消息：直接保存，不涉及两阶段保存（无音频）
+	// Tool-role messages: save directly; no two-phase save (no audio)
 	if msg.Role == schema.Tool {
 		eventbus.Get().Publish(eventbus.TopicAddMessage, &eventbus.AddMessageEvent{
 			ClientState: l.clientState,
 			Msg:         *msg,
 			MessageID:   messageID,
-			AudioData:   nil, // Tool 角色无音频
+			AudioData:   nil, // Tool role has no audio
 			AudioSize:   0,
 			SampleRate:  0,
 			Channels:    0,
 			Timestamp:   time.Now(),
-			IsUpdate:    false, // 一次性保存
+			IsUpdate:    false, // Single-shot save
 		})
 		return nil
 	}
 
-	// User/Assistant 角色：两阶段保存
-	// 将 MessageID 存储到 LLMManager 中，供后续音频更新使用
+	// User/Assistant roles: two-phase save
+	// Store MessageID in LLMManager for later audio updates
 	if msg.Role == schema.User || msg.Role == schema.Assistant {
 		l.lastMessageIDMu.Lock()
 		l.lastMessageID[string(msg.Role)] = messageID
 		l.lastMessageIDMu.Unlock()
 	}
 
-	// 发布事件：第一阶段（仅文本，无音频）
+	// Publish event: phase 1 (text only, no audio)
 	eventbus.Get().Publish(eventbus.TopicAddMessage, &eventbus.AddMessageEvent{
 		ClientState: l.clientState,
 		Msg:         *msg,
 		MessageID:   messageID,
-		AudioData:   nil, // 第一阶段：无音频
+		AudioData:   nil, // Phase 1: no audio
 		AudioSize:   0,
 		SampleRate:  0,
 		Channels:    0,
 		Timestamp:   time.Now(),
-		IsUpdate:    false, // 新增消息
+		IsUpdate:    false, // New message
 	})
 
 	return nil
 }
 
-// AddLlmMessage 保持向后兼容，委托给 AddMessage
+// AddLlmMessage kept for backward compatibility; delegates to AddMessage
 func (l *LLMManager) AddLlmMessage(ctx context.Context, msg *schema.Message) error {
 	return l.AddMessage(ctx, msg)
 }
@@ -1152,7 +1152,7 @@ func (l *LLMManager) GetMessages(ctx context.Context, userMessage *schema.Messag
 	memoryMode := l.clientState.GetMemoryMode()
 	includeHistory := memoryMode != MemoryModeNone
 
-	// 从 dialogue 中获取上下文；none 模式下仅允许携带当前工具调用链的临时消息
+	// Build context from dialogue; in none mode only allow temp messages for the current tool-call chain
 	messageList := make([]*schema.Message, 0)
 	if includeHistory {
 		messageList = l.clientState.GetMessages(count)
@@ -1163,7 +1163,7 @@ func (l *LLMManager) GetMessages(ctx context.Context, userMessage *schema.Messag
 		messageList = toolRoundMessages
 	}
 
-	// 构建 system prompt
+	// Build system prompt
 	systemPrompt := l.clientState.SystemPrompt
 	globalSystemPrompt := strings.TrimSpace(viper.GetString("chat.global_system_prompt"))
 	if globalSystemPrompt != "" {
@@ -1174,7 +1174,7 @@ func (l *LLMManager) GetMessages(ctx context.Context, userMessage *schema.Messag
 		}
 	}
 
-	// 添加当前时间和日期信息
+	// Append current date/time
 	now := time.Now()
 	systemPrompt += fmt.Sprintf("\n当前时间和日期: %s %s", now.Format("2006年01月02日 15:04:05"), now.Format("Monday"))
 
@@ -1184,13 +1184,13 @@ func (l *LLMManager) GetMessages(ctx context.Context, userMessage *schema.Messag
 
 	log.Debugf("speakerResult: %+v, voiceIdentify: %+v", speakerResult, l.clientState.DeviceConfig.VoiceIdentify)
 
-	// 整合说话人识别结果到 systemPrompt
+	// Fold speaker recognition into systemPrompt
 	if speakerResult != nil && speakerResult.Identified {
-		// 根据 speakerResult 匹配 userConfig 中的 speakerGroup 信息
+		// Match speakerGroup in userConfig from speakerResult
 		if l.clientState.DeviceConfig.VoiceIdentify != nil {
-			// 优先使用 SpeakerName 匹配（VoiceIdentify 的 key 是 speakerGroup.Name）
+			// Prefer SpeakerName match (VoiceIdentify key is speakerGroup.Name)
 			if speakerGroupInfo, found := l.clientState.DeviceConfig.VoiceIdentify[speakerResult.SpeakerName]; found {
-				// 如果找到匹配的 speakerGroup，将描述整合到 systemPrompt
+				// If a matching speakerGroup is found, fold its description into systemPrompt
 				if speakerGroupInfo.Prompt != "" {
 					systemPrompt += fmt.Sprintf("\n基于声纹识别到对话人信息: \n%s", speakerGroupInfo.Prompt)
 				}
@@ -1202,9 +1202,9 @@ func (l *LLMManager) GetMessages(ctx context.Context, userMessage *schema.Messag
 	if memoryMode == MemoryModeLong && l.clientState.MemoryProvider != nil && userMessage != nil {
 		memoryContext, err := l.clientState.MemoryProvider.Search(ctx, l.clientState.GetDeviceIDOrAgentID(), userMessage.Content, 10, 180)
 		if err != nil {
-			log.Errorf("搜索记忆失败: %v", err)
+			log.Errorf("Failed to search memory: %v", err)
 		}
-		log.Debugf("搜索记忆成功, 输入内容: %s, 记忆内容: %s", userMessage.Content, memoryContext)
+		log.Debugf("Memory search succeeded, input: %s, memory: %s", userMessage.Content, memoryContext)
 		if memoryContext != "" {
 			systemPrompt += fmt.Sprintf("\n历史关联信息: \n%s", memoryContext)
 		}
@@ -1217,11 +1217,11 @@ func (l *LLMManager) GetMessages(ctx context.Context, userMessage *schema.Messag
 		Role:    schema.System,
 		Content: systemPrompt,
 	})
-	// 过滤掉空的assistant消息，避免发送给LLM API时出现400错误
-	// 空的assistant消息（Content为空且ToolCalls为空）会导致API错误
+	// Filter empty assistant messages to avoid 400 from the LLM API
+	// Empty assistant messages (no Content and no ToolCalls) cause API errors
 	for _, msg := range messageList {
 		if msg != nil && msg.Role == schema.Assistant && msg.Content == "" && len(msg.ToolCalls) == 0 {
-			log.Debugf("过滤掉空的assistant消息，避免发送给LLM API")
+			log.Debugf("Filter out empty assistant messages to avoid sending to LLM API")
 			continue
 		}
 		msgCopy := cloneMessageForRequest(msg)
@@ -1231,14 +1231,14 @@ func (l *LLMManager) GetMessages(ctx context.Context, userMessage *schema.Messag
 		retMessage = append(retMessage, msgCopy)
 	}
 	if userMessage != nil {
-		// 检查 retMessage 的最后一条消息是否已经是相同的用户消息，避免重复添加
+		// Check whether the last retMessage is already the same user message to avoid duplicates
 		shouldAdd := true
 		if len(retMessage) > 0 {
 			lastMsg := retMessage[len(retMessage)-1]
 			if lastMsg.Role == schema.User && lastMsg.Content == userMessage.Content {
-				// 最后一条消息已经是相同的用户消息，跳过添加
+				// Last message is already the same user message; skip add
 				shouldAdd = false
-				//log.Debugf("最后一条消息已经是相同的用户消息，跳过重复添加: %s", userMessage.Content)
+				//log.Debugf("Last message is already the same user message, skip duplicate add: %s", userMessage.Content)
 			}
 		}
 		if shouldAdd {

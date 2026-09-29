@@ -175,7 +175,7 @@ func (s *ChatSession) tryHandleRealtimeMcpAudioASR(ctx context.Context, text str
 			UserText:    text,
 			Timestamp:   time.Now(),
 		})
-		log.Infof("设备 %s realtime媒体播放门控命中退出指令: %s", s.clientState.DeviceID, text)
+		log.Infof("Device %s realtime media playback gate hit exit command: %s", s.clientState.DeviceID, text)
 		return true, nil
 	}
 
@@ -183,10 +183,10 @@ func (s *ChatSession) tryHandleRealtimeMcpAudioASR(ctx context.Context, text str
 	if action != "" {
 		_, err := controlMusicPlayback(ctx, s, &MusicPlaybackControlParams{Action: action})
 		if err != nil {
-			log.Warnf("设备 %s realtime媒体播放门控执行控制动作失败: action=%s, text=%s, err=%v", s.clientState.DeviceID, action, text, err)
+			log.Warnf("Device %s realtime media playback gate control action failed: action=%s, text=%s, err=%v", s.clientState.DeviceID, action, text, err)
 			return true, nil
 		}
-		log.Infof("设备 %s realtime媒体播放门控执行控制动作: action=%s, text=%s", s.clientState.DeviceID, action, text)
+		log.Infof("Device %s realtime media playback gate run control action: action=%s, text=%s", s.clientState.DeviceID, action, text)
 		return true, nil
 	}
 
@@ -194,6 +194,6 @@ func (s *ChatSession) tryHandleRealtimeMcpAudioASR(ctx context.Context, text str
 		return false, nil
 	}
 
-	log.Debugf("设备 %s realtime媒体播放门控忽略ASR文本: %s", s.clientState.DeviceID, text)
+	log.Debugf("Device %s realtime media playback gate ignore ASR text: %s", s.clientState.DeviceID, text)
 	return true, nil
 }

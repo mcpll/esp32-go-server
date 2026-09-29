@@ -19,7 +19,7 @@ type ActivationRequest struct {
 }
 
 func (s *WebSocketServer) handleOta(w http.ResponseWriter, r *http.Request) {
-	//获取客户端ip
+	// Get client IP
 	ip := r.Header.Get("X-Real-IP")
 	if ip == "" {
 		ip = r.Header.Get("X-Forwarded-For")
@@ -28,19 +28,19 @@ func (s *WebSocketServer) handleOta(w http.ResponseWriter, r *http.Request) {
 		ip = r.RemoteAddr
 	}
 
-	//从header头部获取Device-Id和Client-Id
+	// Get Device-Id and Client-Id from headers
 	deviceId := r.Header.Get("Device-Id")
 	clientId := r.Header.Get("Client-Id")
 
 	if deviceId == "" || clientId == "" {
-		log.Errorf("缺少Device-Id或Client-Id")
+		log.Errorf("missing Device-Id or Client-Id")
 		http.Error(w, "缺少Device-Id或Client-Id", http.StatusBadRequest)
 		return
 	}
 
 	//deviceId = strings.ReplaceAll(deviceId, ":", "_")
 
-	//根据ip选择不同的配置
+	// Choose config by IP
 	clientIp := r.Header.Get("X-Real-IP")
 	if clientIp == "" {
 		clientIp = r.Header.Get("X-Forwarded-For")
@@ -54,10 +54,10 @@ func (s *WebSocketServer) handleOta(w http.ResponseWriter, r *http.Request) {
 	log.Debugf("authEnable: %v", authEnable)
 	if authEnable {
 		configProvider, err := user_config.GetProvider(viper.GetString("config_provider.type"))
-		//检查此deviceId是否已认证
+		// Check whether this deviceId is activated
 		isActivited, err := configProvider.IsDeviceActivated(r.Context(), deviceId, clientId)
 		if err != nil {
-			log.Errorf("检查设备是否认证失败: %v", err)
+			log.Errorf("failed to check device activation: %v", err)
 			http.Error(w, "内部服务器错误", http.StatusInternalServerError)
 			return
 		}
@@ -69,12 +69,12 @@ func (s *WebSocketServer) handleOta(w http.ResponseWriter, r *http.Request) {
 				Challenge: challenge,
 				TimeoutMs: timeoutMs,
 			}
-			log.Infof("激活信息: &{Code:%s Message:%s Challenge:%s TimeoutMs:%d}", code, msg, challenge, timeoutMs)
+			log.Infof("activation info: &{Code:%s Message:%s Challenge:%s TimeoutMs:%d}", code, msg, challenge, timeoutMs)
 		}
 	}
 
 	otaConfigPrefix := "ota.external."
-	//如果ip是192.168开头的，则选择test配置
+	// If IP starts with 192.168, use test config
 	if strings.HasPrefix(clientIp, "192.168") || strings.HasPrefix(clientIp, "10.") || strings.HasPrefix(clientIp, "127.0.0.1") {
 		otaConfigPrefix = "ota.test."
 	} else {
@@ -82,7 +82,7 @@ func (s *WebSocketServer) handleOta(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mqttInfo := getMqttInfo(deviceId, clientId, otaConfigPrefix, ip)
-	//密码
+	// Password
 	respData := &OtaResponse{
 		Websocket: WebsocketInfo{
 			Url:   viper.GetString(otaConfigPrefix + "websocket.url"),
@@ -102,7 +102,7 @@ func (s *WebSocketServer) handleOta(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(respData); err != nil {
-		log.Errorf("OTA响应序列化失败: %v", err)
+		log.Errorf("failed to serialize OTA response: %v", err)
 		http.Error(w, "内部服务器错误", http.StatusInternalServerError)
 		return
 	}
@@ -114,11 +114,11 @@ func getMqttInfo(deviceId, clientId, otaConfigPrefix, ip string) *MqttInfo {
 		return nil
 	}
 
-	// 生成MQTT凭据
+	// Generate MQTT credentials
 	signatureKey := viper.GetString("ota.signature_key")
 	credentials, err := util.GenerateMqttCredentials(deviceId, clientId, ip, signatureKey)
 	if err != nil {
-		log.Errorf("生成MQTT凭据失败: %v", err)
+		log.Errorf("failed to generate MQTT credentials: %v", err)
 		return nil
 	}
 
@@ -132,46 +132,46 @@ func getMqttInfo(deviceId, clientId, otaConfigPrefix, ip string) *MqttInfo {
 	}
 }
 
-// handleOtaActivate 设备激活接口
+// handleOtaActivate device activation endpoint
 func (s *WebSocketServer) handleOtaActivate(w http.ResponseWriter, r *http.Request) {
 	deviceId := r.Header.Get("Device-Id")
 	clientId := r.Header.Get("Client-Id")
 	if deviceId == "" || clientId == "" {
-		log.Errorf("缺少Device-Id或Client-Id")
+		log.Errorf("missing Device-Id or Client-Id")
 		http.Error(w, "缺少Device-Id或Client-Id", http.StatusBadRequest)
 		return
 	}
 	var req ActivationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		log.Errorf("激活请求解析失败: %v", err)
+		log.Errorf("failed to parse activation request: %v", err)
 		http.Error(w, "请求体解析失败", http.StatusBadRequest)
 		return
 	}
-	// 校验算法
+	// Validate algorithm
 	if req.Payload.Algorithm != "hmac-sha256" {
 		http.Error(w, "不支持的算法", http.StatusBadRequest)
 		return
 	}
 
-	// 调用配置Provider进行绑定校验
+	// Call config Provider for binding verification
 	configProvider, err := user_config.GetProvider(viper.GetString("config_provider.type"))
 	if err != nil {
-		log.Errorf("获取配置Provider失败: %v", err)
+		log.Errorf("failed to get config Provider: %v", err)
 		http.Error(w, "内部服务器错误", http.StatusInternalServerError)
 		return
 	}
 	ok, err := configProvider.VerifyChallenge(r.Context(), deviceId, clientId, req.Payload)
 	if err != nil {
-		log.Errorf("设备激活校验失败: %v", err)
+		log.Errorf("device activation verification failed: %v", err)
 		http.Error(w, "设备激活校验失败", http.StatusInternalServerError)
 		return
 	}
 	if !ok {
-		log.Warnf("设备激活校验未通过: deviceId=%s, clientId=%s", deviceId, clientId)
+		log.Warnf("device activation verification not passed: deviceId=%s, clientId=%s", deviceId, clientId)
 		http.Error(w, "设备激活校验未通过", http.StatusAccepted)
 		return
 	}
-	// 激活成功，返回200
+	// Activation succeeded, return 200
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("激活成功"))
 }

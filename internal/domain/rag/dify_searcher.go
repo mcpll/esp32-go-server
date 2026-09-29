@@ -115,7 +115,7 @@ func (s *difySearcher) Search(
 		return nil, errors.New(strings.Join(errs, "; "))
 	}
 	if len(errs) > 0 {
-		log.Warnf("Dify 知识库检索部分失败: %s", strings.Join(errs, "; "))
+		log.Warnf("Dify knowledge base search partially failed: %s", strings.Join(errs, "; "))
 	}
 	return ret, nil
 }

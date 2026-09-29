@@ -12,12 +12,12 @@ import (
 )
 
 func main() {
-	// 定义命令行参数
+	// Define command-line flags
 	var endPoint string
 	flag.StringVar(&endPoint, "endpoint", "", "WebSocket endpoint URL (required)")
 	flag.Parse()
 
-	// 检查必需参数
+	// Check required flags
 	if endPoint == "" {
 		fmt.Println("错误: 必须指定 endpoint 参数")
 		fmt.Println("使用方法: go run . -endpoint <websocket_url>")
@@ -25,7 +25,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// 注释掉硬编码的endpoint
+	// Hardcoded endpoint commented out
 	//endPoint := "wss://api.xiaozhi.me/mcp/?token=eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjE0NDQzNSwiYWdlbnRJZCI6MzUxNjQsImVuZHBvaW50SWQiOiJhZ2VudF8zNTE2NCIsInB1cnBvc2UiOiJtY3AtZW5kcG9pbnQiLCJpYXQiOjE3NDk1NDk2MzR9.nPMAHaYyRrxQGqHnzFk-SqLDb61p3YGJqRsQ3TZZEqPxQgef0jg_fTLiZsTNVI34VaNOaOobvKnl55VoIuYx7w"
 	//endPoint := "ws://192.168.208.214:8989/mcp?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImFnZW50SWQiOiIxIiwiZW5kcG9pbnRJZCI6ImFnZW50XzEiLCJwdXJwb3NlIjoibWNwLWVuZHBvaW50IiwiZXhwIjoxNzU2OTczNDM0LCJpYXQiOjE3NTY4ODcwMzR9.igLC-IFSgaf9maZljD-Tq3tI8nUmhx4vaOBcIsAHrRs"
 
@@ -41,14 +41,14 @@ func main() {
 		),
 	)
 
-	// 新增查询天气工具
+	// Add weather-query tool
 	weatherTool := mcp.NewTool("query_weather",
 		mcp.WithDescription("查询天气"),
 	)
 
 	// Add tool handler
 	s.AddTool(tool, helloHandler)
-	// 注册查询天气工具
+	// Register weather-query tool
 	s.AddTool(weatherTool, queryWeatherHandler)
 
 	transport, err := NewWebSocketServerTransport(endPoint, WithWebSocketServerOptionMcpServer(s))
@@ -67,7 +67,7 @@ func helloHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallTo
 	return mcp.NewToolResultText(fmt.Sprintf("Hello, %s!", name)), nil
 }
 
-// 查询天气 handler
+// Weather-query handler
 func queryWeatherHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return mcp.NewToolResultText("天气晴朗 20度 北风3级"), nil
 }

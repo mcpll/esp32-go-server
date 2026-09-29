@@ -147,23 +147,23 @@ func (p *IndexTTSVLLMProvider) TextToSpeechStream(ctx context.Context, text stri
 		defer close(outputChan)
 		resp, reqErr := getHTTPClient().Do(req)
 		if reqErr != nil {
-			log.Errorf("IndexTTS请求失败: %v", reqErr)
+			log.Errorf("IndexTTS request failed: %v", reqErr)
 			return
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
 			msg, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-			log.Errorf("IndexTTS请求失败: status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(msg)))
+			log.Errorf("IndexTTS request failed: status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(msg)))
 			return
 		}
 
 		decoder, decErr := util.CreateAudioDecoderWithSampleRate(ctx, resp.Body, outputChan, frameDuration, "wav", sampleRate)
 		if decErr != nil {
-			log.Errorf("创建IndexTTS音频解码器失败: %v", decErr)
+			log.Errorf("failed to create IndexTTS audio decoder: %v", decErr)
 			return
 		}
 		if runErr := decoder.Run(time.Now().UnixMilli()); runErr != nil {
-			log.Errorf("IndexTTS音频解码失败: %v", runErr)
+			log.Errorf("IndexTTS audio decode failed: %v", runErr)
 		}
 	}()
 

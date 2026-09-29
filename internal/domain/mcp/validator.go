@@ -13,7 +13,7 @@ import (
 
 const validateTimeout = 25 * time.Second
 
-// ValidateMCPConfigMap 对传入的 mcp 配置执行连接级预检（initialize + tools/list）。
+// ValidateMCPConfigMap runs connection-level prechecks on the given MCP config (initialize + tools/list).
 func ValidateMCPConfigMap(mcpConfig map[string]interface{}) error {
 	if mcpConfig == nil {
 		return fmt.Errorf("mcp 配置为空")
@@ -40,7 +40,7 @@ func ValidateMCPConfigMap(mcpConfig map[string]interface{}) error {
 	return ValidateServerConfigs(servers)
 }
 
-// ValidateServerConfigs 校验服务器配置可用性。
+// ValidateServerConfigs checks that server configs are usable.
 func ValidateServerConfigs(serverConfigs []MCPServerConfig) error {
 	if len(serverConfigs) == 0 {
 		return fmt.Errorf("未提供任何MCP服务器配置")

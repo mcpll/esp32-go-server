@@ -289,7 +289,7 @@ func (c *serverConfig) handleTTSSpeech(w http.ResponseWriter, r *http.Request) {
 	if c.ttsFirstDelay > 0 {
 		time.Sleep(time.Duration(c.ttsFirstDelay) * time.Millisecond)
 	}
-	_ = c.ttsFrameDelay // 预留字段，方便后续扩展成真实分帧流式返回
+	_ = c.ttsFrameDelay // reserved for later real framed streaming responses
 
 	responseFormat := strings.ToLower(strings.TrimSpace(req.ResponseFormat))
 	if responseFormat == "" {

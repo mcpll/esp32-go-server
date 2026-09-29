@@ -275,7 +275,7 @@ func acquireRuntime(cfg speech.RuntimeConfig) (runtimeKey, *speech.Runtime, erro
 	if shared, ok := runtimes[key]; ok {
 		shared.refs++
 		log.Debugf(
-			"Silero VAD共享Runtime复用: model=%s, num_sessions=%d, refs=%d",
+			"Silero VAD shared Runtime reuse: model=%s, num_sessions=%d, refs=%d",
 			key.modelPath,
 			key.numSessions,
 			shared.refs,
@@ -289,7 +289,7 @@ func acquireRuntime(cfg speech.RuntimeConfig) (runtimeKey, *speech.Runtime, erro
 	}
 	runtimes[key] = &sharedRuntime{runtime: rt, refs: 1}
 	log.Debugf(
-		"Silero VAD共享Runtime创建: model=%s, num_sessions=%d, intra_threads=%d, inter_threads=%d, refs=1",
+		"Silero VAD shared Runtime created: model=%s, num_sessions=%d, intra_threads=%d, inter_threads=%d, refs=1",
 		key.modelPath,
 		key.numSessions,
 		key.intraOpNumThreads,

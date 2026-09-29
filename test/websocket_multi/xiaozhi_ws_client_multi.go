@@ -181,7 +181,7 @@ func main() {
 			}
 
 			if err := client.runClient(audioOpusDataList); err != nil {
-				log.Printf("客户端运行失败(index=%d): %v", idx, err)
+				log.Printf("client run failed (index=%d): %v", idx, err)
 			}
 		}()
 		if *rampMs > 0 {
@@ -233,14 +233,14 @@ func (w *WsClient) runClient(audioOpusDataList []AudioOpusData) error {
 		for {
 			messageType, message, err := w.Conn.ReadMessage()
 			if err != nil {
-				log.Printf("读取消息失败(index=%d): %v", w.index, err)
+				log.Printf("failed to read message (index=%d): %v", w.index, err)
 				return
 			}
 
 			if messageType == websocket.TextMessage {
 				var serverMsg ServerMessage
 				if err := json.Unmarshal(message, &serverMsg); err != nil {
-					log.Printf("解析消息失败(index=%d): %v", w.index, err)
+					log.Printf("failed to parse message (index=%d): %v", w.index, err)
 					continue
 				}
 

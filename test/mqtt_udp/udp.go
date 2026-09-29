@@ -92,11 +92,11 @@ func (c *UDPClient) aesCTRDecrypt(key, nonce, ciphertext []byte) ([]byte, error)
 }
 
 func (c *UDPClient) decryptAudioData(key []byte, data []byte) ([]byte, error) {
-	//分离nonce和密文
+	//split nonce and ciphertext
 	nonce := data[:16]
 	ciphertext := data[16:]
 
-	//解密
+	//decrypt
 	decryptedData, err := c.aesCTRDecrypt(key, nonce, ciphertext)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decrypt data: %v", err)
@@ -106,18 +106,18 @@ func (c *UDPClient) decryptAudioData(key []byte, data []byte) ([]byte, error) {
 }
 
 func (c *UDPClient) SendAudioData(audioData []byte) error {
-	// 生成新的nonce
+	// generate a new nonce
 	c.localSeq = (c.localSeq + 1) & 0xFFFFFFFF
 
-	// 构建nonce字符串: 固定前缀 + 长度 + 原始nonce + 序列号
-	nonceHex := c.aesNonce[:4] + // 固定前缀 (01000000)
-		fmt.Sprintf("%04x", len(audioData)) + // 数据长度，4个十六进制字符
-		c.aesNonce[8:24] + // 原始nonce
-		fmt.Sprintf("%08x", c.localSeq) // 序列号，8个十六进制字符
+	// build nonce string: fixed prefix + length + original nonce + sequence
+	nonceHex := c.aesNonce[:4] + // fixed prefix (01000000)
+		fmt.Sprintf("%04x", len(audioData)) + // data length, 4 hex chars
+		c.aesNonce[8:24] + // original nonce
+		fmt.Sprintf("%08x", c.localSeq) // sequence number, 8 hex chars
 
 	//fmt.Printf("c.aesNonce: %s len: %d, nonceHex: %s len: %d\n", c.aesNonce, len(c.aesNonce), nonceHex, len(nonceHex))
 
-	// 加密数据
+	// encrypt data
 	key, err := hex.DecodeString(c.aesKey)
 	if err != nil {
 		return fmt.Errorf("failed to decode AES key: %v", err)
@@ -128,8 +128,8 @@ func (c *UDPClient) SendAudioData(audioData []byte) error {
 		return fmt.Errorf("failed to decode nonce: %v", err)
 	}
 
-	// 检查IV长度
-	//fmt.Printf("IV长度: %d 字节, 内容: %x\n", len(nonceBytes), nonceBytes)
+	// check IV length
+	//fmt.Printf("IV length: %d bytes, content: %x\n", len(nonceBytes), nonceBytes)
 
 	iv := nonceBytes
 
@@ -138,17 +138,17 @@ func (c *UDPClient) SendAudioData(audioData []byte) error {
 		return fmt.Errorf("failed to encrypt data: %v", err)
 	}
 
-	// 拼接nonce和密文
+	// concatenate nonce and ciphertext
 	packet := append(nonceBytes, encryptedData...)
 
-	// 发送数据包
+	// send the packet
 	_, err = c.udpConn.Write(packet)
 	if err != nil {
 		return fmt.Errorf("failed to send UDP packet: %v", err)
 	}
 	markUDPTraffic()
 
-	//fmt.Printf("发送数据: nonce=%s, seq=%d, dataLen=%d\n", nonceHex, c.localSeq, len(audioData))
+	//fmt.Printf("send data: nonce=%s, seq=%d, dataLen=%d\n", nonceHex, c.localSeq, len(audioData))
 
 	return nil
 }

@@ -126,7 +126,7 @@ func (p *DoubaoWSProvider) TextToSpeechStream(ctx context.Context, text string, 
 		if idx == len(tryResolved)-1 || !isDoubaoRetryableResourceError(attemptErr) {
 			return nil, summarizeDoubaoWSAttemptError(voice, tryResolved[0], attemptedResources, attemptErrors)
 		}
-		log.Warnf("豆包 WebSocket TTS 资源族不匹配，尝试切换重试: voice=%s from=%s to=%s", voice, candidate.ResourceID, tryResolved[idx+1].ResourceID)
+		log.Warnf("Doubao WebSocket TTS resource family mismatch, switching and retrying: voice=%s from=%s to=%s", voice, candidate.ResourceID, tryResolved[idx+1].ResourceID)
 	}
 
 	return nil, fmt.Errorf("豆包 WebSocket TTS 未找到可用的资源族")
@@ -160,7 +160,7 @@ func (p *DoubaoWSProvider) textToSpeechStreamWithModel(ctx context.Context, text
 	}
 	go func() {
 		if err := decoder.Run(startTs); err != nil {
-			log.Errorf("豆包 WebSocket 音频解码失败: %v", err)
+			log.Errorf("Doubao WebSocket audio decode failed: %v", err)
 		}
 	}()
 
@@ -192,7 +192,7 @@ func (p *DoubaoWSProvider) textToSpeechStreamWithModel(ctx context.Context, text
 			if messageType != websocket.TextMessage && messageType != websocket.BinaryMessage {
 				continue
 			}
-			log.Debugf("豆包 WebSocket TTS 收到消息: ws_type=%d payload_len=%d", messageType, len(payload))
+			log.Debugf("Doubao WebSocket TTS message: ws_type=%d payload_len=%d", messageType, len(payload))
 			audioChunk, isLast, err := parseDoubaoWSMessage(messageType, payload)
 			if err != nil {
 				trySendDoubaoWSAttemptResult(attemptResult, doubaoWSAttemptResult{err: err})
@@ -328,10 +328,10 @@ func parseDoubaoWSBinaryResponse(frame []byte) ([]byte, bool, error) {
 
 	switch messageType {
 	case 0x09:
-		log.Debugf("豆包 WebSocket TTS 收到 full server response: flags=%d compression=%d payload_len=%d", flags, compression, len(payload))
+		log.Debugf("Doubao WebSocket TTS full server response: flags=%d compression=%d payload_len=%d", flags, compression, len(payload))
 		return parseDoubaoWSFullServerResponse(payload, compression, flags)
 	case 0x0b:
-		log.Debugf("豆包 WebSocket TTS 收到 audio-only response: flags=%d payload_len=%d", flags, len(payload))
+		log.Debugf("Doubao WebSocket TTS audio-only response: flags=%d payload_len=%d", flags, len(payload))
 		if flags == 0 {
 			return nil, false, nil
 		}
@@ -340,7 +340,7 @@ func parseDoubaoWSBinaryResponse(frame []byte) ([]byte, bool, error) {
 			if err != nil {
 				return nil, false, err
 			}
-			log.Debugf("豆包 WebSocket 音频帧(request_id=%s): audio_len=%d", requestID, len(audio))
+			log.Debugf("Doubao WebSocket audio frame(request_id=%s): audio_len=%d", requestID, len(audio))
 			return audio, false, nil
 		}
 		if len(payload) < 8 {
@@ -412,11 +412,11 @@ func parseDoubaoWSFullServerResponse(payload []byte, compression byte, flags byt
 		}
 		trimmed := bytes.TrimSpace(body)
 		if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("{}")) {
-			log.Debugf("豆包 WebSocket ACK(request_id=%s) 结束标记: marker=%d body=%q", requestID, marker, string(trimmed))
+			log.Debugf("Doubao WebSocket ACK(request_id=%s) end marker: marker=%d body=%q", requestID, marker, string(trimmed))
 			return nil, true, nil
 		}
 		if !looksLikeJSONPayload(trimmed) {
-			log.Debugf("豆包 WebSocket ACK(request_id=%s) 非JSON payload: marker=%d body=%x", requestID, marker, trimmed)
+			log.Debugf("Doubao WebSocket ACK(request_id=%s) non-JSON payload: marker=%d body=%x", requestID, marker, trimmed)
 			return nil, false, nil
 		}
 
@@ -436,7 +436,7 @@ func parseDoubaoWSFullServerResponse(payload []byte, compression byte, flags byt
 			return chunk, event.Sequence < 0, nil
 		}
 
-		log.Debugf("豆包 WebSocket ACK(request_id=%s) 元数据: marker=%d body=%s", requestID, marker, string(trimmed))
+		log.Debugf("Doubao WebSocket ACK(request_id=%s) metadata: marker=%d body=%s", requestID, marker, string(trimmed))
 		return nil, false, nil
 	}
 
@@ -458,7 +458,7 @@ func parseDoubaoWSFullServerResponse(payload []byte, compression byte, flags byt
 		}
 	}
 	if !looksLikeJSONPayload(body) {
-		log.Debugf("豆包 WebSocket ACK 非JSON payload: %x", body)
+		log.Debugf("Doubao WebSocket ACK non-JSON payload: %x", body)
 		return nil, sequenceNumber < 0, nil
 	}
 
@@ -466,7 +466,7 @@ func parseDoubaoWSFullServerResponse(payload []byte, compression byte, flags byt
 	if err := json.Unmarshal(body, &event); err != nil {
 		return nil, false, fmt.Errorf("解析豆包 WebSocket ACK JSON 失败: %w", err)
 	}
-	log.Debugf("豆包 WebSocket ACK JSON: code=%d sequence=%d message=%q", event.Code, event.Sequence, event.Message)
+	log.Debugf("Doubao WebSocket ACK JSON: code=%d sequence=%d message=%q", event.Code, event.Sequence, event.Message)
 	if event.Code != 0 {
 		msg := strings.TrimSpace(event.Message)
 		if msg == "" {

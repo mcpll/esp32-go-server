@@ -5,47 +5,47 @@ import (
 	"time"
 )
 
-// UserMessageEvent 用户消息事件
-// Deprecated: 使用 AddMessageEvent 替代，统一使用 TopicAddMessage 事件
+// UserMessageEvent user message event
+// Deprecated: use AddMessageEvent instead; unify on TopicAddMessage events
 type UserMessageEvent struct {
-	Ctx         context.Context
-	SessionID   string
-	DeviceID    string
-	AgentID     string
+	Ctx       context.Context
+	SessionID string
+	DeviceID  string
+	AgentID   string
 
-	// ASR结果
+	// ASR result
 	Text      string
-	AudioData []byte  // 原始音频数据（PCM float32 转字节）
-	AudioSize int     // 音频采样数
+	AudioData []byte // raw audio (PCM float32 as bytes)
+	AudioSize int    // audio sample count
 
-	// 音频格式信息（用于转换为WAV）
-	SampleRate int // 采样率
-	Channels   int // 通道数
+	// audio format info (for WAV conversion)
+	SampleRate int // sample rate
+	Channels   int // channels
 
-	// 元数据
+	// metadata
 	Timestamp time.Time
 }
 
-// AssistantMessageEvent 机器人回复事件
-// Deprecated: 使用 AddMessageEvent 替代，统一使用 TopicAddMessage 事件
+// AssistantMessageEvent assistant reply event
+// Deprecated: use AddMessageEvent instead; unify on TopicAddMessage events
 type AssistantMessageEvent struct {
-	Ctx         context.Context
-	SessionID   string
-	DeviceID    string
-	AgentID     string
+	Ctx       context.Context
+	SessionID string
+	DeviceID  string
+	AgentID   string
 
-	// LLM结果
+	// LLM result
 	Text string
 
-	// TTS结果
-	AudioData [][]byte // 合成音频数据（Opus格式，音频帧数组）
-	AudioSize int      // 音频大小(字节)
+	// TTS result
+	AudioData [][]byte // synthesized audio (Opus frame slices)
+	AudioSize int      // audio size (bytes)
 
-	// 音频格式信息（用于转换为WAV）
-	SampleRate int // 采样率
-	Channels   int // 通道数
+	// audio format info (for WAV conversion)
+	SampleRate int // sample rate
+	Channels   int // channels
 
-	// 元数据
-	TTSDuration int // 毫秒
+	// metadata
+	TTSDuration int // milliseconds
 	Timestamp   time.Time
 }

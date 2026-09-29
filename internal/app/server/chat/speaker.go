@@ -6,7 +6,7 @@ import (
 	"xiaozhi-esp32-server-golang/internal/domain/speaker"
 )
 
-// SpeakerManager 声纹识别管理器（包装 SpeakerProvider）
+// SpeakerManager speaker recognition manager (wraps SpeakerProvider)
 type SpeakerManager struct {
 	provider speaker.SpeakerProvider
 }
@@ -15,40 +15,40 @@ type peekableSpeakerProvider interface {
 	PeekAndIdentify(ctx context.Context, requestID string) (*speaker.IdentifyResult, bool, error)
 }
 
-// NewSpeakerManager 创建声纹管理器
+// NewSpeakerManager creates a speaker manager
 func NewSpeakerManager(provider speaker.SpeakerProvider) *SpeakerManager {
 	return &SpeakerManager{
 		provider: provider,
 	}
 }
 
-// StartStreaming 启动流式识别
+// StartStreaming starts streaming recognition
 func (sm *SpeakerManager) StartStreaming(ctx context.Context, sampleRate int, agentId string) error {
 	return sm.provider.StartStreaming(ctx, sampleRate, agentId)
 }
 
-// SendAudioChunk 发送音频块
+// SendAudioChunk sends an audio chunk
 func (sm *SpeakerManager) SendAudioChunk(ctx context.Context, pcmData []float32) error {
 	return sm.provider.SendAudioChunk(ctx, pcmData)
 }
 
-// FinishAndIdentify 完成识别并获取结果
+// FinishAndIdentify finishes recognition and returns the result
 func (sm *SpeakerManager) FinishAndIdentify(ctx context.Context) (*speaker.IdentifyResult, error) {
 	return sm.provider.FinishAndIdentify(ctx)
 }
 
-// Close 关闭声纹管理器
+// Close closes the speaker manager
 func (sm *SpeakerManager) Close() error {
 	return sm.provider.Close()
 }
 
-// IsActive 检查是否处于激活状态
+// IsActive reports whether it is active
 func (sm *SpeakerManager) IsActive() bool {
 	return sm.provider.IsActive()
 }
 
-// PeekAndIdentify 获取声纹中间识别结果（不结束当前轮次）
-// 返回: 识别结果, 是否被服务端防抖, 错误
+// PeekAndIdentify returns an intermediate speaker result without ending the turn
+// returns: result, whether server debounce applied, error
 func (sm *SpeakerManager) PeekAndIdentify(ctx context.Context, requestID string) (*speaker.IdentifyResult, bool, error) {
 	if sm == nil || sm.provider == nil {
 		return nil, false, nil

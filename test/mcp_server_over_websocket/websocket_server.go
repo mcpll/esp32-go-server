@@ -39,7 +39,7 @@ func NewWebSocketServerTransport(endpoint string, opts ...WebSocketServerTranspo
 		opt(t)
 	}
 
-	// 创建WebSocket连接
+	// create the WebSocket connection
 	conn, _, err := websocket.DefaultDialer.Dial(endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to websocket endpoint: %w", err)
@@ -54,7 +54,7 @@ func (t *websocketServerTransport) Run() error {
 	t.ctx = ctx
 	t.cancel = cancel
 
-	// 启动心跳检测
+	// start heartbeat
 	t.wg.Add(1)
 	go func() {
 		defer t.wg.Done()
@@ -75,7 +75,7 @@ func (t *websocketServerTransport) Run() error {
 		}
 	}()
 
-	// 主消息处理循环
+	// main message processing loop
 	t.wg.Add(1)
 	go func() {
 		defer t.wg.Done()
@@ -112,7 +112,7 @@ func (t *websocketServerTransport) Run() error {
 		}
 	}()
 
-	// 等待所有goroutine完成
+	// wait for all goroutines to finish
 	t.wg.Wait()
 	return nil
 }

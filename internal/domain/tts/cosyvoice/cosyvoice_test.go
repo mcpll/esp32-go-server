@@ -46,7 +46,7 @@ func TestNewCosyVoiceTTSProviderDefaultsAndSetVoice(t *testing.T) {
 }
 
 func TestCosyVoiceTTS(t *testing.T) {
-	// 跳过实际的网络请求测试，除非设置了环境变量
+	// skip live network tests unless the env var is set
 	if os.Getenv("RUN_COSYVOICE_TEST") != "1" {
 		t.Skip("跳过CosyVoice API测试，设置环境变量RUN_COSYVOICE_TEST=1以启用")
 	}
@@ -62,7 +62,7 @@ func TestCosyVoiceTTS(t *testing.T) {
 
 	provider := NewCosyVoiceTTSProvider(config)
 
-	// 测试文本转语音
+	// test text-to-speech
 	t.Run("TestTextToSpeech", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -77,7 +77,7 @@ func TestCosyVoiceTTS(t *testing.T) {
 		}
 	})
 
-	// 测试流式文本转语音
+	// test streaming text-to-speech
 	t.Run("TestTextToSpeechStream", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -87,7 +87,7 @@ func TestCosyVoiceTTS(t *testing.T) {
 			t.Fatalf("TextToSpeechStream失败: %v", err)
 		}
 
-		// 接收所有帧
+		// receive all frames
 		var receivedFrames [][]byte
 		timeout := time.After(10 * time.Second)
 

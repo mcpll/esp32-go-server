@@ -197,7 +197,7 @@ func (p *CozeLLMProvider) ResponseWithContext(ctx context.Context, sessionID str
 				break
 			}
 			if i == 0 && len(requestBodies) > 1 {
-				log.Warnf("coze首个请求失败，尝试回退重试: %v", openErr)
+				log.Warnf("coze first request failed, falling back to retry: %v", openErr)
 			}
 		}
 		if openErr != nil {
@@ -213,7 +213,7 @@ func (p *CozeLLMProvider) ResponseWithContext(ctx context.Context, sessionID str
 					return
 				}
 				if seenDelta && strings.Contains(strings.ToLower(eventErr.Error()), "unexpected end of input") {
-					// 部分 Coze 实例在最后一个事件后会直接断开连接，容忍该场景。
+					// Some Coze instances close the connection right after the last event; tolerate that.
 					return
 				}
 				sendLLMError(out, fmt.Errorf("coze流读取失败: %w", eventErr))
@@ -385,7 +385,7 @@ func buildCozeQuery(dialogue []*schema.Message) string {
 		return ""
 	}
 
-	// Coze会话模式仅发送当前轮用户输入，不拼接本地历史。
+	// Coze session mode sends only the current-turn user input, without local history.
 	for i := len(dialogue) - 1; i >= 0; i-- {
 		msg := dialogue[i]
 		if msg == nil || msg.Role != schema.User {
@@ -396,7 +396,7 @@ func buildCozeQuery(dialogue []*schema.Message) string {
 		}
 	}
 
-	// 兜底：若没有 user 消息，回退到最后一条可提取文本的消息。
+	// Fallback: if there is no user message, use the last message with extractable text.
 	for i := len(dialogue) - 1; i >= 0; i-- {
 		if text := extractCozeQueryText(dialogue[i]); text != "" {
 			return text

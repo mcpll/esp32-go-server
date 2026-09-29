@@ -15,7 +15,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// StreamingClient WebSocket 流式识别客户端
+// StreamingClient WebSocket streaming recognition client
 type StreamingClient struct {
 	wsURL      string
 	conn       *websocket.Conn
@@ -39,7 +39,7 @@ type peekResponse struct {
 	err       error
 }
 
-// NewStreamingClient 创建流式识别客户端
+// NewStreamingClient creates a streaming recognition client
 func NewStreamingClient(baseURL string) *StreamingClient {
 	wsURL := deriveWebSocketURL(baseURL)
 	return &StreamingClient{
@@ -47,11 +47,11 @@ func NewStreamingClient(baseURL string) *StreamingClient {
 	}
 }
 
-// deriveWebSocketURL 从 HTTP base_url 推导 WebSocket URL
+// deriveWebSocketURL derives a WebSocket URL from an HTTP base_url
 func deriveWebSocketURL(baseURL string) string {
 	u, err := url.Parse(baseURL)
 	if err != nil {
-		log.Errorf("解析 base_url 失败: %v, 使用默认值", err)
+		log.Errorf("failed to parse base_url: %v, using default", err)
 		return "ws://localhost:8080/api/v1/speaker/identify_ws"
 	}
 
@@ -63,35 +63,35 @@ func deriveWebSocketURL(baseURL string) string {
 	return fmt.Sprintf("%s://%s/api/v1/speaker/identify_ws", scheme, u.Host)
 }
 
-// Connect 连接到声纹识别服务的 WebSocket
+// Connect connects to the speaker recognition service WebSocket
 func (sc *StreamingClient) Connect(sampleRate int, agentId string, threshold float32) error {
 	sc.mutex.Lock()
 	defer sc.mutex.Unlock()
 
 	sc.sampleRate = sampleRate
 
-	// 如果已存在连接，使用 Ping 检测连接是否仍然有效
+	// If a connection exists, Ping to check it is still valid
 	if sc.conn != nil {
 		if sc.pingConnectionLocked() {
-			// 连接有效，复用现有连接
+			// Connection is valid; reuse it
 			return nil
 		}
-		// 连接已断开，关闭旧连接准备重连
-		log.Debugf("检测到旧连接已断开，将重新建立连接")
+		// Connection is dead; close the old one and prepare to reconnect
+		log.Debugf("detected old connection closed, will reconnect")
 		sc.closeConnectionLocked()
 	}
 
-	// 构建 WebSocket URL，包含采样率、agent_id 和 threshold 参数
+	// Build WebSocket URL with sample rate, agent_id, and threshold
 	wsURL := fmt.Sprintf("%s?sample_rate=%d", sc.wsURL, sampleRate)
 	if agentId != "" {
 		wsURL += fmt.Sprintf("&agent_id=%s", url.QueryEscape(agentId))
 	}
-	// 如果阈值大于 0，则传递阈值参数
+	// If threshold > 0, pass the threshold parameter
 	if threshold > 0 {
 		wsURL += fmt.Sprintf("&threshold=%.6f", threshold)
 	}
 
-	// 连接 WebSocket
+	// Connect WebSocket
 	dialer := websocket.Dialer{
 		HandshakeTimeout: 10 * time.Second,
 	}
@@ -105,10 +105,10 @@ func (sc *StreamingClient) Connect(sampleRate int, agentId string, threshold flo
 	sc.finishWait = nil
 	sc.peekWaits = make(map[string]chan peekResponse)
 
-	// 设置读取超时
+	// Set read timeout
 	conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 
-	// 接收连接确认消息
+	// Receive connection ack
 	var connectionMsg map[string]interface{}
 	if err := conn.ReadJSON(&connectionMsg); err != nil {
 		conn.Close()
@@ -123,27 +123,27 @@ func (sc *StreamingClient) Connect(sampleRate int, agentId string, threshold flo
 	}
 	conn.SetReadDeadline(time.Time{})
 
-	log.Debugf("声纹识别 WebSocket 连接成功，采样率: %d Hz, agent_id: %s, 阈值: %.4f", sampleRate, agentId, threshold)
+	log.Debugf("speaker recognition WebSocket connected, sample_rate: %d Hz, agent_id: %s, threshold: %.4f", sampleRate, agentId, threshold)
 	go sc.readLoop(conn)
 	return nil
 }
 
-// SendAudioChunk 发送音频数据块
+// SendAudioChunk sends an audio data chunk
 func (sc *StreamingClient) SendAudioChunk(audioData []float32) error {
 	conn := sc.getConn()
 	if conn == nil {
 		return fmt.Errorf("not connected")
 	}
 
-	// 将 float32 数组转换为二进制字节
+	// Convert float32 slice to binary bytes
 	chunkBytes := float32ToBytes(audioData)
 
-	// 发送二进制消息
+	// Send binary message
 	sc.writeMu.Lock()
 	err := conn.WriteMessage(websocket.BinaryMessage, chunkBytes)
 	sc.writeMu.Unlock()
 	if err != nil {
-		// 发送失败时关闭连接
+		// On send failure, close the connection
 		sc.failConnection(conn, fmt.Errorf("发送音频数据失败: %v", err))
 		return fmt.Errorf("发送音频数据失败: %v", err)
 	}
@@ -151,7 +151,7 @@ func (sc *StreamingClient) SendAudioChunk(audioData []float32) error {
 	return nil
 }
 
-// FinishAndIdentify 完成输入并获取识别结果
+// FinishAndIdentify finishes input and returns the recognition result
 func (sc *StreamingClient) FinishAndIdentify(ctx context.Context) (*IdentifyResult, error) {
 	if ctx == nil {
 		ctx = context.Background()
@@ -172,7 +172,7 @@ func (sc *StreamingClient) FinishAndIdentify(ctx context.Context) (*IdentifyResu
 	conn := sc.conn
 	sc.mutex.Unlock()
 
-	// 发送完成命令
+	// Send finish command
 	finishCmd := map[string]interface{}{
 		"action": "finish",
 	}
@@ -200,8 +200,8 @@ func (sc *StreamingClient) FinishAndIdentify(ctx context.Context) (*IdentifyResu
 	}
 }
 
-// PeekAndIdentify 获取中间识别结果（不结束当前轮次）
-// 返回: 识别结果, 是否被服务端防抖, 错误
+// PeekAndIdentify returns an intermediate result without ending the turn
+// Returns: recognition result, whether server-debounced, error
 func (sc *StreamingClient) PeekAndIdentify(ctx context.Context, requestID string) (*IdentifyResult, bool, error) {
 	if ctx == nil {
 		ctx = context.Background()
@@ -265,7 +265,7 @@ func (sc *StreamingClient) PeekAndIdentify(ctx context.Context, requestID string
 	}
 }
 
-// Close 关闭连接
+// Close closes the connection
 func (sc *StreamingClient) Close() error {
 	sc.mutex.Lock()
 	conn := sc.conn
@@ -283,7 +283,7 @@ func (sc *StreamingClient) Close() error {
 	return nil
 }
 
-// closeConnectionLocked 关闭连接（必须在已持有 mutex 的情况下调用）
+// closeConnectionLocked closes the connection (caller must hold mutex)
 func (sc *StreamingClient) closeConnectionLocked() error {
 	if sc.conn != nil {
 		err := sc.conn.Close()
@@ -293,20 +293,20 @@ func (sc *StreamingClient) closeConnectionLocked() error {
 	return nil
 }
 
-// IsConnected 检查是否已连接
+// IsConnected reports whether connected
 func (sc *StreamingClient) IsConnected() bool {
 	sc.mutex.Lock()
 	defer sc.mutex.Unlock()
 	return sc.conn != nil
 }
 
-// pingConnectionLocked 使用 Ping 检测连接是否有效（必须在已持有 mutex 的情况下调用）
+// pingConnectionLocked uses Ping to check connection liveness (caller must hold mutex)
 func (sc *StreamingClient) pingConnectionLocked() bool {
 	if sc.conn == nil {
 		return false
 	}
 
-	// 使用 Ping 消息检测连接活性
+	// Use Ping to check connection liveness
 	sc.writeMu.Lock()
 	sc.conn.SetWriteDeadline(time.Now().Add(1000 * time.Millisecond))
 	err := sc.conn.WriteMessage(websocket.PingMessage, nil)
@@ -393,7 +393,7 @@ func (sc *StreamingClient) readLoop(conn *websocket.Conn) {
 
 		var msg map[string]interface{}
 		if err := json.Unmarshal(message, &msg); err != nil {
-			log.Warnf("解析声纹消息失败: %v", err)
+			log.Warnf("failed to parse speaker message: %v", err)
 			continue
 		}
 
@@ -451,7 +451,7 @@ func (sc *StreamingClient) dispatchMessage(msg map[string]interface{}) bool {
 	case "error":
 		return false
 	default:
-		// audio_received/connection/ready/cancelled/closing 等消息仅用于状态提示，这里直接忽略
+		// audio_received/connection/ready/cancelled/closing are status-only; ignore here
 		return true
 	}
 }
@@ -463,7 +463,7 @@ func parseServerError(msg map[string]interface{}) error {
 	return fmt.Errorf("服务器错误: %v", msg)
 }
 
-// float32ToBytes 将 float32 数组转换为二进制字节（小端序）
+// float32ToBytes converts a float32 slice to little-endian binary bytes
 func float32ToBytes(samples []float32) []byte {
 	buf := make([]byte, len(samples)*4)
 	for i, sample := range samples {
@@ -473,7 +473,7 @@ func float32ToBytes(samples []float32) []byte {
 	return buf
 }
 
-// 辅助函数：从 map 中安全获取值
+// Helper: safely get a value from a map
 func getString(m map[string]interface{}, key string) string {
 	if v, ok := m[key].(string); ok {
 		return v

@@ -24,16 +24,16 @@ type LocalMcpTool struct {
 	Handle      mcp_manager.LocalToolHandler
 }
 
-// InitChatLocalMCPTools 初始化聊天相关的本地MCP工具
+// InitChatLocalMCPTools initializes chat-related local MCP tools
 func InitChatLocalMCPTools() {
 	manager := mcp_manager.GetLocalMCPManager()
 
-	log.Info("初始化聊天相关的本地MCP工具...")
+	log.Info("Initializing chat-related local MCP tools...")
 
 	localTools := map[string]LocalMcpTool{
 		/*"get_current_datetime": {
 			Name:        "get_current_datetime",
-			Description: "获取当前时间和日期信息",
+			Description: "Get current date and time information",
 			Params:      struct{}{},
 			Handle:      getCurrentDateTimeHandler,
 		},*/
@@ -69,14 +69,14 @@ func InitChatLocalMCPTools() {
 		},
 		/*"play_music": {
 			Name:        "play_music",
-			Description: "当用户想听歌、无聊时、想放空大脑时使用，用于播放指定名称的音乐，当用户想随便听一首音乐时请推荐出具体的歌曲名称，当有多个音乐播放工具时优先使用此工具，**此工具调用耗时较长，需要先返回友好的过渡性提示语**",
+			Description: "Use when the user wants music or to unwind; play a named track; suggest a concrete song if they want anything; prefer this tool when multiple music tools exist; **slow — send a friendly transition first**",
 			Params:      PlayMusicParams{},
 			Handle:      playMusicHandler,
 		},*/
 	}
 
 	for toolName, localTool := range localTools {
-		// 只有当配置明确设为false时才跳过，配置不存在或为true时都启用
+		// Skip only when config is explicitly false; missing or true enables
 		if viper.IsSet("local_mcp."+toolName) && !viper.GetBool("local_mcp."+toolName) {
 			continue
 		}
@@ -87,11 +87,11 @@ func InitChatLocalMCPTools() {
 			localTool.Handle,
 		)
 		if err != nil {
-			log.Errorf("注册本地MCP工具 %s 失败: %+v", toolName, err)
+			log.Errorf("Failed to register local MCP tool %s: %+v", toolName, err)
 		}
 	}
 
-	log.Info("聊天相关的本地MCP工具初始化完成")
+	log.Info("Chat-related local MCP tools init done")
 }
 
 func RegisterLocalMcpFunc(name string, description string, params any, handle mcp_manager.LocalToolHandler) error {
@@ -104,7 +104,7 @@ func RegisterLocalMcpFunc(name string, description string, params any, handle mc
 		handle,
 	)
 	if err != nil {
-		log.Errorf("注册本地MCP工具 %s 失败: %+v", name, err)
+		log.Errorf("Failed to register local MCP tool %s: %+v", name, err)
 		return err
 	}
 	return nil
@@ -120,11 +120,11 @@ type SearchKnowledgeParams struct {
 	KnowledgeBaseIDs []uint `json:"knowledge_base_ids,omitempty" description:"可选：仅在这些知识库ID内检索（当前智能体已关联）"`
 }
 
-// playMusicHandler 播放音乐的处理函数
+// playMusicHandler music playback handler
 func playMusicHandler(ctx context.Context, argumentsInJSON string) (string, error) {
-	log.Info("执行播放音乐工具")
+	log.Info("Executing play-music tool")
 
-	// 解析参数
+	// Parse arguments
 	var params PlayMusicParams
 
 	if argumentsInJSON != "" {
@@ -134,14 +134,14 @@ func playMusicHandler(ctx context.Context, argumentsInJSON string) (string, erro
 		}
 	}
 
-	log.Infof("找到ChatSessionOperator，正在调用LocalMcpPlayMusic方法播放音乐: %s", params.Name)
+	log.Infof("Found ChatSessionOperator, calling LocalMcpPlayMusic to play music: %s", params.Name)
 	audioData, realMusicName, err := GetMusicAudioData(ctx, &params)
 	if err != nil {
-		log.Errorf("获取音乐数据失败: %v", err)
+		log.Errorf("Failed to get music data: %v", err)
 		response := NewErrorResponse("play_music", fmt.Sprintf("获取音乐数据失败: %v", err), "PLAYBACK_ERROR", "请检查音乐名称或网络连接")
 		return response.ToJSON()
 	} else {
-		// 成功播放 - 动作类响应，终止后续处理
+		// Play succeeded — action response; stop further processing
 		response := NewAudioResponse("play_music", "play_music", fmt.Sprintf("开始播放音乐: %s", realMusicName), true, audioData)
 		response.MusicName = realMusicName
 		return response.ToJSON()
@@ -150,13 +150,13 @@ func playMusicHandler(ctx context.Context, argumentsInJSON string) (string, erro
 }
 
 /*
-// getCurrentDateTimeHandler 获取当前时间和日期的处理函数
+// getCurrentDateTimeHandler current date/time handler
 func getCurrentDateTimeHandler(ctx context.Context, argumentsInJSON string) (string, error) {
-	log.Info("执行获取当前时间日期工具")
+	log.Info("Executing get-current-datetime tool")
 
-	// 解析参数
+	// Parse arguments
 	var params map[string]interface{}
-	timezone := "Local" // 默认时区
+	timezone := "Local" // Default timezone
 
 	if argumentsInJSON != "" {
 		if err := json.Unmarshal([]byte(argumentsInJSON), &params); err == nil {
@@ -168,16 +168,16 @@ func getCurrentDateTimeHandler(ctx context.Context, argumentsInJSON string) (str
 
 	now := time.Now()
 
-	// 尝试解析指定的时区
+	// Try loading the given timezone
 	if timezone != "Local" {
 		if loc, err := time.LoadLocation(timezone); err == nil {
 			now = now.In(loc)
 		} else {
-			log.Warnf("无法加载时区 %s，使用本地时区", timezone)
+			log.Warnf("Failed to load timezone %s, using local timezone", timezone)
 		}
 	}
 
-	// 构造返回数据
+	// Build response data
 	data := map[string]interface{}{
 		"datetime": map[string]interface{}{
 			"formatted":     now.Format("2006-01-02 15:04:05"),
@@ -198,22 +198,22 @@ func getCurrentDateTimeHandler(ctx context.Context, argumentsInJSON string) (str
 		},
 	}
 
-	// 创建内容类响应
-	response := NewContentResponse("get_current_datetime", data, fmt.Sprintf("当前时间：%s", formatChineseDateTime(now)))
+	// Create content response
+	response := NewContentResponse("get_current_datetime", data, fmt.Sprintf("Current time: %s", formatChineseDateTime(now)))
 	// response.Format = "datetime"
-	// response.DisplayHint = "可用于显示当前日期时间信息"
+	// response.DisplayHint = "Can be used to display current date/time"
 
-	log.Infof("获取当前时间日期成功: %s", now.Format("2006-01-02 15:04:05"))
+	log.Infof("Got current datetime successfully: %s", now.Format("2006-01-02 15:04:05"))
 	return response.ToJSON(),nil
 }
 */
-// exitConversationHandler 退出对话的处理函数
+// exitConversationHandler exit-conversation handler
 func exitConversationHandler(ctx context.Context, argumentsInJSON string) (string, error) {
-	log.Info("执行退出对话工具")
+	log.Info("Executing exit-dialog tool")
 
-	// 解析参数
+	// Parse arguments
 	var params map[string]interface{}
-	reason := "用户主动退出" // 默认原因
+	reason := "用户主动退出" // Default reason
 
 	if argumentsInJSON != "" {
 		if err := json.Unmarshal([]byte(argumentsInJSON), &params); err == nil {
@@ -223,7 +223,7 @@ func exitConversationHandler(ctx context.Context, argumentsInJSON string) (strin
 		}
 	}
 
-	// 创建动作类响应 - 终止性操作
+	// Create action response — terminating operation
 	response := NewActionResponse("exit_conversation", "exit_conversation", "对话即将结束，感谢您的使用！", "exiting", true)
 	response.UserState = "conversation_ended"
 	response.Instruction = "对话已结束，请不要生成额外的文本回复"
@@ -234,18 +234,18 @@ func exitConversationHandler(ctx context.Context, argumentsInJSON string) (strin
 		"farewell_english": "Goodbye! Looking forward to our next conversation.",
 	}
 
-	log.Infof("退出对话处理完成，原因: %s", reason)
+	log.Infof("Exit dialog handling done, reason: %s", reason)
 
-	// 从context中获取ChatSessionOperator并调用Close方法
+	// Get ChatSessionOperator from context and call Close
 	if chatSessionOperatorValue := ctx.Value("chat_session_operator"); chatSessionOperatorValue != nil {
 		if chatSessionOperator, ok := chatSessionOperatorValue.(ChatSessionOperator); ok {
-			log.Info("找到ChatSessionOperator，正在调用Close方法关闭会话")
+			log.Info("Found ChatSessionOperator, calling Close to shut down session")
 			defer chatSessionOperator.LocalMcpCloseChat()
 		} else {
-			log.Warn("从context中获取的chat_session_operator不是ChatSessionOperator类型")
+			log.Warn("chat_session_operator from context is not ChatSessionOperator type")
 		}
 	} else {
-		log.Warn("从context中未找到chat_session_operator")
+		log.Warn("chat_session_operator not found in context")
 	}
 
 	responseStr, err := response.ToJSON()
@@ -256,13 +256,13 @@ func exitConversationHandler(ctx context.Context, argumentsInJSON string) (strin
 	return responseStr, nil
 }
 
-// clearConversationHistoryHandler 清空历史对话的处理函数
+// clearConversationHistoryHandler clear-history handler
 func clearConversationHistoryHandler(ctx context.Context, argumentsInJSON string) (string, error) {
-	log.Info("执行清空历史对话工具")
+	log.Info("Executing clear-history tool")
 
-	// 解析参数
+	// Parse arguments
 	var params map[string]interface{}
-	reason := "用户主动清空历史" // 默认原因
+	reason := "用户主动清空历史" // Default reason
 
 	if argumentsInJSON != "" {
 		if err := json.Unmarshal([]byte(argumentsInJSON), &params); err == nil {
@@ -272,36 +272,36 @@ func clearConversationHistoryHandler(ctx context.Context, argumentsInJSON string
 		}
 	}
 
-	// 从context中获取ChatSessionOperator并调用LocalMcpClearHistory方法
+	// Get ChatSessionOperator from context and call LocalMcpClearHistory
 	if chatSessionOperatorValue := ctx.Value("chat_session_operator"); chatSessionOperatorValue != nil {
 		if chatSessionOperator, ok := chatSessionOperatorValue.(ChatSessionOperator); ok {
-			log.Info("找到ChatSessionOperator，正在调用LocalMcpClearHistory方法清空历史")
+			log.Info("Found ChatSessionOperator, calling LocalMcpClearHistory to clear history")
 			if err := chatSessionOperator.LocalMcpClearHistory(); err != nil {
-				log.Errorf("清空历史对话失败: %v", err)
+				log.Errorf("Failed to clear dialog history: %v", err)
 				return "", err
 			} else {
-				// 成功清空 - 动作类响应，但不终止对话
+				// Cleared successfully — action response; do not end conversation
 				response := NewActionResponse("clear_conversation_history", "clear_history", "历史对话已成功清空，您可以开始全新的对话。", "completed", false)
 				response.Metadata = map[string]string{
 					"reason": reason,
 					"status": "cleared",
 				}
-				log.Info("历史对话清空成功")
+				log.Info("Dialog history cleared successfully")
 
 				return response.ToJSON()
 			}
 		} else {
-			log.Warn("从context中获取的chat_session_operator不是ChatSessionOperator类型")
+			log.Warn("chat_session_operator from context is not ChatSessionOperator type")
 			return "", fmt.Errorf("从context中获取的chat_session_operator不是ChatSessionOperator类型")
 		}
 	}
-	log.Warn("从context中未找到chat_session_operator")
+	log.Warn("chat_session_operator not found in context")
 	return "", fmt.Errorf("从context中未找到chat_session_operator")
 }
 
-// switchDeviceRoleHandler 切换设备角色的处理函数
+// switchDeviceRoleHandler switch-device-role handler
 func switchDeviceRoleHandler(ctx context.Context, argumentsInJSON string) (string, error) {
-	log.Info("执行切换设备角色工具")
+	log.Info("Executing switch-device-role tool")
 
 	var params SwitchDeviceRoleParams
 	if argumentsInJSON == "" {
@@ -322,7 +322,7 @@ func switchDeviceRoleHandler(ctx context.Context, argumentsInJSON string) (strin
 		if chatSessionOperator, ok := chatSessionOperatorValue.(ChatSessionOperator); ok {
 			matchedRoleName, err := chatSessionOperator.LocalMcpSwitchDeviceRole(ctx, params.RoleName)
 			if err != nil {
-				log.Errorf("切换设备角色失败: %v", err)
+				log.Errorf("Failed to switch device role: %v", err)
 				response := NewErrorResponse("switch_device_role", fmt.Sprintf("切换角色失败: %v", err), "SWITCH_ROLE_FAILED", "请尝试更换角色名称或稍后重试")
 				return response.ToJSON()
 			}
@@ -346,14 +346,14 @@ func switchDeviceRoleHandler(ctx context.Context, argumentsInJSON string) (strin
 	return "", fmt.Errorf("从context中未找到chat_session_operator")
 }
 
-// restoreDeviceDefaultRoleHandler 恢复设备默认角色的处理函数
+// restoreDeviceDefaultRoleHandler restore-default-role handler
 func restoreDeviceDefaultRoleHandler(ctx context.Context, argumentsInJSON string) (string, error) {
-	log.Info("执行恢复设备默认角色工具")
+	log.Info("Executing restore-device-default-role tool")
 
 	if chatSessionOperatorValue := ctx.Value("chat_session_operator"); chatSessionOperatorValue != nil {
 		if chatSessionOperator, ok := chatSessionOperatorValue.(ChatSessionOperator); ok {
 			if err := chatSessionOperator.LocalMcpRestoreDeviceDefaultRole(ctx); err != nil {
-				log.Errorf("恢复设备默认角色失败: %v", err)
+				log.Errorf("Failed to restore device default role: %v", err)
 				response := NewErrorResponse("restore_device_default_role", fmt.Sprintf("恢复默认角色失败: %v", err), "RESTORE_ROLE_FAILED", "请稍后重试")
 				return response.ToJSON()
 			}
@@ -374,7 +374,7 @@ func restoreDeviceDefaultRoleHandler(ctx context.Context, argumentsInJSON string
 }
 
 func searchKnowledgeHandler(ctx context.Context, argumentsInJSON string) (string, error) {
-	log.Info("执行知识库检索工具")
+	log.Info("Executing knowledge-base search tool")
 
 	var params SearchKnowledgeParams
 	if argumentsInJSON != "" {
@@ -436,13 +436,13 @@ func searchKnowledgeHandler(ctx context.Context, argumentsInJSON string) (string
 	return response.ToJSON()
 }
 
-// getWeekNumber 获取周数
+// getWeekNumber returns week number
 func getWeekNumber(t time.Time) int {
 	_, week := t.ISOWeek()
 	return week
 }
 
-// formatChineseDateTime 格式化中文日期时间
+// formatChineseDateTime formats Chinese date/time
 func formatChineseDateTime(t time.Time) string {
 	weekdays := map[time.Weekday]string{
 		time.Sunday:    "星期日",
@@ -461,7 +461,7 @@ func formatChineseDateTime(t time.Time) string {
 	)
 }
 
-// getWeekdayChinese 获取中文星期几
+// getWeekdayChinese returns Chinese weekday name
 func getWeekdayChinese(weekday time.Weekday) string {
 	weekdays := map[time.Weekday]string{
 		time.Sunday:    "星期日",
@@ -475,26 +475,26 @@ func getWeekdayChinese(weekday time.Weekday) string {
 	return weekdays[weekday]
 }
 
-// RegisterChatMCPTools 公共函数，供外部调用注册聊天MCP工具
+// RegisterChatMCPTools public helper to register chat MCP tools
 func RegisterChatMCPTools() {
 	InitChatLocalMCPTools()
 }
 
-// 播放音乐
+// Play music
 func GetMusicAudioData(ctx context.Context, musicParams *PlayMusicParams) ([]byte, string, error) {
 	musicName := musicParams.Name
 	//welcome := musicParams.Welcome
 	welcome := ""
-	log.Infof("搜索音乐: %s 中, welcome: %s", musicName, welcome)
-	// 这里可以根据音乐名称获取音乐URL
-	// 目前简化实现，假设musicName就是URL或者从配置中获取
+	log.Infof("Searching music: %s, welcome: %s", musicName, welcome)
+	// Resolve music URL from the name here
+	// Simplified: assume musicName is a URL or comes from config
 	musicURL, realMusicName, ierr := getMusicURL(musicName)
 	if ierr != nil {
-		log.Errorf("获取音乐URL失败: %v", ierr)
+		log.Errorf("Failed to get music URL: %v", ierr)
 		return nil, "", fmt.Errorf("获取音乐URL失败: %v", ierr)
 	}
 
-	log.Infof("搜索音乐成功 URL: %s, 音乐名称: %s", musicURL, realMusicName)
+	log.Infof("Music search succeeded URL: %s, title: %s", musicURL, realMusicName)
 
 	client := getHTTPClient()
 	req, err := http.NewRequest("GET", musicURL, nil)
@@ -513,7 +513,7 @@ func GetMusicAudioData(ctx context.Context, musicParams *PlayMusicParams) ([]byt
 		return nil, "", fmt.Errorf("读取响应失败: %v", err)
 	}
 
-	log.Infof("获取音乐 %s 数据成功, 音频数据长度: %d", realMusicName, len(audioData))
+	log.Infof("Fetched music %s data successfully, audio length: %d", realMusicName, len(audioData))
 
 	return audioData, realMusicName, nil
 }
@@ -523,9 +523,9 @@ func GetMusicAudioData(ctx context.Context, musicParams *PlayMusicParams) ([]byt
 	musicName := musicParams.Name
 	//welcome := musicParams.Welcome
 	welcome := ""
-	log.Infof("搜索音乐: %s 中, welcome: %s", musicName, welcome)
-	// 这里可以根据音乐名称获取音乐URL
-	// 目前简化实现，假设musicName就是URL或者从配置中获取
+	log.Infof("Searching music: %s, welcome: %s", musicName, welcome)
+	// Resolve music URL from the name here
+	// Simplified: assume musicName is a URL or comes from config
 	musicList := netease.Search(musicName)
 	musicList = append(musicList, qq.Search(musicName)...)
 	for id, music := range musicList {
@@ -533,22 +533,22 @@ func GetMusicAudioData(ctx context.Context, musicParams *PlayMusicParams) ([]byt
 	}
 
 	if len(musicList) <= 0 {
-		return nil, "", fmt.Errorf("没有找到音乐")
+		return nil, "", fmt.Errorf("No music found")
 	}
 	m := musicList[0]
 	m.ParseMusic()
 	rc, err := m.ReadCloser()
 	if err != nil {
-		return nil, "", fmt.Errorf("获取音乐数据失败: %v", err)
+		return nil, "", fmt.Errorf("Failed to get music data: %v", err)
 	}
 	defer rc.Close()
 
 	audioData, err := io.ReadAll(rc)
 	if err != nil {
-		return nil, "", fmt.Errorf("读取响应失败: %v", err)
+		return nil, "", fmt.Errorf("Failed to read response: %v", err)
 	}
 
-	log.Infof("获取音乐 %s 数据成功, 音频数据长度: %d", m.Name, len(audioData))
+	log.Infof("Fetched music %s data successfully, audio length: %d", m.Name, len(audioData))
 
 	return audioData, m.Name, nil
 

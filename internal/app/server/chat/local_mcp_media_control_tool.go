@@ -18,12 +18,12 @@ func init() {
 		MusicPlaybackControlParams{},
 		musicPlaybackControlHandler,
 	); err != nil {
-		log.Errorf("注册媒体控制本地MCP工具失败: %v", err)
+		log.Errorf("Failed to register media-control local MCP tool: %v", err)
 	}
 }
 
 func musicPlaybackControlHandler(ctx context.Context, argumentsInJSON string) (string, error) {
-	log.Infof("执行媒体控制工具, args=%s", argumentsInJSON)
+	log.Infof("Executing media control tool, args=%s", argumentsInJSON)
 
 	var params MusicPlaybackControlParams
 	if argumentsInJSON != "" {
@@ -45,7 +45,7 @@ func musicPlaybackControlHandler(ctx context.Context, argumentsInJSON string) (s
 
 	result, err := chatSessionOperator.LocalMcpControlMusicPlayback(ctx, &params)
 	if err != nil {
-		log.Errorf("媒体控制失败: %v", err)
+		log.Errorf("Media control failed: %v", err)
 		response := NewErrorResponse(localMcpMusicControlToolName, fmt.Sprintf("媒体控制失败: %v", err), "MEDIA_CONTROL_FAILED", "请检查当前播放状态后重试")
 		return response.ToJSON()
 	}

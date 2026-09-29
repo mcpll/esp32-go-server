@@ -4,10 +4,10 @@ import (
 	"github.com/cloudwego/eino/schema"
 )
 
-// 请求与响应结构体
-// Message 表示对话消息
+// Request and response structs
+// Message is a chat message
 
-// 响应类型常量
+// Response type constants
 const (
 	ResponseTypeContent   = "content"
 	ResponseTypeToolCalls = "tool_calls"

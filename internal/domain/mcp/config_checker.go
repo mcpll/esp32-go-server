@@ -10,37 +10,37 @@ import (
 	"github.com/spf13/viper"
 )
 
-// CheckMCPConfig 检查MCP配置并报告潜在问题
+// CheckMCPConfig checks MCP config and reports potential issues
 func CheckMCPConfig() {
-	log.Info("=== MCP配置检查 ===")
+	log.Info("=== MCP config check ===")
 
-	// 检查全局启用状态
+	// Check global enable flag
 	globalEnabled := viper.GetBool("mcp.global.enabled")
-	log.Infof("全局MCP启用状态: %v", globalEnabled)
+	log.Infof("global MCP enabled: %v", globalEnabled)
 
 	if !globalEnabled {
-		log.Info("全局MCP已禁用，配置检查完成")
+		log.Info("global MCP disabled, config check done")
 		return
 	}
 
-	// 检查重连配置
+	// Check reconnect config
 	reconnectInterval := viper.GetInt("mcp.global.reconnect_interval")
 	maxAttempts := viper.GetInt("mcp.global.max_reconnect_attempts")
-	log.Infof("重连配置: 间隔=%d秒, 最大尝试次数=%d", reconnectInterval, maxAttempts)
+	log.Infof("reconnect config: interval=%ds, max_attempts=%d", reconnectInterval, maxAttempts)
 
-	// 检查服务器配置
+	// Check server configs
 	var serverConfigs []MCPServerConfig
 	if err := viper.UnmarshalKey("mcp.global.servers", &serverConfigs); err != nil {
-		log.Errorf("❌ 解析MCP服务器配置失败: %v", err)
+		log.Errorf("❌ failed to parse MCP server config: %v", err)
 		return
 	}
 
 	if len(serverConfigs) == 0 {
-		log.Warn("⚠️  未配置任何MCP服务器")
+		log.Warn("⚠️  no MCP servers configured")
 		return
 	}
 
-	log.Infof("共配置了 %d 个MCP服务器:", len(serverConfigs))
+	log.Infof("configured %d MCP servers:", len(serverConfigs))
 
 	enabledCount := 0
 	problemCount := 0
@@ -49,10 +49,10 @@ func CheckMCPConfig() {
 		status := "✅"
 		issues := []string{}
 
-		// 检查名称
+		// Check name
 		if config.Name == "" {
 			status = "❌"
-			issues = append(issues, "名称为空")
+			issues = append(issues, "name is empty")
 			problemCount++
 		}
 
@@ -64,38 +64,38 @@ func CheckMCPConfig() {
 		} else {
 			if _, parseErr := url.ParseRequestURI(endpoint); parseErr != nil {
 				status = "❌"
-				issues = append(issues, "URL格式不正确")
+				issues = append(issues, "invalid URL format")
 				problemCount++
 			}
 			if transportType == "sse" && !strings.HasPrefix(endpoint, "http://") && !strings.HasPrefix(endpoint, "https://") {
 				status = "⚠️"
-				issues = append(issues, "SSE URL格式可能不正确")
+				issues = append(issues, "SSE URL format may be incorrect")
 			}
 		}
 
-		// 检查启用状态
+		// Check enable flag
 		if config.Enabled {
 			enabledCount++
 		}
 
-		// 输出检查结果
+		// Print check results
 		issueStr := ""
 		if len(issues) > 0 {
-			issueStr = fmt.Sprintf(" - 问题: %s", strings.Join(issues, ", "))
+			issueStr = fmt.Sprintf(" - issues: %s", strings.Join(issues, ", "))
 		}
 
-		log.Infof("  [%d] %s %s (URL: %s, 启用: %v)%s",
+		log.Infof("  [%d] %s %s (URL: %s, enabled: %v)%s",
 			i+1, status, config.Name, endpointForLog(config), config.Enabled, issueStr)
 	}
 
-	// 总结
-	log.Infof("配置检查完成: %d个服务器已启用, %d个存在问题", enabledCount, problemCount)
+	// Summary
+	log.Infof("config check done: %d servers enabled, %d with issues", enabledCount, problemCount)
 
 	if problemCount > 0 {
-		log.Warn("⚠️  发现配置问题，请检查上述错误并修复")
+		log.Warn("⚠️  config issues found, please review and fix the errors above")
 	}
 
-	log.Info("=== MCP配置检查完成 ===")
+	log.Info("=== MCP config check complete ===")
 }
 
 func endpointForLog(config MCPServerConfig) string {

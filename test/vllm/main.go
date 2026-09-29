@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	// 命令行参数
+	// command-line args
 	imagePath := flag.String("image", "", "图片文件路径")
 	question := flag.String("question", "", "问题文本")
 	url := flag.String("url", "", "HTTP接口地址")
@@ -23,7 +23,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// 打开图片文件
+	// open the image file
 	file, err := os.Open(*imagePath)
 	if err != nil {
 		fmt.Printf("打开图片失败: %v\n", err)
@@ -31,11 +31,11 @@ func main() {
 	}
 	defer file.Close()
 
-	// 创建 multipart writer
+	// create multipart writer
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 
-	// 写入图片字段
+	// write the image field
 	fileWriter, err := writer.CreateFormFile("file", (*imagePath))
 	if err != nil {
 		fmt.Printf("创建图片字段失败: %v\n", err)
@@ -47,12 +47,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	// 写入文本字段
+	// write the text field
 	_ = writer.WriteField("question", *question)
 
 	writer.Close()
 
-	// 创建自定义请求，添加Device-Id头
+	// create a custom request with Device-Id header
 	req, err := http.NewRequest("POST", *url, body)
 	if err != nil {
 		fmt.Printf("创建请求失败: %v\n", err)
@@ -69,7 +69,7 @@ func main() {
 	}
 	defer resp.Body.Close()
 
-	// 读取响应
+	// read the response
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Printf("读取响应失败: %v\n", err)

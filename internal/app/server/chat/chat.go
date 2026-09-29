@@ -56,7 +56,7 @@ type ChatManager struct {
 	lastSpeakPathWarmAt atomic.Int64
 	speakReadyTimeout   time.Duration
 
-	// Close 保护，防止多次关闭
+	// Close guard against multiple Close calls
 	closeOnce      sync.Once
 	managerClosing atomic.Bool
 	needFreshHello bool
@@ -137,7 +137,7 @@ func sharedChatHookAsyncExecutor() *pkghooks.AsyncExecutor {
 			Timeout:      time.Duration(viper.GetInt("chat_hooks.async.timeout_ms")) * time.Millisecond,
 		}
 		chatHookAsyncExecutor = pkghooks.NewAsyncExecutor(context.Background(), asyncCfg)
-		log.Infof("初始化全局共享 chat hook observer executor: queue_size=%d worker_count=%d drop_when_full=%v timeout=%s", asyncCfg.QueueSize, asyncCfg.WorkerCount, asyncCfg.DropWhenFull, asyncCfg.Timeout)
+		log.Infof("Init global shared chat hook observer executor: queue_size=%d worker_count=%d drop_when_full=%v timeout=%s", asyncCfg.QueueSize, asyncCfg.WorkerCount, asyncCfg.DropWhenFull, asyncCfg.Timeout)
 	})
 	return chatHookAsyncExecutor
 }
@@ -151,7 +151,7 @@ func newChatHookHub(parent context.Context) *chathooks.Hub {
 	}
 	hub := chathooks.NewHub(parent, pkghooks.WithAsyncConfig(asyncCfg), pkghooks.WithAsyncExecutor(sharedChatHookAsyncExecutor()))
 	stats := hub.Stats()
-	log.Infof("初始化 chat hook hub: queue_size=%d worker_count=%d drop_when_full=%v timeout=%s dropped_async=%d", asyncCfg.QueueSize, asyncCfg.WorkerCount, asyncCfg.DropWhenFull, asyncCfg.Timeout, stats.DroppedAsync)
+	log.Infof("Init chat hook hub: queue_size=%d worker_count=%d drop_when_full=%v timeout=%s dropped_async=%d", asyncCfg.QueueSize, asyncCfg.WorkerCount, asyncCfg.DropWhenFull, asyncCfg.Timeout, stats.DroppedAsync)
 	return hub
 }
 
@@ -189,7 +189,7 @@ func NewChatManager(deviceID string, transport types_conn.IConn, options ...Chat
 
 	clientState, err := GenClientState(cm.ctx, cm.DeviceID)
 	if err != nil {
-		log.Errorf("初始化客户端状态失败: %v", err)
+		log.Errorf("Failed to init client state: %v", err)
 		_ = cm.transport.Close()
 		return nil, err
 	}
@@ -206,11 +206,11 @@ func NewChatManager(deviceID string, transport types_conn.IConn, options ...Chat
 	cm.hookHub = newChatHookHub(cm.ctx)
 	if !viper.IsSet("chat_hooks.enabled") || viper.GetBool("chat_hooks.enabled") {
 		if err := chathooks.RegisterBuiltinPlugins(cm.hookHub, chatHookBuiltinOverrides()); err != nil {
-			log.Errorf("注册 chat hook builtin plugins 失败: %v", err)
+			log.Errorf("Failed to register chat hook builtin plugins: %v", err)
 			_ = cm.transport.Close()
 			return nil, err
 		}
-		log.Infof("已加载 chat hook plugins: %+v", cm.hookHub.PluginMetas())
+		log.Infof("Loaded chat hook plugins: %+v", cm.hookHub.PluginMetas())
 	}
 
 	cm.transformRegistry = streamtransform.NewRegistry()
@@ -222,12 +222,12 @@ func NewChatManager(deviceID string, transport types_conn.IConn, options ...Chat
 func GenClientState(pctx context.Context, deviceID string) (*ClientState, error) {
 	configProvider, err := userconfig.GetProvider(viper.GetString("config_provider.type"))
 	if err != nil {
-		log.Errorf("获取 用户配置提供者失败: %+v", err)
+		log.Errorf("Failed to get user config provider: %+v", err)
 		return nil, err
 	}
 	deviceConfig, err := configProvider.GetUserConfig(pctx, deviceID)
 	if err != nil {
-		log.Errorf("获取 设备 %s 配置失败: %+v", deviceID, err)
+		log.Errorf("Failed to get device %s config: %+v", deviceID, err)
 		return nil, err
 	}
 	deviceConfig.MemoryMode = NormalizeMemoryMode(deviceConfig.MemoryMode)
@@ -242,7 +242,7 @@ func GenClientState(pctx context.Context, deviceID string) (*ClientState, error)
 
 	isDeviceActivated, err := configProvider.IsDeviceActivated(ctx, deviceID, "")
 	if err != nil {
-		log.Errorf("检查设备激活状态失败: %v", err)
+		log.Errorf("Failed to check device activation status: %v", err)
 	}
 
 	clientState := &ClientState{
@@ -311,7 +311,7 @@ func (c *ChatManager) ReloadDeviceConfig(ctx context.Context) error {
 	openclaw.GetManager().ExitMode(oldAgentID, c.DeviceID)
 	openclaw.GetManager().ExitMode(c.clientState.AgentID, c.DeviceID)
 	applyOutputAudioFormatForTTS(c.clientState)
-	log.Infof("设备 %s 配置已刷新，当前agent=%s", c.DeviceID, deviceConfig.AgentId)
+	log.Infof("Device %s config refreshed, current agent=%s", c.DeviceID, deviceConfig.AgentId)
 	return nil
 }
 
@@ -325,7 +325,7 @@ func (c *ChatManager) Start() error {
 
 func (c *ChatManager) handleLoopExit(loopName string, ctx context.Context) {
 	if r := recover(); r != nil {
-		log.Errorf("设备 %s %s loop panic: %v\n%s", c.DeviceID, loopName, r, string(debug.Stack()))
+		log.Errorf("Device %s %s loop panic: %v\n%s", c.DeviceID, loopName, r, string(debug.Stack()))
 	}
 	if ctx == nil || ctx.Err() != nil {
 		return
@@ -333,9 +333,9 @@ func (c *ChatManager) handleLoopExit(loopName string, ctx context.Context) {
 	if c.serverTransport != nil && c.serverTransport.IsClosed() {
 		return
 	}
-	log.Warnf("设备 %s %s loop 异常退出，关闭 ChatManager", c.DeviceID, loopName)
+	log.Warnf("Device %s %s loop exited abnormally, closing ChatManager", c.DeviceID, loopName)
 	if err := c.Close(); err != nil {
-		log.Warnf("设备 %s %s loop 退出后关闭 ChatManager 失败: %v", c.DeviceID, loopName, err)
+		log.Warnf("Device %s failed to close ChatManager after %s loop exit: %v", c.DeviceID, loopName, err)
 	}
 }
 
@@ -346,13 +346,13 @@ func (c *ChatManager) cmdMessageLoop(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Infof("设备 %s recvCmd context cancel", c.DeviceID)
+			log.Infof("Device %s recvCmd context cancel", c.DeviceID)
 			return
 		default:
 		}
 
 		if recvFailCount > 3 {
-			log.Errorf("设备 %s recv cmd timeout 超过阈值", c.DeviceID)
+			log.Errorf("Device %s recv cmd timeout exceeded threshold", c.DeviceID)
 			return
 		}
 
@@ -367,9 +367,9 @@ func (c *ChatManager) cmdMessageLoop(ctx context.Context) {
 		}
 
 		recvFailCount = 0
-		log.Infof("收到文本消息: %s", string(message))
+		log.Infof("Received text message: %s", string(message))
 		if err := c.handleTextMessage(message); err != nil {
-			log.Errorf("处理文本消息失败: %v, 消息内容: %s", err, string(message))
+			log.Errorf("Failed to handle text message: %v, content: %s", err, string(message))
 		}
 	}
 }
@@ -380,7 +380,7 @@ func (c *ChatManager) audioMessageLoop(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Debugf("设备 %s recvAudio context cancel", c.DeviceID)
+			log.Debugf("Device %s recvAudio context cancel", c.DeviceID)
 			return
 		default:
 		}
@@ -396,27 +396,27 @@ func (c *ChatManager) audioMessageLoop(ctx context.Context) {
 
 		session := c.GetSession()
 		if session == nil {
-			log.Debugf("设备 %s 当前无活动 ChatSession，丢弃音频数据", c.DeviceID)
+			log.Debugf("Device %s no active ChatSession, drop audio data", c.DeviceID)
 			continue
 		}
 		if c.hasPendingSpeakRequest() {
-			log.Debugf("设备 %s 当前存在待完成 speak_request，丢弃音频数据", c.DeviceID)
+			log.Debugf("Device %s pending speak_request, drop audio data", c.DeviceID)
 			continue
 		}
 
-		log.Debugf("收到音频数据，大小: %d 字节", len(message))
+		log.Debugf("Received audio data, size: %d bytes", len(message))
 		isAuth := viper.GetBool("auth.enable")
 		if isAuth && !c.clientState.IsActivated {
-			log.Debugf("设备 %s 未激活, 跳过音频数据", c.clientState.DeviceID)
+			log.Debugf("Device %s not activated, skip audio data", c.clientState.DeviceID)
 			continue
 		}
 		if c.clientState.GetClientVoiceStop() {
-			log.Debug("客户端停止说话, 跳过音频数据")
+			log.Debug("Client stopped speaking, skip audio data")
 			continue
 		}
 
 		if ok := session.HandleAudioMessage(message); !ok {
-			log.Warnf("音频缓冲区已满，丢弃音频数据")
+			log.Warnf("Audio buffer full, drop audio data")
 		}
 	}
 }
@@ -424,7 +424,7 @@ func (c *ChatManager) audioMessageLoop(ctx context.Context) {
 func (c *ChatManager) handleTextMessage(message []byte) error {
 	var clientMsg ClientMessage
 	if err := json.Unmarshal(message, &clientMsg); err != nil {
-		log.Errorf("解析消息失败: %v", err)
+		log.Errorf("Failed to parse message: %v", err)
 		return fmt.Errorf("解析消息失败: %v", err)
 	}
 
@@ -478,7 +478,7 @@ func (c *ChatManager) HandleHelloMessage(msg *ClientMessage) error {
 	if c.helloInited {
 		prevAgentID := clientState.AgentID
 		if err := c.refreshDeviceConfigOnHello(); err != nil {
-			log.Warnf("设备 %s duplicate hello 刷新配置失败，降级继续: %v", clientState.DeviceID, err)
+			log.Warnf("Device %s duplicate hello config refresh failed, degrade and continue: %v", clientState.DeviceID, err)
 		}
 		c.resetOpenClawModeOnHello(prevAgentID, clientState.AgentID)
 	} else {
@@ -498,7 +498,7 @@ func (c *ChatManager) HandleHelloMessage(msg *ClientMessage) error {
 		c.helloInited = true
 	}
 	if isDuplicateMqttHello {
-		log.Infof("设备 %s 收到 duplicate_hello，执行 hello 重协商", clientState.DeviceID)
+		log.Infof("Device %s received duplicate_hello, run hello renegotiation", clientState.DeviceID)
 		c.markMqttConversationStateStale("duplicate_hello")
 	}
 
@@ -521,7 +521,7 @@ func (c *ChatManager) HandleHelloMessage(msg *ClientMessage) error {
 	c.refreshSpeakPathWarmFromTransport()
 	c.scheduleMcpInitOnHelloLocked(msg)
 	if !isFirstHello && !requiresFreshHello {
-		log.Infof("设备 %s duplicate_hello 处理完成，hello 重协商已刷新", clientState.DeviceID)
+		log.Infof("Device %s duplicate_hello handled, hello renegotiation refreshed", clientState.DeviceID)
 	}
 	return nil
 }
@@ -545,7 +545,7 @@ func (c *ChatManager) scheduleMcpInitLocked() {
 	}
 	if c.mcpInitState == chatMcpInitStateReady {
 		log.Warnf(
-			"设备 %s MCP 状态漂移: ChatManager 已ready，但 transport=%s 需要重新初始化",
+			"Device %s MCP state drift: ChatManager ready but transport=%s needs re-init",
 			c.DeviceID,
 			strings.TrimSpace(c.mcpTransport.GetMcpTransportType()),
 		)
@@ -578,7 +578,7 @@ func (c *ChatManager) finishMcpInit(transportType string, err error) {
 
 	if err != nil {
 		c.mcpInitState = chatMcpInitStateIdle
-		log.Warnf("设备 %s MCP 初始化失败，等待后续 hello 重试: %v", c.DeviceID, err)
+		log.Warnf("Device %s MCP init failed, wait for later hello retry: %v", c.DeviceID, err)
 		return
 	}
 
@@ -646,7 +646,7 @@ func (c *ChatManager) buildMqttHelloUdpConfig() (*UdpConfig, error) {
 func (c *ChatManager) HandleListenMessage(msg *ClientMessage) error {
 	if c.requiresHelloBootstrapForSession() {
 		log.Infof(
-			"设备 %s 当前会话已关闭或尚未完成 hello，忽略 listen %s，等待新 hello",
+			"Device %s current session closed or hello incomplete, ignore listen %s, wait for new hello",
 			c.DeviceID,
 			strings.TrimSpace(msg.State),
 		)
@@ -663,7 +663,7 @@ func (c *ChatManager) HandleListenMessage(msg *ClientMessage) error {
 func (c *ChatManager) HandleAbortMessage(msg *ClientMessage) error {
 	session := c.GetSession()
 	if session == nil {
-		log.Debugf("设备 %s 当前无活动 ChatSession，忽略 abort", c.DeviceID)
+		log.Debugf("Device %s no active ChatSession, ignore abort", c.DeviceID)
 		return nil
 	}
 	return session.HandleAbortMessage(msg)
@@ -673,7 +673,7 @@ func (c *ChatManager) HandleIoTMessage(msg *ClientMessage) error {
 	if err := c.serverTransport.SendIot(msg); err != nil {
 		return fmt.Errorf("发送响应失败: %v", err)
 	}
-	log.Infof("设备 %s 物联网指令: %s", msg.DeviceID, msg.Text)
+	log.Infof("Device %s IoT command: %s", msg.DeviceID, msg.Text)
 	return nil
 }
 
@@ -684,11 +684,11 @@ func (c *ChatManager) HandleMcpMessage(msg *ClientMessage) error {
 func (c *ChatManager) HandleGoodByeMessage(msg *ClientMessage) error {
 	session := c.GetSession()
 	if session != nil {
-		log.Infof("设备 %s 收到设备端 goodbye，保留 ChatSession 并重置为静默态", c.DeviceID)
+		log.Infof("Device %s received device goodbye, retain ChatSession and reset to silent state", c.DeviceID)
 		session.ResetToSilentState()
 		c.scheduleRetainedSessionCleanup(session, "peer_goodbye")
 	} else {
-		log.Infof("设备 %s 收到设备端 goodbye，但当前无活动 ChatSession，仅清理音频链路", c.DeviceID)
+		log.Infof("Device %s received device goodbye but no active ChatSession, only clear audio path", c.DeviceID)
 	}
 
 	c.resetSpeakPathAfterGoodbye()
@@ -703,11 +703,11 @@ func (c *ChatManager) HandleSpeakReadyMessage(msg *ClientMessage) error {
 		return nil
 	}
 	if msg.State != "" && msg.State != MessageStateReady {
-		log.Debugf("设备 %s speak_ready 状态不是 ready，忽略: %+v", c.DeviceID, msg)
+		log.Debugf("Device %s speak_ready status is not ready, ignore: %+v", c.DeviceID, msg)
 		return nil
 	}
 	if msg.SpeakUDPConfig != nil && !msg.SpeakUDPConfig.Ready {
-		log.Warnf("设备 %s speak_ready udp_config.ready=false，忽略", c.DeviceID)
+		log.Warnf("Device %s speak_ready udp_config.ready=false, ignore", c.DeviceID)
 		return nil
 	}
 
@@ -715,11 +715,11 @@ func (c *ChatManager) HandleSpeakReadyMessage(msg *ClientMessage) error {
 	pending := c.pendingSpeakRequest
 	c.speakRequestMu.Unlock()
 	if pending == nil {
-		log.Debugf("设备 %s 收到无待处理请求的 speak_ready，忽略", c.DeviceID)
+		log.Debugf("Device %s received speak_ready with no pending request, ignore", c.DeviceID)
 		return nil
 	}
 	if pending.sessionID != "" && strings.TrimSpace(msg.SessionID) != pending.sessionID {
-		log.Warnf("设备 %s speak_ready session_id 不匹配: got=%s want=%s", c.DeviceID, msg.SessionID, pending.sessionID)
+		log.Warnf("Device %s speak_ready session_id mismatch: got=%s want=%s", c.DeviceID, msg.SessionID, pending.sessionID)
 		return nil
 	}
 
@@ -731,7 +731,7 @@ func (c *ChatManager) HandleSpeakReadyMessage(msg *ClientMessage) error {
 	if msg.SpeakUDPConfig != nil {
 		reuseExisting = msg.SpeakUDPConfig.ReuseExisting
 	}
-	log.Infof("设备 %s speak_ready 已就绪，reuse_existing=%v", c.DeviceID, reuseExisting)
+	log.Infof("Device %s speak_ready is ready, reuse_existing=%v", c.DeviceID, reuseExisting)
 	return nil
 }
 
@@ -822,7 +822,7 @@ func (c *ChatManager) clearMqttRebootstrapPending(reason string) {
 		return
 	}
 	if c.mqttRebootstrapPending.Swap(false) {
-		log.Debugf("设备 %s 清除 MQTT 会话重建标记: reason=%s", c.DeviceID, reason)
+		log.Debugf("Device %s clear MQTT session rebuild flag: reason=%s", c.DeviceID, reason)
 	}
 }
 
@@ -857,23 +857,23 @@ func (c *ChatManager) markMqttConversationStateStale(reason string) {
 		return
 	}
 	if reason == "duplicate_hello" && c.hasPendingSpeakRequest() {
-		log.Infof("设备 %s 收到 duplicate_hello，检测到待完成 speak_request，按主动播报握手重协商处理，跳过会话重建归一化", c.DeviceID)
+		log.Infof("Device %s received duplicate_hello with pending speak_request, renegotiate as proactive speak handshake, skip session rebuild normalize", c.DeviceID)
 		return
 	}
 
 	alreadyPending := c.mqttRebootstrapPending.Swap(true)
 	if alreadyPending {
-		log.Debugf("设备 %s MQTT 会话重建标记已存在，跳过重复归一化: reason=%s", c.DeviceID, reason)
+		log.Debugf("Device %s MQTT session rebuild flag already set, skip duplicate normalize: reason=%s", c.DeviceID, reason)
 		return
 	}
 
 	session := c.GetSession()
 	if session != nil && !session.IsClosing() {
-		log.Infof("设备 %s MQTT 链路重建，重置当前会话状态: reason=%s", c.DeviceID, reason)
+		log.Infof("Device %s MQTT link rebuild, reset current session state: reason=%s", c.DeviceID, reason)
 		session.ResetToSilentState()
 		c.scheduleRetainedSessionCleanup(session, "mqtt_transport_rebootstrap")
 	} else if c.clientState != nil {
-		log.Infof("设备 %s MQTT 链路重建，清理残留客户端状态: reason=%s", c.DeviceID, reason)
+		log.Infof("Device %s MQTT link rebuild, clear residual client state: reason=%s", c.DeviceID, reason)
 		c.clientState.Destroy()
 		c.clientState.Abort = false
 		c.clientState.IsWelcomeSpeaking = false
@@ -896,7 +896,7 @@ func (c *ChatManager) resetMcpRuntimeOnMqttTransportReady() {
 		return
 	}
 
-	log.Infof("设备 %s 收到 MQTT online 广播，销毁现有 IoT MCP runtime，准备重新初始化", c.DeviceID)
+	log.Infof("Device %s received MQTT online broadcast, destroy existing IoT MCP runtime for re-init", c.DeviceID)
 	closeDeviceMcpRuntime(c.clientState.DeviceID, c.mcpTransport)
 }
 
@@ -953,7 +953,7 @@ func (c *ChatManager) cancelRetainedSessionCleanup(reason string) {
 
 	if timer != nil {
 		timer.Stop()
-		log.Debugf("设备 %s 取消 ChatSession 保留期清理: reason=%s", c.DeviceID, reason)
+		log.Debugf("Device %s cancel ChatSession retention cleanup: reason=%s", c.DeviceID, reason)
 	}
 }
 
@@ -973,7 +973,7 @@ func (c *ChatManager) scheduleRetainedSessionCleanup(session *ChatSession, reaso
 	c.retainedSessionCleanupMu.Unlock()
 
 	log.Infof(
-		"设备 %s ChatSession 已进入保留态: timeout=%s reason=%s",
+		"Device %s ChatSession entered retention: timeout=%s reason=%s",
 		c.DeviceID,
 		timeout,
 		reason,
@@ -1001,7 +1001,7 @@ func (c *ChatManager) runRetainedSessionCleanup(session *ChatSession, timeout ti
 		return
 	}
 
-	log.Infof("设备 %s ChatSession 空闲超过 %s，执行彻底清理", c.DeviceID, timeout)
+	log.Infof("Device %s ChatSession idle longer than %s, performing full cleanup", c.DeviceID, timeout)
 	session.CloseWithReason(chatSessionCloseReasonRetainedIdleTimeout)
 }
 
@@ -1042,21 +1042,21 @@ func (c *ChatManager) handleSessionClosed(session *ChatSession, reason string) {
 		c.startingSessionDone = nil
 	default:
 		c.sessionMu.Unlock()
-		log.Debugf("设备 %s 收到过期 ChatSession close 回调，忽略后续清理", c.DeviceID)
+		log.Debugf("Device %s received stale ChatSession close callback, ignore further cleanup", c.DeviceID)
 		return
 	}
 	c.sessionMu.Unlock()
 
 	if waitCh != nil {
 		close(waitCh)
-		log.Debugf("设备 %s ChatSession 在启动阶段关闭，已清理启动状态", c.DeviceID)
+		log.Debugf("Device %s ChatSession closed during startup, startup state cleaned", c.DeviceID)
 		return
 	}
 
 	if reason == chatSessionCloseReasonManagerShutdown {
-		// manager_shutdown 既可能来自服务端主动 shutdown(true)，也可能来自底层链路
-		// 已断开后的资源清理 shutdown(false)。主动 shutdown(true) 场景仍由
-		// ServerTransport.Close() 发送 goodbye，避免在被动断连路径误发。
+		// manager_shutdown may come from an intentional server shutdown(true) or from the underlying link
+		// already disconnected and cleaned up via shutdown(false). Intentional shutdown(true) still relies on
+		// ServerTransport.Close() sending goodbye, avoiding a spurious goodbye on passive disconnect.
 		return
 	}
 
@@ -1067,7 +1067,7 @@ func (c *ChatManager) handleSessionClosed(session *ChatSession, reason string) {
 	switch c.serverTransport.GetTransportType() {
 	case types_conn.TransportTypeWebsocket:
 		if err := c.shutdown(true); err != nil {
-			log.Warnf("关闭 websocket transport 失败: %v", err)
+			log.Warnf("Failed to close websocket transport: %v", err)
 		}
 	case types_conn.TransportTypeMqttUdp:
 		if reason == chatSessionCloseReasonRetainedIdleTimeout {
@@ -1081,7 +1081,7 @@ func (c *ChatManager) handleSessionClosed(session *ChatSession, reason string) {
 		c.setNeedFreshHello(true)
 		c.resetSpeakPathAfterServerSessionClose(reason)
 		if err := c.serverTransport.SendMqttGoodbye(); err != nil {
-			log.Warnf("发送 mqtt goodbye 失败: %v", err)
+			log.Warnf("Failed to send mqtt goodbye: %v", err)
 		}
 	}
 }
@@ -1104,7 +1104,7 @@ func (c *ChatManager) shutdown(closeTransport bool) error {
 		c.cancelRetainedSessionCleanup("manager_shutdown")
 
 		if c.clientState != nil {
-			log.Infof("关闭 ChatManager, 设备 %s", c.clientState.DeviceID)
+			log.Infof("Closing ChatManager, device %s", c.clientState.DeviceID)
 		}
 
 		c.sessionMu.RLock()
@@ -1138,7 +1138,7 @@ func (c *ChatManager) shutdown(closeTransport bool) error {
 			}
 		} else if c.serverTransport != nil {
 			if err := c.serverTransport.CloseWithoutTransport(); err != nil {
-				log.Warnf("关闭 server transport 包装层失败: %v", err)
+				log.Warnf("Failed to close server transport wrapper: %v", err)
 			}
 		}
 
@@ -1155,12 +1155,12 @@ func (c *ChatManager) Close() error {
 }
 
 func (c *ChatManager) OnClose(deviceId string) {
-	log.Infof("设备 %s 断开连接", deviceId)
+	log.Infof("Device %s disconnected", deviceId)
 	if c.managerClosing.Load() {
 		return
 	}
 	if err := c.shutdown(false); err != nil {
-		log.Warnf("连接关闭后的资源清理失败: %v", err)
+		log.Warnf("Resource cleanup after connection close failed: %v", err)
 	}
 }
 
@@ -1224,11 +1224,11 @@ func (c *ChatManager) prepareSpeakPathForInjectedSpeech(previewText string, auto
 		return nil
 	}
 	if c.serverTransport.GetTransportType() != types_conn.TransportTypeMqttUdp {
-		log.Debugf("设备 %s 注入消息跳过 speak_request: transport=%s", c.DeviceID, c.serverTransport.GetTransportType())
+		log.Debugf("Device %s inject message skip speak_request: transport=%s", c.DeviceID, c.serverTransport.GetTransportType())
 		return nil
 	}
 	if !c.shouldSendSpeakRequest(time.Now()) {
-		log.Debugf("设备 %s 注入消息复用现有播报链路，跳过 speak_request", c.DeviceID)
+		log.Debugf("Device %s inject message reuses existing speak path, skip speak_request", c.DeviceID)
 		return nil
 	}
 	if _, err := c.ensureClientSessionID(); err != nil {
@@ -1242,7 +1242,7 @@ func (c *ChatManager) prepareSpeakPathForInjectedSpeech(previewText string, auto
 			c.finishPendingSpeakRequest(pending, err)
 			return err
 		}
-		log.Infof("设备 %s 已发送 speak_request，session_id=%s", c.DeviceID, pending.sessionID)
+		log.Infof("Device %s speak_request sent, session_id=%s", c.DeviceID, pending.sessionID)
 	}
 
 	waitCtx := c.ctx
@@ -1265,34 +1265,34 @@ func (c *ChatManager) shouldSendSpeakRequest(now time.Time) bool {
 		return false
 	}
 	if c.serverTransport.GetTransportType() != types_conn.TransportTypeMqttUdp {
-		log.Debugf("设备 %s speak_request 判定: transport=%s，无需发送", c.DeviceID, c.serverTransport.GetTransportType())
+		log.Debugf("Device %s speak_request decision: transport=%s, no send needed", c.DeviceID, c.serverTransport.GetTransportType())
 		return false
 	}
 	if c.requiresHelloBootstrapForSession() {
-		log.Debugf("设备 %s speak_request 判定: ChatSession 依赖新 hello 建立，需发送", c.DeviceID)
+		log.Debugf("Device %s speak_request decision: ChatSession needs new hello, must send", c.DeviceID)
 		return true
 	}
 	if c.needsMqttRebootstrap() {
-		log.Debugf("设备 %s speak_request 判定: MQTT 链路待重建，需发送", c.DeviceID)
+		log.Debugf("Device %s speak_request decision: MQTT link pending rebuild, must send", c.DeviceID)
 		return true
 	}
 	if c.isConversationActive() {
-		log.Debugf("设备 %s speak_request 判定: 当前处于会话中，跳过发送", c.DeviceID)
+		log.Debugf("Device %s speak_request decision: currently in session, skip send", c.DeviceID)
 		return false
 	}
 
 	warmAt := c.currentSpeakPathWarmAt()
 	if warmAt <= 0 {
-		log.Debugf("设备 %s speak_request 判定: 无可复用热链路，需发送", c.DeviceID)
+		log.Debugf("Device %s speak_request decision: no reusable warm link, must send", c.DeviceID)
 		return true
 	}
 	reuseWindow := speakRequestReuseWindow()
 	idleFor := now.Sub(time.UnixMilli(warmAt))
 	if idleFor <= reuseWindow {
-		log.Debugf("设备 %s speak_request 判定: 热链路仍有效 idle_for=%s reuse_window=%s，跳过发送", c.DeviceID, idleFor, reuseWindow)
+		log.Debugf("Device %s speak_request decision: warm link still valid idle_for=%s reuse_window=%s, skip send", c.DeviceID, idleFor, reuseWindow)
 		return false
 	}
-	log.Debugf("设备 %s speak_request 判定: 热链路已过期 idle_for=%s reuse_window=%s，需发送", c.DeviceID, idleFor, reuseWindow)
+	log.Debugf("Device %s speak_request decision: warm link expired idle_for=%s reuse_window=%s, must send", c.DeviceID, idleFor, reuseWindow)
 	return true
 }
 
@@ -1458,11 +1458,11 @@ func (c *ChatManager) refreshSpeakPathWarmFromTransport() {
 		return
 	}
 	if c.hasPendingSpeakRequest() {
-		log.Debugf("设备 %s 当前存在待完成 speak_request，跳过刷新热链路", c.DeviceID)
+		log.Debugf("Device %s pending speak_request, skip refreshing warm link", c.DeviceID)
 		return
 	}
 	if c.needsMqttRebootstrap() {
-		log.Debugf("设备 %s 当前存在 MQTT 会话重建标记，跳过刷新热链路", c.DeviceID)
+		log.Debugf("Device %s MQTT session rebuild flag present, skip refreshing warm link", c.DeviceID)
 		return
 	}
 	if ts := c.serverTransport.GetUDPLastActiveTs(); ts > 0 {
@@ -1546,7 +1546,7 @@ func (c *ChatManager) handleTTSTurnEndPolicy(ctx context.Context, policy ttsTurn
 		return
 	}
 	if stopErr != nil {
-		log.Debugf("设备 %s TTS turn end policy skipped: policy=%d err=%v", c.DeviceID, policy, stopErr)
+		log.Debugf("Device %s TTS turn end policy skipped: policy=%d err=%v", c.DeviceID, policy, stopErr)
 		return
 	}
 
@@ -1562,7 +1562,7 @@ func (c *ChatManager) handleTTSTurnEndPolicy(ctx context.Context, policy ttsTurn
 			select {
 			case <-timer.C:
 			case <-c.ctx.Done():
-				log.Debugf("设备 %s TTS turn end policy delayed goodbye canceled: %v", c.DeviceID, c.ctx.Err())
+				log.Debugf("Device %s TTS turn end policy delayed goodbye canceled: %v", c.DeviceID, c.ctx.Err())
 				return
 			}
 		}
@@ -1572,7 +1572,7 @@ func (c *ChatManager) handleTTSTurnEndPolicy(ctx context.Context, policy ttsTurn
 
 		session := c.GetSession()
 		if session == nil || session.IsClosing() {
-			log.Debugf("设备 %s TTS turn end policy skipped: session already closed", c.DeviceID)
+			log.Debugf("Device %s TTS turn end policy skipped: session already closed", c.DeviceID)
 			return
 		}
 		session.CloseWithReason(chatSessionCloseReasonExplicitExit)
@@ -1615,7 +1615,7 @@ func (c *ChatManager) resetOpenClawModeOnHello(agentIDs ...string) {
 		}
 		seen[agentID] = struct{}{}
 		if openclawManager.ExitMode(agentID, deviceID) {
-			log.Infof("设备 %s 在 hello 后重置OpenClaw模式: agent=%s", deviceID, agentID)
+			log.Infof("Device %s reset OpenClaw mode after hello: agent=%s", deviceID, agentID)
 		}
 	}
 }
@@ -1640,6 +1640,6 @@ func (c *ChatManager) refreshDeviceConfigOnHello() error {
 	c.clientState.SpeakerTTSConfig = nil
 	applyOutputAudioFormatForTTS(c.clientState)
 
-	log.Infof("设备 %s hello 刷新配置成功，agent: %s -> %s", c.clientState.DeviceID, prevAgentID, deviceConfig.AgentId)
+	log.Infof("Device %s hello config refresh succeeded, agent: %s -> %s", c.clientState.DeviceID, prevAgentID, deviceConfig.AgentId)
 	return nil
 }

@@ -7,9 +7,9 @@ import (
 	"github.com/spf13/viper"
 )
 
-// removePunctuation 移除文本中的标点符号
+// removePunctuation strips punctuation from text
 func removePunctuation(text string) string {
-	// 创建一个字符串构建器
+	// create a strings.Builder
 	var builder strings.Builder
 	builder.Grow(len(text))
 
@@ -22,7 +22,7 @@ func removePunctuation(text string) string {
 	return builder.String()
 }
 
-// isWakeupWord 检查文本是否是唤醒词
+// isWakeupWord checks whether text is a wake word
 func isWakeupWord(text string) bool {
 	wakeupWords := viper.GetStringSlice("wakeup_words")
 	for _, word := range wakeupWords {

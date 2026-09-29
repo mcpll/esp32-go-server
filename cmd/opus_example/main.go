@@ -8,45 +8,45 @@ import (
 )
 
 func main() {
-	// 音频参数设置
+	// Audio params
 	channels := 1
 	sampleRate := 16000 // 16kHz
 	fmt.Printf("通道数: %d, 采样率: %d Hz\n", channels, sampleRate)
 
-	// 创建一个编码器，指定应用类型为VoIP (低延迟语音)
+	// Create encoder with VoIP application (low-latency speech)
 	enc, err := opus.NewEncoder(sampleRate, channels, opus.AppVoIP)
 	if err != nil {
 		fmt.Printf("创建编码器失败: %v\n", err)
 		os.Exit(1)
 	}
 
-	// 设置比特率为16kbps
+	// Set bitrate to 16kbps
 	if err = enc.SetBitrate(16000); err != nil {
 		fmt.Printf("设置比特率失败: %v\n", err)
 		os.Exit(1)
 	}
 
-	// 设置复杂度，0-10之间，越高质量越好但CPU消耗越大
+	// Set complexity 0-10; higher is better quality, more CPU
 	if err = enc.SetComplexity(5); err != nil {
 		fmt.Printf("设置复杂度失败: %v\n", err)
 		os.Exit(1)
 	}
 
-	// 生成20ms的测试PCM数据 (每帧20ms，16kHz采样率 = 320样本)
+	// Generate 20ms test PCM (20ms/frame at 16kHz = 320 samples)
 	frameSize := 320
 	pcm := make([]int16, frameSize*channels)
 
-	// 生成一个简单的正弦波进行测试
+	// Generate a simple sine wave for testing
 	for i := 0; i < frameSize; i++ {
-		// 简单的正弦波，频率约为440Hz
+		// Simple sine ~440Hz
 		value := int16(10000.0 * float64(i%36) / 36.0)
 		pcm[i] = value
 	}
 
-	// 用于存储编码后的数据
+	// Buffer for encoded data
 	data := make([]byte, 1000)
 
-	// 编码PCM数据为Opus
+	// Encode PCM as Opus
 	n, err := enc.Encode(pcm, data)
 	if err != nil {
 		fmt.Printf("编码失败: %v\n", err)
@@ -56,17 +56,17 @@ func main() {
 	fmt.Printf("编码%d个样本为%d字节的Opus数据，压缩率: %.2f%%\n",
 		frameSize*channels, n, float64(n)/float64(frameSize*channels*2)*100)
 
-	// 创建解码器进行解码测试
+	// Create decoder for round-trip test
 	dec, err := opus.NewDecoder(sampleRate, channels)
 	if err != nil {
 		fmt.Printf("创建解码器失败: %v\n", err)
 		os.Exit(1)
 	}
 
-	// 用于存储解码后的PCM数据
+	// Buffer for decoded PCM
 	decodedPCM := make([]int16, frameSize*channels)
 
-	// 解码Opus数据为PCM
+	// Decode Opus to PCM
 	samplesDecoded, err := dec.Decode(data[:n], decodedPCM)
 	if err != nil {
 		fmt.Printf("解码失败: %v\n", err)
@@ -75,7 +75,7 @@ func main() {
 
 	fmt.Printf("解码%d字节的Opus数据为%d个样本\n", n, samplesDecoded)
 
-	// 计算原始PCM与解码后PCM的差异
+	// Measure difference between original and decoded PCM
 	var sumDiff int64
 	for i := 0; i < frameSize; i++ {
 		diff := int64(pcm[i]) - int64(decodedPCM[i])

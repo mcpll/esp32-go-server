@@ -85,7 +85,7 @@ type xunfeiSuperRequest struct {
 
 type xunfeiSuperHeader struct {
 	AppID   string `json:"app_id"`
-	Status  int    `json:"status"` // 讯飞要求请求中必须带 header.status，0 表示首帧不能省略
+	Status  int    `json:"status"` // Xunfei requires header.status on every request; 0 means first frame and must not be omitted
 	Code    int    `json:"code,omitempty"`
 	Message string `json:"message,omitempty"`
 	SID     string `json:"sid,omitempty"`
@@ -126,17 +126,17 @@ type xunfeiSuperAudioParam struct {
 type xunfeiSuperPayload struct {
 	Text  xunfeiSuperTextPayload   `json:"text"`
 	Audio *xunfeiSuperAudioResp    `json:"audio,omitempty"`
-	Pybuf *xunfeiSuperPybufPayload `json:"pybuf,omitempty"` // rhy=1 时返回，base64 编码的音素/拼音
+	Pybuf *xunfeiSuperPybufPayload `json:"pybuf,omitempty"` // returned when rhy=1; base64-encoded phonemes/pinyin
 }
 
-// xunfeiSuperPybufPayload 响应 payload.pybuf，文档见 https://www.xfyun.cn/doc/spark/super%20smart-tts.html
+// xunfeiSuperPybufPayload is response payload.pybuf; see https://www.xfyun.cn/doc/spark/super%20smart-tts.html
 type xunfeiSuperPybufPayload struct {
 	Encoding string `json:"encoding"`
 	Compress string `json:"compress"`
 	Format   string `json:"format"`
 	Status   int    `json:"status"`
 	Seq      int    `json:"seq"`
-	Text     string `json:"text"` // base64 编码，解码后为音素信息
+	Text     string `json:"text"` // base64; decodes to phoneme info
 }
 
 type xunfeiSuperTextPayload struct {
@@ -235,7 +235,7 @@ func NewXunfeiSuperTTSProvider(config map[string]interface{}) *XunfeiSuperTTSPro
 
 	encoding, expectedPayloadLen, err := mapXunfeiSuperAudioEncoding(provider.AudioEncoding, provider.SampleRate)
 	if err != nil {
-		log.Warnf("初始化 xunfei_super_tts 配置失败，回退到 raw/24k: %v", err)
+		log.Warnf("failed to init xunfei_super_tts config, falling back to raw/24k: %v", err)
 		provider.AudioEncoding = defaultXunfeiSuperAudioEncoding
 		provider.SampleRate = defaultXunfeiSuperSampleRate
 		encoding = "raw"
@@ -287,7 +287,7 @@ func (p *XunfeiSuperTTSProvider) TextToSpeechStream(ctx context.Context, text st
 
 	go func() {
 		if err := p.streamSynthesis(ctx, text, targetSampleRate, targetFrameDuration, startTs, outputChan); err != nil && ctx.Err() == nil {
-			log.Errorf("xunfei_super_tts 流式合成失败: %v", err)
+			log.Errorf("xunfei_super_tts stream synthesis failed: %v", err)
 		}
 	}()
 
@@ -298,8 +298,8 @@ func (p *XunfeiSuperTTSProvider) streamSynthesis(ctx context.Context, text strin
 	p.synthesisMu.Lock()
 	defer p.synthesisMu.Unlock()
 
-	// 讯飞超拟人连接在单次合成结束后会结束 input channel，跨句复用连接会导致后续请求直接失败。
-	// 因此每次合成都使用独立连接；单次合成内部的多段文本仍复用这一条连接。
+	// Xunfei Super TTS closes the input channel after one synthesis; reusing the connection across sentences makes later requests fail immediately.
+	// so each synthesis uses its own connection; multi-segment text within one synthesis still shares that connection.
 	conn, err := p.reconnect(ctx)
 	if err != nil {
 		close(outputChan)
@@ -363,7 +363,7 @@ func (p *XunfeiSuperTTSProvider) streamSynthesis(ctx context.Context, text strin
 		go func() {
 			defer close(decoderDone)
 			if err := decoder.Run(startTs); err != nil && ctx.Err() == nil {
-				log.Errorf("xunfei_super_tts 音频解码失败: %v", err)
+				log.Errorf("xunfei_super_tts audio decode failed: %v", err)
 			}
 		}()
 		return nil
@@ -392,7 +392,7 @@ func (p *XunfeiSuperTTSProvider) streamSynthesis(ctx context.Context, text strin
 	finishDecoder(streamErr)
 
 	if streamErr == nil && ctx.Err() == nil {
-		log.Infof("xunfei_super_tts 耗时: 从输入至获取音频数据结束耗时: %d ms", time.Now().UnixMilli()-startTs)
+		log.Infof("xunfei_super_tts elapsed from input to end of audio: %d ms", time.Now().UnixMilli()-startTs)
 	}
 
 	return streamErr
@@ -763,7 +763,7 @@ func (p *XunfeiSuperTTSProvider) validate() error {
 	return nil
 }
 
-// StreamingSynthesize 双流式合成：从 textChan 持续收文本、边合成边输出事件。textChan 关闭表示文本结束。
+// StreamingSynthesize bidirectional streaming: keep reading text from textChan, synthesize and emit events; closing textChan ends input.
 func (p *XunfeiSuperTTSProvider) StreamingSynthesize(ctx context.Context, textChan <-chan string, sampleRate int, channels int, frameDuration int) (chan streaming.SynthesisEvent, error) {
 	if err := p.validate(); err != nil {
 		return nil, err
@@ -780,7 +780,7 @@ func (p *XunfeiSuperTTSProvider) StreamingSynthesize(ctx context.Context, textCh
 	startTs := time.Now().UnixMilli()
 	go func() {
 		if err := p.streamingSynthesisLoop(ctx, textChan, targetSampleRate, targetFrameDuration, startTs, outputChan); err != nil && ctx.Err() == nil {
-			log.Errorf("xunfei_super_tts 双流式合成失败: %v", err)
+			log.Errorf("xunfei_super_tts dual-stream synthesis failed: %v", err)
 		}
 	}()
 	return outputChan, nil
@@ -943,7 +943,7 @@ func (p *XunfeiSuperTTSProvider) streamingSynthesisLoop(ctx context.Context, tex
 		go func() {
 			defer close(decoderDone)
 			if err := decoder.Run(startTs); err != nil && ctx.Err() == nil {
-				log.Errorf("xunfei_super_tts 双流式音频解码失败: %v", err)
+				log.Errorf("xunfei_super_tts dual-stream audio decode failed: %v", err)
 			}
 		}()
 		return nil
@@ -963,7 +963,7 @@ func (p *XunfeiSuperTTSProvider) streamingSynthesisLoop(ctx context.Context, tex
 		close(audioFrameChan)
 	}
 
-	// 等待第一条非空文本
+	// wait for the first non-empty text
 	var firstText string
 	for {
 		select {
@@ -983,8 +983,8 @@ func (p *XunfeiSuperTTSProvider) streamingSynthesisLoop(ctx context.Context, tex
 	}
 gotFirstText:
 
-	// 双流式请求状态按协议独立推进：
-	// 首个非空文本必须使用 status=0，后续文本使用 status=1，输入关闭时用 status=2 收尾。
+	// bidirectional streaming request status advances per protocol:
+	// first non-empty text must use status=0, later text status=1, and status=2 when input closes.
 	sendErrCh := make(chan error, 1)
 	go func() {
 		seq := 0
@@ -1056,7 +1056,7 @@ gotFirstText:
 		}
 
 		if !fallbackLogged {
-			log.Warnf("xunfei_super_tts 双流式响应未返回 ced，回退为音频块级句子边界估算")
+			log.Warnf("xunfei_super_tts dual-stream response missing ced, falling back to chunk-level sentence boundary estimate")
 			fallbackLogged = true
 		}
 		enableFallbackMode()
@@ -1071,7 +1071,7 @@ gotFirstText:
 		streamErr = sendErr
 	}
 	if streamErr == nil && ctx.Err() == nil {
-		log.Infof("xunfei_super_tts 双流式耗时: %d ms", time.Now().UnixMilli()-startTs)
+		log.Infof("xunfei_super_tts dual-stream elapsed: %d ms", time.Now().UnixMilli()-startTs)
 	}
 	return streamErr
 }
@@ -1120,7 +1120,7 @@ func mapXunfeiSuperAudioEncoding(audioEncoding string, sampleRate int) (string, 
 		case 16000:
 			return "opus-wb", 40, nil
 		case 24000:
-			// 文档列出了 opus-swb 编码名，但未明确响应载荷大小，这里不强行假设长度。
+			// docs list the opus-swb encoding name but not payload size; do not assume a length here.
 			return "opus-swb", 0, nil
 		default:
 			return "", 0, fmt.Errorf("xunfei_super_tts opus 仅支持 8000/16000/24000 采样率，当前: %d", sampleRate)

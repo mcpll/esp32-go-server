@@ -656,12 +656,12 @@ func (r *deviceMediaRuntime) attachSession(session *ChatSession) {
 	shouldResume = r.resumeOnAttach
 	r.mu.Unlock()
 
-	log.Infof("设备 %s 媒体播放 attachment 已绑定", r.deviceID)
+	log.Infof("Device %s media playback attachment bound", r.deviceID)
 
 	if shouldResume {
 		go func() {
 			if err := r.RecoverPlayback(context.Background(), r.currentAudioConfig(), mediaRecoveryTriggerAttach); err != nil && !errors.Is(err, context.Canceled) {
-				log.Warnf("设备 %s 恢复媒体播放失败: %v", r.deviceID, err)
+				log.Warnf("Device %s resume media playback failed: %v", r.deviceID, err)
 			}
 		}()
 	}
@@ -700,7 +700,7 @@ func (r *deviceMediaRuntime) detachSession(session *ChatSession, preserve bool) 
 	r.notifyAttachmentChangedLocked()
 	r.mu.Unlock()
 
-	log.Infof("设备 %s 媒体播放 attachment 已解绑, preserve=%v", r.deviceID, preserve)
+	log.Infof("Device %s media playback attachment unbound, preserve=%v", r.deviceID, preserve)
 
 	if releaseAttachment != nil {
 		releaseAttachment.bridge.EndExclusiveMediaPlayback()
@@ -754,7 +754,7 @@ func (r *deviceMediaRuntime) ReplaceStandaloneQueueAndPlayWithHandle(ctx context
 	r.state.UpdatedAt = time.Now().UnixMilli()
 	r.mu.Unlock()
 
-	log.Infof("设备 %s 开始 standalone 媒体播放, source=%s, title=%s", r.deviceID, items[startIndex].Source.SourceType, items[startIndex].Source.Title)
+	log.Infof("Device %s start standalone media playback, trigger=%s, title=%s", r.deviceID, items[startIndex].Source.SourceType, items[startIndex].Source.Title)
 
 	releaseMediaAttachment(oldExclusive)
 	stopOldPlayback(oldActive)
@@ -803,7 +803,7 @@ func (r *deviceMediaRuntime) PlayAgentPlaylistIndex(ctx context.Context, agentID
 	r.state.UpdatedAt = time.Now().UnixMilli()
 	r.mu.Unlock()
 
-	log.Infof("设备 %s 开始智能体歌单播放, agent=%s, index=%d, title=%s", r.deviceID, agentID, startIndex, snapshot[startIndex].Source.Title)
+	log.Infof("Device %s start agent playlist playback, agent=%s, index=%d, title=%s", r.deviceID, agentID, startIndex, snapshot[startIndex].Source.Title)
 
 	releaseMediaAttachment(oldExclusive)
 	stopOldPlayback(oldActive)
@@ -874,7 +874,7 @@ func (r *deviceMediaRuntime) RecoverPlayback(ctx context.Context, cfg mediaPlayb
 		if trigger == mediaRecoveryTriggerAttach {
 			r.clearResumeOnAttach()
 		}
-		log.Infof("设备 %s 跳过媒体恢复, trigger=%s, 原因=already_playing", r.deviceID, trigger)
+		log.Infof("Device %s skip media resume, trigger=%s, reason=already_playing", r.deviceID, trigger)
 		return nil
 	}
 
@@ -887,13 +887,13 @@ func (r *deviceMediaRuntime) RecoverPlayback(ctx context.Context, cfg mediaPlayb
 		if playbackIndex < 0 || playbackIndex >= len(snapshot) {
 			playbackIndex = 0
 		}
-		log.Infof("设备 %s 执行媒体恢复, trigger=%s, mode=agent_playlist, index=%d", r.deviceID, trigger, playbackIndex)
+		log.Infof("Device %s run media resume, trigger=%s, mode=agent_playlist, index=%d", r.deviceID, trigger, playbackIndex)
 		return r.PlayAgentPlaylistIndex(ctx, agentID, playbackIndex, cfg)
 	default:
 		if currentSource == nil {
 			return fmt.Errorf("当前没有可播放的媒体")
 		}
-		log.Infof("设备 %s 执行媒体恢复, trigger=%s, mode=standalone, source=%s, title=%s", r.deviceID, trigger, currentSource.SourceType, currentSource.Title)
+		log.Infof("Device %s run media resume, trigger=%s, mode=standalone, source=%s, title=%s", r.deviceID, trigger, currentSource.SourceType, currentSource.Title)
 		return r.ReplaceStandaloneQueueAndPlay(ctx, []MediaSourceDescriptor{*currentSource}, 0, cfg)
 	}
 }
@@ -918,14 +918,14 @@ func (r *deviceMediaRuntime) recoverActivePlayback(trigger mediaRecoveryTrigger)
 	}
 	if !r.active.setPaused(false) {
 		r.resumeOnAttach = false
-		log.Infof("设备 %s 跳过媒体恢复, trigger=%s, 原因=already_playing", r.deviceID, trigger)
+		log.Infof("Device %s skip media resume, trigger=%s, reason=already_playing", r.deviceID, trigger)
 		return nil
 	}
 	r.pauseReason = mediaPauseReasonNone
 	r.resumeOnAttach = false
 	r.state.Status = play_music.StatusPlaying
 	r.state.UpdatedAt = time.Now().UnixMilli()
-	log.Infof("设备 %s 执行媒体恢复, trigger=%s, mode=resume_active", r.deviceID, trigger)
+	log.Infof("Device %s run media resume, trigger=%s, mode=resume_active", r.deviceID, trigger)
 	return nil
 }
 
@@ -1114,7 +1114,7 @@ func (r *deviceMediaRuntime) AppendCurrentToAgentPlaylist(agentID string) (*Play
 	r.state.UpdatedAt = time.Now().UnixMilli()
 	r.mu.Unlock()
 
-	log.Infof("设备 %s 将当前媒体加入智能体歌单, agent=%s, title=%s, index=%d", r.deviceID, strings.TrimSpace(agentID), item.Source.Title, index)
+	log.Infof("Device %s add current media to agent playlist, agent=%s, title=%s, index=%d", r.deviceID, strings.TrimSpace(agentID), item.Source.Title, index)
 
 	return &PlaylistAppendResult{
 		AddedTitle:      item.Source.Title,
@@ -1517,7 +1517,7 @@ func (r *deviceMediaRuntime) handleAttachmentFailure(active *activeMediaPlayback
 	r.mu.Unlock()
 
 	releaseMediaAttachment(releaseAttachment)
-	log.Warnf("设备 %s 媒体输出通道失效，等待重连恢复: %v", r.deviceID, err)
+	log.Warnf("Device %s media output channel invalid, wait for reconnect: %v", r.deviceID, err)
 }
 
 func (r *deviceMediaRuntime) playItem(active *activeMediaPlayback, item MediaPlaylistItem) error {
@@ -1538,7 +1538,7 @@ func (r *deviceMediaRuntime) playItem(active *activeMediaPlayback, item MediaPla
 		return err
 	}
 
-	log.Infof("媒体播放完成: %s", title)
+	log.Infof("Media playback finished: %s", title)
 	return nil
 }
 
@@ -1694,12 +1694,12 @@ func openLocalMediaFileStream(ctx context.Context, path string, sampleRate int, 
 		defer file.Close()
 		decoder, err := util.CreateAudioDecoderWithSampleRate(ctx, file, outputChan, frameDuration, audioFormat, sampleRate)
 		if err != nil {
-			log.Errorf("创建本地音频解码器失败: %v", err)
+			log.Errorf("Failed to create local audio decoder: %v", err)
 			close(outputChan)
 			return
 		}
 		if err := decoder.Run(time.Now().UnixMilli()); err != nil && !errors.Is(err, context.Canceled) {
-			log.Errorf("本地音频解码失败: %v", err)
+			log.Errorf("Local audio decode failed: %v", err)
 		}
 	}()
 	return outputChan, nil
