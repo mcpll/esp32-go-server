@@ -1,5 +1,9 @@
 # Agent instructions
 
+## Language
+
+English. Log messages are English in every file in this repo. When you edit a file, translate the Chinese in that file to English before you finish. The file is done when a search for Chinese characters in it is empty. Keep a Chinese string only when an external protocol requires those exact bytes, and note that on the line.
+
 ## Agent skills
 
 ### Issue tracker
