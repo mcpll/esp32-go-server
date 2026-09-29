@@ -2,7 +2,11 @@
 
 A personal Italian voice server for Xiaozhi ESP32 devices, built as a fork of [hackers365/xiaozhi-esp32-server-golang](https://github.com/hackers365/xiaozhi-esp32-server-golang) (MIT).
 
-> **Status: planning.** The design is written and the work is split into tickets. The upstream code is not imported yet, so there is nothing to build or run here today.
+> **Status: import.** The upstream code is imported at commit [`21f1a2e`](https://github.com/hackers365/xiaozhi-esp32-server-golang/commit/21f1a2e71ff383723f1464ea9b137016e6feab8d) with its history. Pruning and the PocketBase provider come next, so this tree still builds and behaves as upstream.
+
+## Fork of upstream
+
+This repository is a fork of [hackers365/xiaozhi-esp32-server-golang](https://github.com/hackers365/xiaozhi-esp32-server-golang). It keeps upstream history and authorship. To pull later upstream fixes, see [`docs/upstream-sync.md`](docs/upstream-sync.md).
 
 ## What it is
 
@@ -29,4 +33,4 @@ The voice loop is Italian, hold-to-talk, over the protocol the Eye firmware alre
 
 ## License
 
-MIT, as upstream. See `LICENSE` once the upstream import lands.
+MIT, as upstream. See [`LICENSE`](LICENSE): copyright hackers365 and mcpll.

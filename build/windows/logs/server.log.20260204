@@ -1,0 +1,157 @@
+2026-02-04 11:33:34.156[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:33:39.074[37m [debug] [websocket_client.go:127] [0m收到pong消息
+2026-02-04 11:33:39.074[37m [debug] [websocket_client.go:370] [0m发送ping消息成功
+2026-02-04 11:33:39.156[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:33:44.156[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:33:49.153[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:33:54.154[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:33:57.735[31m [error] [websocket_conn.go:61] [0m发送ping消息失败，设备ID: shijingbosss, 错误: write tcp 192.168.208.97:8989->192.168.209.60:59894: wsasend: An established connection was aborted by the software in your host machine.
+2026-02-04 11:33:57.736[36m [info] [chat.go:162] [0m设备 shijingbosss 断开连接
+2026-02-04 11:33:57.736[37m [debug] [event_handle.go:198] [0mHandleSessionEnd: deviceId: shijingbosss
+2026-02-04 11:33:59.153[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:34:04.156[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:34:09.074[37m [debug] [websocket_client.go:370] [0m发送ping消息成功
+2026-02-04 11:34:09.074[37m [debug] [websocket_client.go:127] [0m收到pong消息
+2026-02-04 11:34:09.155[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:34:14.155[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:34:19.158[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:34:24.155[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:34:29.157[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:34:34.156[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:34:39.074[37m [debug] [websocket_client.go:370] [0m发送ping消息成功
+2026-02-04 11:34:39.074[37m [debug] [websocket_client.go:127] [0m收到pong消息
+2026-02-04 11:34:39.154[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:34:44.156[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:34:49.153[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:34:54.154[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:34:59.155[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:35:04.153[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:35:09.073[37m [debug] [websocket_client.go:370] [0m发送ping消息成功
+2026-02-04 11:35:09.073[37m [debug] [websocket_client.go:127] [0m收到pong消息
+2026-02-04 11:35:09.155[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:35:14.153[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:35:19.156[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:35:24.154[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:35:29.157[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:35:34.157[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:35:39.074[37m [debug] [websocket_client.go:370] [0m发送ping消息成功
+2026-02-04 11:35:39.074[37m [debug] [websocket_client.go:127] [0m收到pong消息
+2026-02-04 11:35:39.154[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:35:44.157[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:35:49.153[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:35:54.154[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:35:59.157[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:36:04.156[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:36:09.073[37m [debug] [websocket_client.go:127] [0m收到pong消息
+2026-02-04 11:36:09.073[37m [debug] [websocket_client.go:370] [0m发送ping消息成功
+2026-02-04 11:36:09.153[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:36:14.155[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:36:19.155[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:36:24.154[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:36:29.156[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:36:34.157[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:36:39.073[37m [debug] [websocket_client.go:370] [0m发送ping消息成功
+2026-02-04 11:36:39.073[37m [debug] [websocket_client.go:127] [0m收到pong消息
+2026-02-04 11:36:39.081[37m [debug] [config.go:184] [0mLoad config from API: map[asr:map[doubao_asr:map[access_token:shijingbo appid:12345 chunk_duration:200 enable_ddc:false enable_itn:true enable_punc:true end_window_size:800 is_default:false model_name:bigmodel name:doubao_asr provider:doubao timeout:30 ws_url:wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_nostream] funasr:map[auto_end:false chunk_interval:10 chunk_size:[5 10 5] host:192.168.208.214 is_default:true max_connections:100 mode:2pass name:funasr port:10096 provider:funasr sample_rate:16000 timeout:30] provider:funasr] llm:map[aliyun_qwen:map[api_key:abce base_url:https://dashscope.aliyuncs.com/compatible-mode/v1 is_default:true max_tokens:4000 model_name:qwen-plus name:阿里云 temperature:0.7 top_p:0.9 type:openai] provider:aliyun_qwen] local_mcp:map[clear_conversation_history:true exit_conversation:true play_music:false] mcp:map[global:map[enabled:false max_reconnect_attempts:10 reconnect_interval:300 servers:[map[enabled:true name:默认MCP服务器 type:streamablehttp url:http://192.168.208.214:3001/mcp]]]] mqtt:map[broker:127.0.0.1 client_id:test enable:false name:MQTT配置 password:shijingbo port:1883 type:tcp username:admin] mqtt_server:map[enable:false enable_auth:false listen_host:0.0.0.0 listen_port:1883 name:MQTT Server配置 password:shijingbo signature_key:admin tls:map[enable:false key: pem: port:8883] type:mqtt_server username:admin] ota:map[external:map[mqtt:map[enable:false endpoint:] websocket:map[url:ws://127.0.0.1:8989/xiaozhi/v1/]] name:OTA配置 signature_key:admin test:map[mqtt:map[enable:false endpoint:] websocket:map[url:ws://127.0.0.1:8989/xiaozhi/v1/]] type:ota] tts:map[cosyvoice:map[api_url:https://tts.linkerai.cn/tts audio_format:mp3 frame_duration:60 instruct_text:你好 is_default:false name:cosyvoice provider:cosyvoice spk_id:spk_id target_sr:24000] edge_tts:map[connect_timeout:10 is_default:true name:edge_tts pitch:+0Hz provider:edge rate:+0% receive_timeout:60 voice:zh-CN-XiaoxiaoNeural volume:+0%] provider:edge_tts] vad:map[acquire_timeout_ms:3000 hop_size:310 name:tenvad pool_size:10 threshold:0.4 type:vad] voice_identify:map[base_url:http://127.0.0.1:9000 enable:true threshold:0.6]]
+2026-02-04 11:36:39.082[37m [debug] [config.go:198] [0m配置获取成功
+2026-02-04 11:36:39.150[36m [info] [manager.go:300] [0m========== 全局资源池统计信息 ==========
+2026-02-04 11:36:39.150[36m [info] [manager.go:301] [0m统计时间: 2026-02-04 11:36:39
+2026-02-04 11:36:39.150[36m [info] [manager.go:302] [0m资源池数量: 4
+2026-02-04 11:36:39.150[36m [info] [manager.go:303] [0m详细信息:
+{
+  "asr:funasr": {
+    "available_resources": 1,
+    "in_use_resources": 0,
+    "is_closed": false,
+    "max_idle": 50,
+    "max_size": 1000,
+    "min_size": 1,
+    "total_resources": 1
+  },
+  "llm:aliyun": {
+    "available_resources": 1,
+    "in_use_resources": 0,
+    "is_closed": false,
+    "max_idle": 50,
+    "max_size": 1000,
+    "min_size": 1,
+    "total_resources": 1
+  },
+  "tts:edge:zh-CN-XiaoxiaoNeural": {
+    "available_resources": 1,
+    "in_use_resources": 0,
+    "is_closed": false,
+    "max_idle": 50,
+    "max_size": 1000,
+    "min_size": 1,
+    "total_resources": 1
+  },
+  "vad:ten_vad": {
+    "available_resources": 1,
+    "in_use_resources": 0,
+    "is_closed": false,
+    "max_idle": 50,
+    "max_size": 1000,
+    "min_size": 1,
+    "total_resources": 1
+  }
+}
+2026-02-04 11:36:39.151[36m [info] [manager.go:304] [0m========================================
+2026-02-04 11:36:39.153[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:36:44.154[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:36:49.156[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:36:54.153[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:36:59.154[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:37:04.158[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:37:09.073[37m [debug] [websocket_client.go:370] [0m发送ping消息成功
+2026-02-04 11:37:09.074[37m [debug] [websocket_client.go:127] [0m收到pong消息
+2026-02-04 11:37:09.153[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:37:14.153[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:37:19.156[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+2026-02-04 11:37:24.153[37m [debug] [reporter.go:115] [0m资源池统计上报成功，资源池数量: 4
+[36mINFO[0m[0000] Initializing config system with provider: manager  [36mcaller[0m="config_init.go:25"
+[36mINFO[0m[0000] Initializing Manager config provider with WebSocket client  [36mcaller[0m="websocket_client.go:940"
+[37mDEBU[0m[0000] WebSocket客户端已连接到: ws://127.0.0.1:8080/ws      [37mcaller[0m="websocket_client.go:140"
+[36mINFO[0m[0000] Manager config provider initialized successfully  [36mcaller[0m="websocket_client.go:951"
+[37mDEBU[0m[0000] Manager WebSocket工作线程 0 已启动                   [37mcaller[0m="websocket_client.go:309"
+[37mDEBU[0m[0000] Manager WebSocket工作线程 2 已启动                   [37mcaller[0m="websocket_client.go:309"
+[37mDEBU[0m[0000] Manager WebSocket工作线程 1 已启动                   [37mcaller[0m="websocket_client.go:309"
+[37mDEBU[0m[0000] Load config from API: map[asr:map[doubao_asr:map[access_token:shijingbo appid:12345 chunk_duration:200 enable_ddc:false enable_itn:true enable_punc:true end_window_size:800 is_default:false model_name:bigmodel name:doubao_asr provider:doubao timeout:30 ws_url:wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_nostream] funasr:map[auto_end:false chunk_interval:10 chunk_size:[5 10 5] host:192.168.208.214 is_default:true max_connections:100 mode:2pass name:funasr port:10096 provider:funasr sample_rate:16000 timeout:30] provider:funasr] llm:map[aliyun_qwen:map[api_key:abce base_url:https://dashscope.aliyuncs.com/compatible-mode/v1 is_default:true max_tokens:4000 model_name:qwen-plus name:阿里云 temperature:0.7 top_p:0.9 type:openai] provider:aliyun_qwen] local_mcp:map[clear_conversation_history:true exit_conversation:true play_music:false] mcp:map[global:map[enabled:false max_reconnect_attempts:10 reconnect_interval:300 servers:[map[enabled:true name:默认MCP服务器 type:streamablehttp url:http://192.168.208.214:3001/mcp]]]] mqtt:map[broker:127.0.0.1 client_id:test enable:false name:MQTT配置 password:shijingbo port:1883 type:tcp username:admin] mqtt_server:map[enable:false enable_auth:false listen_host:0.0.0.0 listen_port:1883 name:MQTT Server配置 password:shijingbo signature_key:admin tls:map[enable:false key: pem: port:8883] type:mqtt_server username:admin] ota:map[external:map[mqtt:map[enable:false endpoint:] websocket:map[url:ws://127.0.0.1:8989/xiaozhi/v1/]] name:OTA配置 signature_key:admin test:map[mqtt:map[enable:false endpoint:] websocket:map[url:ws://127.0.0.1:8989/xiaozhi/v1/]] type:ota] tts:map[cosyvoice:map[api_url:https://tts.linkerai.cn/tts audio_format:mp3 frame_duration:60 instruct_text:你好 is_default:false name:cosyvoice provider:cosyvoice spk_id:spk_id target_sr:24000] edge_tts:map[connect_timeout:10 is_default:true name:edge_tts pitch:+0Hz provider:edge rate:+0% receive_timeout:60 voice:zh-CN-XiaoxiaoNeural volume:+0%] provider:edge_tts] vad:map[acquire_timeout_ms:3000 hop_size:310 name:tenvad pool_size:10 threshold:0.4 type:vad] voice_identify:map[base_url:http://127.0.0.1:9000 enable:true threshold:0.6]]  [37mcaller[0m="config.go:184"
+[37mDEBU[0m[0000] 配置获取成功                                        [37mcaller[0m="config.go:198"
+[36mINFO[0m[0000] 周期性配置更新已启动，更新间隔: 5m0s                         [36mcaller[0m="config.go:113"
+[36mINFO[0m[0000] 开始初始化 VAD 模块...                               [36mcaller[0m="config.go:256"
+[36mINFO[0m[0000] VAD 提供商: ten_vad                              [36mcaller[0m="config.go:258"
+[36mINFO[0m[0000] VAD 模块将使用懒加载模式，在首次使用时自动初始化                    [36mcaller[0m="config.go:261"
+[36mINFO[0m[0000] pprof服务已禁用                                    [36mcaller[0m="main.go:54"
+[36mINFO[0m[0000] 本地MCP管理器默认工具初始化完成                             [36mcaller[0m="local_manager.go:43"
+[36mINFO[0m[0000] 初始化聊天相关的本地MCP工具...                            [36mcaller[0m="local_mcp_tool.go:30"
+[36mINFO[0m[0000] === 启动MCP管理器集群 ===                            [36mcaller[0m="manager.go:47"
+[36mINFO[0m[0000] 启动本地MCP管理器...                                 [36mcaller[0m="manager.go:50"
+[36mINFO[0m[0000] 本地MCP管理器已启动                                   [36mcaller[0m="local_manager.go:172"
+[36mINFO[0m[0000] 启动全局MCP管理器...                                 [36mcaller[0m="manager.go:57"
+[36mINFO[0m[0000] === MCP配置检查 ===                               [36mcaller[0m="config_checker.go:14"
+[36mINFO[0m[0000] 全局MCP启用状态: false                              [36mcaller[0m="config_checker.go:18"
+[36mINFO[0m[0000] 全局MCP已禁用，配置检查完成                               [36mcaller[0m="config_checker.go:21"
+[36mINFO[0m[0000] 全局MCP管理器已禁用                                   [36mcaller[0m="global_manage.go:93"
+[36mINFO[0m[0000] 设备MCP管理器将根据连接动态创建                             [36mcaller[0m="manager.go:64"
+[36mINFO[0m[0000] === MCP管理器集群启动完成 ===                          [36mcaller[0m="manager.go:67"
+[36mINFO[0m[0000] MCP管理器启动统计:                                   [36mcaller[0m="manager.go:130"
+[36mINFO[0m[0000]   - 本地工具数量: 0                                 [36mcaller[0m="manager.go:131"
+[36mINFO[0m[0000]   - 全局工具数量: 0                                 [36mcaller[0m="manager.go:132"
+[36mINFO[0m[0000]   - 设备管理器: 动态管理                               [36mcaller[0m="manager.go:133"
+[36mINFO[0m[0000]   - 总计工具数量: 0                                 [36mcaller[0m="manager.go:134"
+[36mINFO[0m[0000] 成功注册本地工具: exit_conversation - 当用户明确表示要结束对话、退出系统或告别时使用，用于优雅地关闭当前聊天会话  [36mcaller[0m="local_manager.go:69"
+[36mINFO[0m[0000] WebSocket 服务器启动在 ws://0.0.0.0:8989/xiaozhi/v1/  [36mcaller[0m="websocket_server.go:101"
+[36mINFO[0m[0000] MCP WebSocket 端点: ws://0.0.0.0:8989/mcp?token=xxx  [36mcaller[0m="websocket_server.go:102"
+[36mINFO[0m[0000] 成功注册本地工具: clear_conversation_history - 当用户要求清空、清除或重置历史对话记录时使用，用于清空当前会话的所有历史对话内容  [36mcaller[0m="local_manager.go:69"
+[36mINFO[0m[0000] MCP API 端点: http://0.0.0.0:8989/xiaozhi/api/mcp/tools/{deviceId}  [36mcaller[0m="websocket_server.go:103"
+[36mINFO[0m[0000] 聊天相关的本地MCP工具初始化完成                             [36mcaller[0m="local_mcp_tool.go:75"
+[36mINFO[0m[0000] 聊天相关的本地MCP工具注册完成                              [36mcaller[0m="app.go:242"
+[36mINFO[0m[0000] UnifiedWorkerPool初始化完成，启动 32 个worker goroutine（可处理多个topic）  [36mcaller[0m="event_handle.go:56"
+[36mINFO[0m[0000] UnifiedWorkerPool: 注册topic处理器 [session_end]   [36mcaller[0m="event_handle.go:65"
+[36mINFO[0m[0000] UnifiedWorkerPool: 注册topic处理器 [exit_chat]     [36mcaller[0m="event_handle.go:65"
+[36mINFO[0m[0000] EventHandle初始化完成（使用统一worker池处理多个topic，Redis处理已迁移至MessageWorker）  [36mcaller[0m="event_handle.go:290"
+[36mINFO[0m[0000] MessageWorker初始化完成，启动 32 个worker goroutine（统一处理Redis+MemoryProvider+History）  [36mcaller[0m="message_handle.go:80"
+[36mINFO[0m[0000] 消息处理器已初始化                                     [36mcaller[0m="app.go:99"
+[36mINFO[0m[0000] 资源池统计监控已启动，每 5m0s 输出一次统计信息到日志                 [36mcaller[0m="manager.go:314"
+[36mINFO[0m[0000] 资源池统计上报器已初始化，backend_url=http://127.0.0.1:8080, enabled=true  [36mcaller[0m="reporter.go:53"
