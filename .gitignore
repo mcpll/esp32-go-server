@@ -1,0 +1,50 @@
+# Agents: track the shared contract, ignore the personal and generated parts.
+# Tracked on purpose: AGENTS.md, docs/agents/, docs/adr/, skills-lock.json.
+# Installed skills are reproducible from skills-lock.json, so they are not tracked.
+.agents/
+.scratch/
+.tokensave/
+# Personal overrides and tool-local state (may hold tokens or machine paths)
+AGENTS.local.md
+CLAUDE.local.md
+.claude/settings.local.json
+.cursor/mcp.json
+.aider*
+
+# Secrets and local config (never commit)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.idea/
+.vscode/
+*.swp
+
+# Go
+/bin/
+*.exe
+*.test
+*.out
+coverage.*
+go.work
+go.work.sum
+
+# Node / console (React + Vite)
+node_modules/
+console/dist/
+*.log
+npm-debug.log*
+
+# PocketBase: runtime data and the built console (migrations stay tracked)
+pb_data/
+pb_public/
+
+# Docker
+docker-compose.override.yml
