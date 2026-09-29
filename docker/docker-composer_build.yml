@@ -1,0 +1,94 @@
+version: '3.8'
+
+services:
+  # MySQL数据库服务
+  mysql:
+    image: docker.jsdelivr.fyi/mysql:8.0
+    container_name: xiaozhi-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: xiaozhi_admin
+    ports:
+      - "23306:3306"        #可以不进行映射
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password --skip-ssl
+    networks:
+      - xiaozhi-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-ppassword"]
+      timeout: 20s
+      retries: 10
+      interval: 10s
+      start_period: 30s
+
+  # 主程序服务
+  main-server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.main
+    container_name: xiaozhi-main-server
+    ports:
+      - "18989:8989"
+      - "12883:2883"
+    depends_on:
+      - mysql
+      - backend
+    environment:
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=password
+      - DB_NAME=xiaozhi_admin
+      - BACKEND_URL=http://backend:8080
+    volumes:
+      - ../config:/workspace/config
+      - ../logs:/workspace/logs
+    networks:
+      - xiaozhi-network
+    restart: unless-stopped
+
+  # 后端管理服务
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    container_name: xiaozhi-backend
+    ports:
+      - "28080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=password
+      - DB_NAME=xiaozhi_admin
+    volumes:
+      - ../manager/backend/config:/root/config
+    networks:
+      - xiaozhi-network
+    restart: unless-stopped
+
+  # 前端管理服务
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    container_name: xiaozhi-frontend
+    ports:
+      - "18080:80"
+    depends_on:
+      - backend
+    networks:
+      - xiaozhi-network
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+
+networks:
+  xiaozhi-network:
+    driver: bridge

@@ -1,0 +1,16 @@
+**/.git
+**/node_modules
+**/*.log
+**/bin
+**/vendor
+**/dist
+**/test
+**/.vscode
+**/tmp
+**/*.exe
+**/*.dll
+**/*.bat
+!build/windows/*.dll
+!build/windows/*.bat
+**/Thumbs.db
+**/Desktop.ini

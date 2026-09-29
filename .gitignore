@@ -38,7 +38,7 @@ go.work.sum
 
 # Node / console (React + Vite)
 node_modules/
-console/dist/
+dist/
 *.log
 npm-debug.log*
 

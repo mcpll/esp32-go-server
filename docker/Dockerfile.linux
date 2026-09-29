@@ -1,0 +1,88 @@
+﻿# syntax=docker/dockerfile:1
+ARG UBUNTU_VERSION=18.04
+ARG NODE_VERSION=20
+FROM node:${NODE_VERSION}-bullseye AS frontend
+
+WORKDIR /src/manager/frontend
+COPY manager/frontend/package*.json ./
+RUN npm ci
+COPY manager/frontend ./
+RUN npm run build
+
+FROM ubuntu:${UBUNTU_VERSION} AS builder
+
+ARG GO_VERSION=1.24.4
+ARG OPUS_VERSION=1.3.1
+ARG ONNXRUNTIME_VERSION=1.21.0
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV CGO_ENABLED=1
+ENV GOOS=linux
+ENV GOARCH=amd64
+
+RUN apt-get update && apt-get install -y \
+    ca-certificates curl git wget build-essential pkg-config \
+    libc++-dev libc++abi-dev upx-ucl zip patchelf \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz -o /tmp/go.tgz \
+    && tar -C /usr/local -xzf /tmp/go.tgz \
+    && rm /tmp/go.tgz
+ENV PATH=/usr/local/go/bin:$PATH
+
+WORKDIR /src
+COPY . .
+
+RUN mkdir -p manager/backend/static/dist
+COPY --from=frontend /src/manager/frontend/dist /src/manager/backend/static/dist
+
+RUN test -f asr_server/server/setup.go
+
+RUN wget -q "https://archive.mozilla.org/pub/opus/opus-${OPUS_VERSION}.tar.gz" \
+    && tar xf "opus-${OPUS_VERSION}.tar.gz" \
+    && cd "opus-${OPUS_VERSION}" \
+    && ./configure --enable-static --disable-shared --disable-doc --disable-extra-programs --prefix="/opt/opus-linux" \
+    && make -j"$(nproc)" \
+    && make install
+
+RUN SHERPA_ONNX_GO_VERSION="$(grep -E 'github.com/k2-fsa/sherpa-onnx-go[[:space:]]+v' go.mod | head -n 1 | awk '{print $2}')" \
+    && if [ -z "$SHERPA_ONNX_GO_VERSION" ]; then echo "sherpa-onnx-go version not found in go.mod" >&2; exit 1; fi \
+    && SHERPA_ONNX_GO_LINUX_VERSION="${SHERPA_ONNX_GO_VERSION#v}" \
+    && wget -q "https://github.com/k2-fsa/sherpa-onnx-go-linux/archive/refs/tags/v${SHERPA_ONNX_GO_LINUX_VERSION}.tar.gz" -O /tmp/sherpa-onnx-go-linux.tar.gz \
+    && tar xf /tmp/sherpa-onnx-go-linux.tar.gz -C /tmp \
+    && mkdir -p /opt/sherpa-onnx-go-linux \
+    && mv /tmp/sherpa-onnx-go-linux-${SHERPA_ONNX_GO_LINUX_VERSION}/lib/x86_64-unknown-linux-gnu /opt/sherpa-onnx-go-linux/ \
+    && rm -rf /tmp/sherpa-onnx-go-linux-${SHERPA_ONNX_GO_LINUX_VERSION} /tmp/sherpa-onnx-go-linux.tar.gz
+
+RUN mkdir -p /opt/onnxruntime-linux \
+    && tar -xzf "docker/lib/onnxruntime-linux-x64-${ONNXRUNTIME_VERSION}.tgz" -C /tmp \
+    && cp -r "/tmp/onnxruntime-linux-x64-${ONNXRUNTIME_VERSION}/include" /opt/onnxruntime-linux/ \
+    && rm -rf "/tmp/onnxruntime-linux-x64-${ONNXRUNTIME_VERSION}"
+
+ENV PKG_CONFIG_PATH=/opt/opus-linux/lib/pkgconfig
+ENV C_INCLUDE_PATH=/opt/onnxruntime-linux/include
+ENV LIBRARY_PATH=/opt/sherpa-onnx-go-linux/x86_64-unknown-linux-gnu
+ENV CGO_LDFLAGS="-lm -L/opt/sherpa-onnx-go-linux/x86_64-unknown-linux-gnu"
+
+RUN go mod tidy \
+    && go build -v -tags "nolibopusfile asr_server manager embed_ui" \
+       -ldflags "-s -w" \
+       -o xiaozhi_server ./cmd/server
+
+RUN upx --lzma xiaozhi_server -o xiaozhi_server.upx && mv xiaozhi_server.upx xiaozhi_server || true
+
+RUN PACK_DIR="/out/linux-amd64/xiaozhi_server-linux-amd64" \
+    && mkdir -p "$PACK_DIR/ten-vad/lib/Linux/x64" "$PACK_DIR/logs" \
+    && cp xiaozhi_server "$PACK_DIR/" \
+    && patchelf --add-rpath '$ORIGIN/ten-vad/lib/Linux/x64' "$PACK_DIR/xiaozhi_server" 2>/dev/null || true \
+    && cp build/linux/libten_vad.so "$PACK_DIR/ten-vad/lib/Linux/x64/" \
+    && cp /opt/sherpa-onnx-go-linux/x86_64-unknown-linux-gnu/libsherpa-onnx-c-api.so "$PACK_DIR/ten-vad/lib/Linux/x64/" \
+    && cp /opt/sherpa-onnx-go-linux/x86_64-unknown-linux-gnu/libsherpa-onnx-cxx-api.so "$PACK_DIR/ten-vad/lib/Linux/x64/" \
+    && cp /opt/sherpa-onnx-go-linux/x86_64-unknown-linux-gnu/libonnxruntime.so "$PACK_DIR/ten-vad/lib/Linux/x64/" \
+    && cp build/common/main_config.yaml build/common/manager.json build/common/asr_server.json "$PACK_DIR/" \
+    && cp doc/aio/README_linux.md "$PACK_DIR/README.md" \
+    && cp -r build/common/models build/common/data "$PACK_DIR/" \
+    && chmod +x "$PACK_DIR/xiaozhi_server"
+
+FROM scratch AS export
+COPY --from=builder /out /out

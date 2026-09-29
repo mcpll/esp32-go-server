@@ -1,0 +1,32 @@
+# 构建阶段
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+# 复制package文件
+COPY manager/frontend/package*.json ./
+RUN npm ci
+
+# 复制源代码
+COPY manager/frontend/ .
+
+# 构建应用
+RUN npm run build
+
+RUN ls -a 
+
+# 运行阶段
+FROM nginx:alpine
+
+# 复制构建结果
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# 复制 diagnose.js 文件
+COPY manager/frontend/diagnose.js /usr/share/nginx/html/
+
+# 复制nginx配置
+COPY manager/frontend/nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
