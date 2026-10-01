@@ -43,7 +43,6 @@ migrate((app) => {
       {
         name: "memory_mode",
         type: "select",
-        required: true,
         maxSelect: 1,
         values: ["none", "short", "long"],
       },
@@ -51,11 +50,11 @@ migrate((app) => {
       {
         name: "speaker_chat_mode",
         type: "select",
-        required: true,
         maxSelect: 1,
         values: ["off", "identified_only"],
       },
       { name: "knowledge_enabled", type: "bool" },
+      // knowledge_bases (relation) arrives with the knowledge_bases collection in the RAGFlow ticket.
       { name: "mcp_service_names", type: "json" },
       { name: "openclaw", type: "json", required: true },
     ],

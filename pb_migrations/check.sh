@@ -43,11 +43,11 @@ AGENT=$(get agents "$SU" | jq '.items[0]')
 [ "$(get agents "$SU" | jq .totalItems)" = 1 ] || fail "expected one seeded agent"
 echo "$AGENT" | jq -e '
   .asr_provider == "aliyun_qwen3" and .asr_config.language == "it" and .asr_config.auto_end == false
-  and .llm_config.model_name == "qwen3.8-flash" and .llm_config.thinking.mode == "disabled" and .llm_config.max_tokens == 300
+  and .llm_provider == "aliyun" and .llm_config.model_name == "qwen3.8-flash" and .llm_config.thinking.mode == "disabled" and .llm_config.max_tokens == 300
   and .tts_provider == "aliyun_qwen" and .tts_config.language_type == "Italian" and (.tts_config.voice | length > 0)
   and (.prompt | length > 0) and .memory_mode == "none" and .voiceprint_enabled == false and .knowledge_enabled == false
   and (.openclaw.enter_keywords | length > 0) and (.openclaw.exit_keywords | length > 0)' >/dev/null || fail "seed agent mismatch: $AGENT"
-[ "$(total settings "$SU")" -ge 9 ] || fail "settings not seeded"
+[ "$(total settings "$SU")" -ge 10 ] || fail "settings not seeded"
 
 # 3. Access: console user sees data; no auth and a second user are refused everywhere.
 ME=$(token users "$ADMIN_EMAIL" "$ADMIN_PASSWORD")
@@ -66,8 +66,12 @@ for who in "" "$ME" "$SECOND"; do
     -d "email=third@example.com&password=third-pass-123&passwordConfirm=third-pass-123")
   [ "$code" -ge 400 ] || fail "users create allowed ($code)"
 done
-code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Authorization: $SECOND" "$URL/api/collections/settings/records" -d 'key=x&value={}')
-[ "$code" -ge 400 ] || fail "second user could write settings"
+for c in agents devices settings; do
+  for who in "" "$SECOND"; do
+    code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: $who" "$URL/api/collections/$c/records" -d 'name=x&key=x&device_id=x&code=123456')
+    [ "$code" -ge 400 ] || fail "$c writable by '${who:0:6}' ($code)"
+  done
+done
 stop
 
 # 4. Migrations repeat on another empty folder.
