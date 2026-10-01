@@ -116,13 +116,6 @@ jobs:
         with:
           go-version: "1.24.4"
 
-      - name: Set up Node (frontend)
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: manager/frontend/package-lock.json
-
       - name: Build libopus (static, macOS)
         run: |
           brew update
@@ -136,12 +129,6 @@ jobs:
           make install
           popd
           echo "PKG_CONFIG_PATH=$HOME/opus-macos/lib/pkgconfig" >> $GITHUB_ENV
-
-      - name: Build frontend (embed_ui)
-        run: |
-          cd manager/frontend && npm ci && npm run build
-          mkdir -p ../backend/static/dist
-          cp -r dist/* ../backend/static/dist/
 
       - name: Download sherpa-onnx-go-macos libs
         run: |
@@ -182,7 +169,7 @@ jobs:
           CGO_LDFLAGS: -L${{ env.SHERPA_LIB_DIR }}
         run: |
           go mod tidy
-          go build -v -tags "nolibopusfile asr_server manager embed_ui" \
+          go build -v -tags "nolibopusfile asr_server" \
             -ldflags "-s -w" \
             -o xiaozhi_server ./cmd/server
 
@@ -193,7 +180,7 @@ jobs:
           mkdir -p "$PACK_DIR/ten-vad/lib/macOS" "$PACK_DIR/logs"
 
           cp xiaozhi_server "$PACK_DIR/"
-          cp build/common/main_config.yaml build/common/manager.json build/common/asr_server.json "$PACK_DIR/"
+          cp build/common/main_config.yaml build/common/asr_server.json "$PACK_DIR/"
           cp doc/aio/README_macos.md "$PACK_DIR/README.md"
           cp -r build/common/models build/common/data "$PACK_DIR/"
           rm -f "$PACK_DIR/data/xiaozhi.db"

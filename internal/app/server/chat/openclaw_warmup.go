@@ -369,8 +369,8 @@ func (s *ChatSession) runOpenClawWarmupTask(task *openClawWarmupTask, userText s
 		task.spokeAny.Store(true)
 	}
 
-	// 不在这里清理 active task：最后一条暖场音频可能仍在发送/播放中，
-	// 需要继续允许 OpenClaw 首句到达时执行抢占打断。
+	// Do not clear the active task here: the last warmup audio may still be sending/playing,
+	// and OpenClaw's first sentence must still be allowed to preempt/interrupt.
 }
 
 func waitOpenClawWarmupUntil(ctx context.Context, deadline time.Time) bool {
@@ -444,7 +444,7 @@ func (s *ChatSession) speakOpenClawWarmupLine(task *openClawWarmupTask, text str
 		IsStart: task.takeWarmupSegmentStartFlag(),
 		IsEnd:   true,
 	}
-	// 暖场句需要确保已经进入发送链路，避免被后续正式回复“看起来像没生效”。
+	// Warmup lines must enter the send path so a later formal reply does not make them "look ineffective".
 	return s.ttsManager.handleTextResponse(task.sessionCtx, resp, true)
 }
 

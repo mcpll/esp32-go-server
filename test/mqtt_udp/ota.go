@@ -113,7 +113,7 @@ func GetDeviceConfig(deviceInfo *DeviceInfo, deviceID, clientID string, otaUrl s
 	req.Header.Set("Activation-Version", "1")
 	req.Header.Set("User-Agent", "lc-esp32-s3/xiaozhi-1.6.0")
 
-	//打印header
+	//Print header
 	fmt.Println("header: ", req.Header)
 	fmt.Println("url: ", url)
 	fmt.Println("jsonData: ", string(jsonData))
@@ -193,12 +193,12 @@ func activateDevice(deviceID, clientID, serialNumber, hmacKey, challenge string,
 		url = strings.TrimRight(url, "/") + "/activate"
 	}
 
-	// 创建 HMAC
+	// Create HMAC
 	h := hmac.New(sha256.New, []byte(hmacKey))
 	h.Write([]byte(challenge))
 	hmacValue := hex.EncodeToString(h.Sum(nil))
 
-	// 构建请求数据
+	// Build request payload
 	payload := ActivationPayload{
 		Algorithm:    "hmac-sha256",
 		SerialNumber: serialNumber,
@@ -218,7 +218,7 @@ func activateDevice(deviceID, clientID, serialNumber, hmacKey, challenge string,
 
 	fmt.Println("激活请求数据: ", string(jsonData))
 
-	//循环10次
+	//Loop 10 times
 	for i := 0; i < 10; i++ {
 		req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 		if err != nil {
@@ -244,7 +244,7 @@ func activateDevice(deviceID, clientID, serialNumber, hmacKey, challenge string,
 
 		if resp.StatusCode == http.StatusOK {
 			fmt.Printf("激活成功, resp: %+v\n", string(body))
-			//验证成功
+			//Verification succeeded
 			return nil, nil
 		}
 

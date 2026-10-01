@@ -16,7 +16,7 @@ import (
 )
 
 // ServerTransport handles sending messages to the client via the transport layer
-// (原ServerMsgService)
+// (formerly ServerMsgService)
 type ServerTransport struct {
 	transport      types_conn.IConn
 	clientState    *ClientState
@@ -99,7 +99,7 @@ func (s *ServerTransport) SendTtsStop() error {
 		return err
 	}
 	s.clientState.IsWelcomePlaying = false
-	// 一轮对话播报结束后，回到可触发下一轮对话的状态。
+	// After one dialogue round finishes playing, return to a state that can trigger the next round.
 	s.clientState.SetStatus(ClientStatusListenStop)
 	s.clientState.SetTtsStart(false)
 	return nil
@@ -313,7 +313,7 @@ func (s *ServerTransport) HandleMcpMessage(payload []byte) error {
 	select {
 	case s.McpRecvMsgChan <- payload:
 	default:
-		log.Warnf("mcp 接收消息通道已满, 丢弃消息")
+		log.Warnf("MCP receive message channel full, drop message")
 	}
 	return nil
 }
@@ -342,7 +342,7 @@ func (s *ServerTransport) close(closeUnderlyingTransport bool) error {
 
 	if closeUnderlyingTransport && s.transport.GetTransportType() == types_conn.TransportTypeMqttUdp {
 		if err := s.SendMqttGoodbye(); err != nil {
-			log.Warnf("发送 mqtt goodbye 失败: %v", err)
+			log.Warnf("Failed to send mqtt goodbye: %v", err)
 		}
 	}
 

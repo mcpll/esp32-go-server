@@ -126,7 +126,7 @@ func (s *ragflowSearcher) Search(
 		return nil, errors.New(strings.Join(errs, "; "))
 	}
 	if len(errs) > 0 {
-		log.Warnf("RAGFlow 知识库检索部分失败: %s", strings.Join(errs, "; "))
+		log.Warnf("RAGFlow knowledge base search partially failed: %s", strings.Join(errs, "; "))
 	}
 	return ret, nil
 }

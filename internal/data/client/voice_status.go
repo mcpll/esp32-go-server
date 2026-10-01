@@ -1,10 +1,10 @@
 package client
 
 type VoiceStatus struct {
-	HaveVoice            bool  //上次是否有说话
-	HaveVoiceLastTime    int64 //最后说话时间
-	VoiceStop            bool  //是否停止说话
-	SilenceThresholdTime int64 //无声音持续时间阈值
+	HaveVoice            bool  //whether speech was present last time
+	HaveVoiceLastTime    int64 //last speech time
+	VoiceStop            bool  //whether speech stopped
+	SilenceThresholdTime int64 //silence duration threshold
 }
 
 func (v *VoiceStatus) Reset() {

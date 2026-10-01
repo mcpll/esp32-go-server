@@ -38,8 +38,6 @@ type SpeakerGroupInfo struct {
 	Uuids       []string `json:"uuids"`
 	TTSConfigID *string  `json:"tts_config_id"`
 	Voice       *string  `json:"voice"`
-	// 当音色来自复刻时，运行时用于覆盖 TTS 模型。
-	VoiceModelOverride *string `json:"voice_model_override,omitempty"`
 }
 
 type KnowledgeBaseRef struct {
@@ -66,12 +64,12 @@ type UConfig struct {
 	Llm             LlmConfig                   `json:"llm"`
 	Vad             VadConfig                   `json:"vad"`
 	Memory          MemoryConfig                `json:"memory"`
-	VoiceIdentify   map[string]SpeakerGroupInfo `json:"voice_identify"`    // 声纹识别配置
-	MemoryMode      string                      `json:"memory_mode"`       // 记忆模式: none/short/long
-	SpeakerChatMode string                      `json:"speaker_chat_mode"` // 声纹聊天模式: off/identified_only
-	AgentId         string                      `json:"agent_id"`          // 所属agent_id
-	MCPServiceNames string                      `json:"mcp_service_names"` // 逗号分隔的MCP服务名，空=使用全部已启用全局MCP服务
-	OpenClaw        OpenClawConfig              `json:"openclaw"`          // OpenClaw 配置
+	VoiceIdentify   map[string]SpeakerGroupInfo `json:"voice_identify"`    // Voiceprint config
+	MemoryMode      string                      `json:"memory_mode"`       // Memory mode: none/short/long
+	SpeakerChatMode string                      `json:"speaker_chat_mode"` // Voiceprint chat mode: off/identified_only
+	AgentId         string                      `json:"agent_id"`          // Owning agent_id
+	MCPServiceNames string                      `json:"mcp_service_names"` // Comma-separated MCP service names; empty = all enabled global MCP services
+	OpenClaw        OpenClawConfig              `json:"openclaw"`          // OpenClaw config
 	KnowledgeBases  []KnowledgeBaseRef          `json:"knowledge_bases"`
 }
 

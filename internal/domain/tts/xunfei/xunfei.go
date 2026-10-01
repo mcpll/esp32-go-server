@@ -152,7 +152,7 @@ func NewXunfeiTTSProvider(config map[string]interface{}) *XunfeiTTSProvider {
 
 	aue, expectedPayloadLen, err := mapXunfeiAudioEncoding(provider.AudioEncoding, provider.SampleRate)
 	if err != nil {
-		log.Warnf("初始化 xunfei TTS 配置失败，回退到 raw/16k: %v", err)
+		log.Warnf("failed to init Xunfei TTS config, falling back to raw/16k: %v", err)
 		provider.AudioEncoding = defaultXunfeiAudioEncoding
 		provider.SampleRate = defaultXunfeiSampleRate
 		aue = "raw"
@@ -204,7 +204,7 @@ func (p *XunfeiTTSProvider) TextToSpeechStream(ctx context.Context, text string,
 
 	go func() {
 		if err := p.streamSynthesis(ctx, text, targetSampleRate, targetFrameDuration, startTs, outputChan); err != nil && ctx.Err() == nil {
-			log.Errorf("xunfei TTS 流式合成失败: %v", err)
+			log.Errorf("Xunfei TTS stream synthesis failed: %v", err)
 		}
 	}()
 
@@ -260,7 +260,7 @@ func (p *XunfeiTTSProvider) streamSynthesis(ctx context.Context, text string, ta
 	go func() {
 		defer close(decoderDone)
 		if err := decoder.Run(startTs); err != nil && ctx.Err() == nil {
-			log.Errorf("xunfei 音频解码失败: %v", err)
+			log.Errorf("Xunfei audio decode failed: %v", err)
 		}
 	}()
 
@@ -279,7 +279,7 @@ func (p *XunfeiTTSProvider) streamSynthesis(ctx context.Context, text string, ta
 	<-decoderDone
 
 	if streamErr == nil && ctx.Err() == nil {
-		log.Infof("xunfei TTS耗时: 从输入至获取音频数据结束耗时: %d ms", time.Now().UnixMilli()-startTs)
+		log.Infof("Xunfei TTS elapsed from input to end of audio: %d ms", time.Now().UnixMilli()-startTs)
 	}
 
 	return streamErr

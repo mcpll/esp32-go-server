@@ -62,42 +62,42 @@ func classifyDoubaoRetryReason(errMsg string, code int) string {
 	return types.RetryReasonNone
 }
 
-// DoubaoV2ASR 豆包ASR实现
+// DoubaoV2ASR Doubao ASR implementation
 type DoubaoV2ASR struct {
 	config      DoubaoV2Config
 	isStreaming bool
 	reqID       string
 	connectID   string
 
-	// 流式识别相关字段
+	// streaming recognition fields
 	result      string
 	err         error
 	sendDataCnt int
 	c           *client.AsrWsClient
 }
 
-// NewDoubaoV2ASR 创建一个新的豆包ASR实例
+// NewDoubaoV2ASR creates a new Doubao ASR instance
 func NewDoubaoV2ASR(config DoubaoV2Config) (*DoubaoV2ASR, error) {
-	log.Info("创建豆包ASR实例")
-	log.Info(fmt.Sprintf("配置: %+v", config))
+	log.Info("creating Doubao ASR instance")
+	log.Info(fmt.Sprintf("config: %+v", config))
 
 	if config.AppID == "" {
-		log.Error("缺少appid配置")
+		log.Error("missing appid config")
 		return nil, fmt.Errorf("缺少appid配置")
 	}
 	if config.AccessToken == "" {
-		log.Error("缺少access_token配置")
+		log.Error("missing access_token config")
 		return nil, fmt.Errorf("缺少access_token配置")
 	}
 
-	// 使用默认配置填充缺失的字段
+	// fill missing fields with defaults
 	if config.WsURL == "" {
 		config.WsURL = DefaultConfig.WsURL
 	}
 	originalWsURL := config.WsURL
 	config.WsURL = normalizeDoubaoWsURL(config.WsURL)
 	if originalWsURL != config.WsURL {
-		log.Warnf("豆包ASR ws_url 使用了非流式地址，已自动切换为流式地址: %s -> %s", originalWsURL, config.WsURL)
+		log.Warnf("Doubao ASR ws_url used non-streaming address, auto-switched to streaming: %s -> %s", originalWsURL, config.WsURL)
 	}
 	if config.ResourceID == "" {
 		config.ResourceID = DefaultConfig.ResourceID
@@ -129,8 +129,8 @@ func NewDoubaoV2ASR(config DoubaoV2Config) (*DoubaoV2ASR, error) {
 	}, nil
 }
 
-// StreamingRecognize 实现流式识别接口
-// 注意：连接将在收到第一个音频包时延迟建立，避免因VAD延迟导致服务端超时
+// StreamingRecognize implements the streaming recognition interface
+// Note: the connection is deferred until the first audio packet to avoid server timeouts from VAD delay
 func (d *DoubaoV2ASR) StreamingRecognize(ctx context.Context, audioStream <-chan []float32) (chan types.StreamingResult, error) {
 	connectID := fmt.Sprintf("%s-%d", d.connectID, time.Now().UnixMilli())
 	streamID := shortDebugID(connectID)
@@ -146,7 +146,7 @@ func (d *DoubaoV2ASR) StreamingRecognize(ctx context.Context, audioStream <-chan
 		ForceToSpeechTime: d.config.ForceToSpeechTime,
 		EnableNonstream:   d.config.EnableNonstream,
 	}
-	// 创建客户端实例（不立即建立连接）
+	// create the client instance (do not connect yet)
 	d.c = client.NewAsrWsClient(d.config.WsURL, d.config.AppID, d.config.AccessToken, d.config.ResourceID, connectID, streamID, requestOptions)
 	log.Debugf(
 		"[doubao-asr:%s] StreamingRecognize start: ws=%s, resource_id=%s, result_type=%s, show_utterances=%v, force_to_speech_time=%d, chunk_duration=%d, timeout=%d",
@@ -160,12 +160,12 @@ func (d *DoubaoV2ASR) StreamingRecognize(ctx context.Context, audioStream <-chan
 		d.config.Timeout,
 	)
 
-	// 豆包返回的识别结果
+	// recognition result from Doubao
 	doubaoResultChan := make(chan *response.AsrResponse, 10)
-	//程序内部的结果通道
+	//internal result channel
 	resultChan := make(chan types.StreamingResult, 10)
 
-	// 启动音频流处理（连接将在第一个音频包到达时建立）
+	// start audio stream handling (connection opens on the first audio packet)
 	go func() {
 		defer close(doubaoResultChan)
 		if err := d.c.StartAudioStream(ctx, audioStream, doubaoResultChan); err != nil {
@@ -183,13 +183,13 @@ func (d *DoubaoV2ASR) StreamingRecognize(ctx context.Context, audioStream <-chan
 		}
 	}()
 
-	// 启动结果接收goroutine
+	// start the result-receiver goroutine
 	go d.receiveStreamResults(ctx, streamID, resultChan, doubaoResultChan)
 
 	return resultChan, nil
 }
 
-// receiveStreamResults 接收流式识别结果
+// receiveStreamResults receives streaming recognition results
 func (d *DoubaoV2ASR) receiveStreamResults(ctx context.Context, streamID string, resultChan chan types.StreamingResult, asrResponseChan chan *response.AsrResponse) {
 	packetCount := 0
 	nonEmptyPacketCount := 0
@@ -205,12 +205,12 @@ func (d *DoubaoV2ASR) receiveStreamResults(ctx context.Context, streamID string,
 	for {
 		select {
 		case <-ctx.Done():
-			log.Debugf("[doubao-asr:%s] receiveStreamResults 上下文已取消", streamID)
+			log.Debugf("[doubao-asr:%s] receiveStreamResults context canceled", streamID)
 			return
 		case result, ok := <-asrResponseChan:
 			if !ok {
 				log.Debugf(
-					"[doubao-asr:%s] receiveStreamResults asrResponseChan 已关闭: packets=%d, non_empty_packets=%d, last_non_empty=%q, last_non_empty_utterance=%q",
+					"[doubao-asr:%s] receiveStreamResults asrResponseChan closed: packets=%d, non_empty_packets=%d, last_non_empty=%q, last_non_empty_utterance=%q",
 					streamID,
 					packetCount,
 					nonEmptyPacketCount,
@@ -246,7 +246,7 @@ func (d *DoubaoV2ASR) receiveStreamResults(ctx context.Context, streamID string,
 				lastNonEmptyUtterance = firstUtterance
 			}
 			log.Debugf(
-				"[doubao-asr:%s] 上游结果摘要: idx=%d, payload_seq=%d, event=%d, last=%v, code=%d, text_len=%d, text=%q, utterances=%d, first_utterance=%q, audio_duration=%d",
+				"[doubao-asr:%s] upstream result summary: idx=%d, payload_seq=%d, event=%d, last=%v, code=%d, text_len=%d, text=%q, utterances=%d, first_utterance=%q, audio_duration=%d",
 				streamID,
 				packetCount,
 				result.PayloadSequence,
@@ -266,7 +266,7 @@ func (d *DoubaoV2ASR) receiveStreamResults(ctx context.Context, streamID string,
 				}
 				retryReason := classifyDoubaoRetryReason(errMsg, result.Code)
 				log.Warnf(
-					"[doubao-asr:%s] 收到错误结果: packets=%d, non_empty_packets=%d, last_non_empty=%q, last_non_empty_utterance=%q, err=%s, retry_reason=%s",
+					"[doubao-asr:%s] received error result: packets=%d, non_empty_packets=%d, last_non_empty=%q, last_non_empty_utterance=%q, err=%s, retry_reason=%s",
 					streamID,
 					packetCount,
 					nonEmptyPacketCount,
@@ -275,10 +275,10 @@ func (d *DoubaoV2ASR) receiveStreamResults(ctx context.Context, streamID string,
 					errMsg,
 					retryReason,
 				)
-				// 使用 select 避免向已关闭的 channel 发送（如果 ctx 已取消，优先选择 ctx.Done()）
+				// use select to avoid sending on a closed channel (if ctx is canceled, prefer ctx.Done())
 				select {
 				case <-ctx.Done():
-					log.Debugf("[doubao-asr:%s] 发送错误结果时上下文已取消，跳过发送", streamID)
+					log.Debugf("[doubao-asr:%s] context canceled while sending error result, skip send", streamID)
 					return
 				case resultChan <- types.StreamingResult{
 					Text:        "",
@@ -293,7 +293,7 @@ func (d *DoubaoV2ASR) receiveStreamResults(ctx context.Context, streamID string,
 				if candidateText != lastPartialText {
 					lastPartialText = candidateText
 					log.Debugf(
-						"[doubao-asr:%s] 透传中间结果: packets=%d, partial_text=%q, payload_seq=%d, event=%d",
+						"[doubao-asr:%s] forwarding partial result: packets=%d, partial_text=%q, payload_seq=%d, event=%d",
 						streamID,
 						packetCount,
 						previewDoubaoText(candidateText, 24),
@@ -302,7 +302,7 @@ func (d *DoubaoV2ASR) receiveStreamResults(ctx context.Context, streamID string,
 					)
 					select {
 					case <-ctx.Done():
-						log.Debugf("[doubao-asr:%s] 发送中间结果时上下文已取消，跳过发送", streamID)
+						log.Debugf("[doubao-asr:%s] context canceled while sending partial result, skip send", streamID)
 						return
 					case resultChan <- types.StreamingResult{
 						Text:    candidateText,
@@ -325,7 +325,7 @@ func (d *DoubaoV2ASR) receiveStreamResults(ctx context.Context, streamID string,
 				if finalText == "" {
 					emptyReason := classifyEmptyFinalReason(packetCount, nonEmptyPacketCount, result, audioDuration)
 					log.Warnf(
-						"[doubao-asr:%s] 最终包文本为空: packets=%d, non_empty_packets=%d, last_non_empty=%q, last_non_empty_utterance=%q, payload_seq=%d, event=%d, utterances=%d, audio_duration=%d, empty_reason=%s",
+						"[doubao-asr:%s] final packet text empty: packets=%d, non_empty_packets=%d, last_non_empty=%q, last_non_empty_utterance=%q, payload_seq=%d, event=%d, utterances=%d, audio_duration=%d, empty_reason=%s",
 						streamID,
 						packetCount,
 						nonEmptyPacketCount,
@@ -339,7 +339,7 @@ func (d *DoubaoV2ASR) receiveStreamResults(ctx context.Context, streamID string,
 					)
 					select {
 					case <-ctx.Done():
-						log.Debugf("[doubao-asr:%s] 发送最终空结果时上下文已取消，跳过发送", streamID)
+						log.Debugf("[doubao-asr:%s] context canceled while sending final empty result, skip send", streamID)
 						return
 					case resultChan <- types.StreamingResult{
 						Text:        "",
@@ -351,7 +351,7 @@ func (d *DoubaoV2ASR) receiveStreamResults(ctx context.Context, streamID string,
 				}
 				if text == "" {
 					log.Warnf(
-						"[doubao-asr:%s] 最终包文本为空，回退到最近非空结果: packets=%d, non_empty_packets=%d, final_text=%q, last_non_empty_utterance=%q, payload_seq=%d, event=%d, utterances=%d, audio_duration=%d",
+						"[doubao-asr:%s] final packet text empty, falling back to last non-empty: packets=%d, non_empty_packets=%d, final_text=%q, last_non_empty_utterance=%q, payload_seq=%d, event=%d, utterances=%d, audio_duration=%d",
 						streamID,
 						packetCount,
 						nonEmptyPacketCount,
@@ -364,17 +364,17 @@ func (d *DoubaoV2ASR) receiveStreamResults(ctx context.Context, streamID string,
 					)
 				} else {
 					log.Debugf(
-						"[doubao-asr:%s] 最终包文本: packets=%d, non_empty_packets=%d, final_text=%q",
+						"[doubao-asr:%s] final packet text: packets=%d, non_empty_packets=%d, final_text=%q",
 						streamID,
 						packetCount,
 						nonEmptyPacketCount,
 						previewDoubaoText(text, 24),
 					)
 				}
-				// 处理最终结果（包括静音情况的空结果），使用 select 避免向已关闭的 channel 发送
+				// handle final results (including empty silence results); use select to avoid sending on a closed channel
 				select {
 				case <-ctx.Done():
-					log.Debugf("[doubao-asr:%s] 发送最终结果时上下文已取消，跳过发送", streamID)
+					log.Debugf("[doubao-asr:%s] context canceled while sending final result, skip send", streamID)
 					return
 				case resultChan <- types.StreamingResult{
 					Text:    finalText,
@@ -387,14 +387,14 @@ func (d *DoubaoV2ASR) receiveStreamResults(ctx context.Context, streamID string,
 	}
 }
 
-// Reset 重置ASR状态
+// Reset resets ASR state
 func (d *DoubaoV2ASR) Reset() error {
 
-	log.Info("ASR状态已重置")
+	log.Info("ASR state reset")
 	return nil
 }
 
-// Close 关闭资源，释放连接等
+// Close releases resources and connections
 func (d *DoubaoV2ASR) Close() error {
 	if d.c != nil {
 		return d.c.Close()
@@ -402,7 +402,7 @@ func (d *DoubaoV2ASR) Close() error {
 	return nil
 }
 
-// IsValid 检查资源是否有效
+// IsValid checks whether the resource is valid
 func (d *DoubaoV2ASR) IsValid() bool {
 	return d != nil
 }

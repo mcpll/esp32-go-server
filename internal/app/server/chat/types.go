@@ -6,31 +6,31 @@ import (
 	config_types "xiaozhi-esp32-server-golang/internal/domain/config/types"
 )
 
-// ChatSessionOperator 定义 local mcp tool 需要的 ChatSession 操作接口
-// 这个接口用于解耦 LLMManager 和 ChatSession，避免循环依赖
+// ChatSessionOperator ChatSession ops interface for local MCP tools
+// Decouples LLMManager from ChatSession to avoid import cycles
 type ChatSessionOperator interface {
-	// LocalMcpCloseChat 关闭聊天会话
+	// LocalMcpCloseChat close the chat session
 	LocalMcpCloseChat() error
 
-	// LocalMcpClearHistory 清空历史对话
+	// LocalMcpClearHistory Clear conversation history
 	LocalMcpClearHistory() error
 
-	// LocalMcpPlayMusic 播放音乐
+	// LocalMcpPlayMusic Play music
 	LocalMcpPlayMusic(ctx context.Context, params *PlayMusicParams) error
 
-	// LocalMcpSwitchDeviceRole 按角色名称切换设备角色（支持模糊匹配）
+	// LocalMcpSwitchDeviceRole switch device role by name (fuzzy match)
 	LocalMcpSwitchDeviceRole(ctx context.Context, roleName string) (string, error)
 
-	// LocalMcpRestoreDeviceDefaultRole 恢复设备默认角色
+	// LocalMcpRestoreDeviceDefaultRole restore the device default role
 	LocalMcpRestoreDeviceDefaultRole(ctx context.Context) error
 
-	// LocalMcpSearchKnowledge 检索当前智能体关联知识库
+	// LocalMcpSearchKnowledge search knowledge bases linked to the current agent
 	LocalMcpSearchKnowledge(ctx context.Context, query string, topK int, knowledgeBaseIDs []uint) ([]config_types.KnowledgeSearchHit, error)
 
-	// LocalMcpControlMusicPlayback 控制当前会话级媒体播放
+	// LocalMcpControlMusicPlayback control session-scoped media playback
 	LocalMcpControlMusicPlayback(ctx context.Context, params *MusicPlaybackControlParams) (*MusicPlaybackControlResult, error)
 
-	// 未来可以根据需要添加其他操作
+	// More ops can be added later
 	// GetDeviceID() string
 	// IsActive() bool
 }

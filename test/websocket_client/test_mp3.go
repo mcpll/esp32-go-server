@@ -13,12 +13,12 @@ import (
 )
 
 func main1() {
-	// HTTP接口URL
+	// HTTP API URL
 	mp3URL := "http://home.hackers365.com:55555/apk/test.mp3"
-	// 指定输出的PCM文件路径
+	// Output PCM file path
 	pcmFilePath := "output.pcm"
 
-	// 创建PCM文件
+	// Create PCM file
 	pcmFile, err := os.Create(pcmFilePath)
 	if err != nil {
 		fmt.Printf("无法创建PCM文件: %v\n", err)
@@ -26,7 +26,7 @@ func main1() {
 	}
 	defer pcmFile.Close()
 
-	// 从HTTP接口获取MP3数据并处理
+	// Fetch and process MP3 from HTTP API
 	err = processMP3FromHTTP(mp3URL, pcmFile)
 	if err != nil {
 		fmt.Printf("处理HTTP MP3数据失败: %v\n", err)
@@ -35,7 +35,7 @@ func main1() {
 
 	fmt.Printf("HTTP MP3数据已成功解码为PCM格式，保存至: %s\n", pcmFilePath)
 
-	// 导出WAV格式
+	// Export WAV format
 	exportHTTPToWav(mp3URL, "output.wav")
 }
 
@@ -47,37 +47,37 @@ func (r readCloserWrapper) Close() error {
 	return nil
 }
 
-// 从HTTP接口获取并处理MP3数据
+// Fetch and process MP3 data from HTTP API
 func processMP3FromHTTP(url string, pcmFile *os.File) error {
-	// 发起HTTP请求
+	// Send HTTP request
 	resp, err := http.Get(url)
 	if err != nil {
 		return fmt.Errorf("HTTP请求失败: %v", err)
 	}
 	defer resp.Body.Close()
 
-	// 检查HTTP响应状态
+	// Check HTTP response status
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("HTTP请求返回非200状态码: %d", resp.StatusCode)
 	}
 
-	// 创建一个pipe用于处理数据流
+	// Create a pipe for the data stream
 	pipeReader, pipeWriter := io.Pipe()
 	defer pipeReader.Close()
 
-	// 创建一个读取缓冲区和采样缓冲区
+	// Create read and sample buffers
 	bufferSize := 10 * 1024            // 10KB
-	buffer := make([]byte, bufferSize) // HTTP 读取缓冲区
+	buffer := make([]byte, bufferSize) // HTTP read buffer
 
-	opusBuffer := make([]byte, 1000) // Opus 编码输出缓冲区
+	opusBuffer := make([]byte, 1000) // Opus encode output buffer
 
-	// 创建一个错误通道和完成通道
+	// Create error and done channels
 	errChan := make(chan error, 1)
 	doneChan := make(chan struct{}, 1)
 
-	// 启动goroutine解码MP3和处理PCM
+	// Start goroutine to decode MP3 and process PCM
 	go func() {
-		// 尝试初始化解码器
+		// Try initializing the decoder
 		streamer, format, err := mp3.Decode(pipeReader)
 		if err != nil {
 			errChan <- fmt.Errorf("MP3解码器初始化失败: %v", err)
@@ -88,15 +88,15 @@ func processMP3FromHTTP(url string, pcmFile *os.File) error {
 		fmt.Printf("MP3解码器初始化成功，采样率: %d Hz, 声道数: %d\n",
 			format.SampleRate, format.NumChannels)
 
-		//原mp3格式信息
+		//Original MP3 format info
 		sampleRate := int(format.SampleRate)
 		channels := int(format.NumChannels)
 
-		// PCM缓冲区 及 Opus帧大小(例如60ms)
-		perFrameDuration := 60 // 毫秒
+		// PCM buffer and Opus frame size (e.g. 60ms)
+		perFrameDuration := 60 // ms
 		frameSize := sampleRate * perFrameDuration / 1000
 		pcmBuffer := make([]int16, frameSize*channels)
-		opusFrames := make([][]byte, 0) // 存储编码后的Opus帧
+		opusFrames := make([][]byte, 0) // store encoded Opus frames
 
 		enc, err := opus.NewEncoder(sampleRate, channels, opus.AppAudio)
 		if err != nil {
@@ -105,51 +105,51 @@ func processMP3FromHTTP(url string, pcmFile *os.File) error {
 			return
 		}
 
-		beepSampleBuf := make([][2]float64, 1024) // Beep 解码缓冲区
-		// 处理解码后的音频流
-		currentFramePos := 0 // 当前填充到pcmBuffer的位置
+		beepSampleBuf := make([][2]float64, 1024) // Beep decode buffer
+		// Process decoded audio stream
+		currentFramePos := 0 // current fill position in pcmBuffer
 		for {
-			// 从流中读取采样到sampleBuf
+			// Read samples from stream into sampleBuf
 			numSamplesRead, ok := streamer.Stream(beepSampleBuf)
 			if !ok {
-				// 处理剩余不足一帧的数据
+				// Handle remaining data shorter than one frame
 				if currentFramePos > 0 {
-					// 创建一个完整的帧缓冲区，用0填充剩余部分
+					// Create a full frame buffer; zero-pad the rest
 					paddedFrame := make([]int16, len(pcmBuffer))
-					copy(paddedFrame, pcmBuffer[:currentFramePos]) // 将有效数据复制到开头，剩余部分默认为0
+					copy(paddedFrame, pcmBuffer[:currentFramePos]) // copy valid data to the start; remainder stays zero
 
-					// 编码补齐后的完整帧
+					// Encode the padded full frame
 					n, err := enc.Encode(paddedFrame, opusBuffer)
 					if err != nil {
 						fmt.Printf("编码剩余数据失败: %v\n", err)
-						// 可能需要通过 errChan 发送错误
+						// may need to send error via errChan
 					} else {
 						frameData := make([]byte, n)
 						copy(frameData, opusBuffer[:n])
 						opusFrames = append(opusFrames, frameData)
-						// 注意：这里编码的是一个完整的帧，即使原始数据不足
+						// Note: this encodes a full frame even if source data was short
 						fmt.Printf("已编码最后补齐的 %d 个PCM样本 (原始 %d)\n", len(paddedFrame), currentFramePos)
 					}
 				}
-				// 解码完成
+				// Decode finished
 				doneChan <- struct{}{}
 				return
 			}
 
-			// 将读取到的float64样本转换为int16并填充到pcmBuffer
+			// Convert float64 samples to int16 into pcmBuffer
 			for i := 0; i < numSamplesRead; i++ {
-				// 直接进行转换
+				// Convert directly
 				leftSample := int16(beepSampleBuf[i][0] * 32767.0)
 				rightSample := int16(beepSampleBuf[i][1] * 32767.0)
 
-				// 写入PCM数据
+				// Write PCM data
 				pcmBuffer[currentFramePos] = leftSample
 				if channels > 1 {
 					pcmBuffer[currentFramePos+1] = rightSample
 				}
 				currentFramePos += channels
 
-				// 如果pcmBuffer已满一帧，则进行编码
+				// If pcmBuffer has a full frame, encode it
 				if currentFramePos == len(pcmBuffer) {
 					n, err := enc.Encode(pcmBuffer, opusBuffer)
 					if err != nil {
@@ -158,30 +158,30 @@ func processMP3FromHTTP(url string, pcmFile *os.File) error {
 						return
 					}
 
-					// 将当前帧复制到新的切片中并添加到帧数组
+					// Copy current frame into a new slice and append to frames
 					frameData := make([]byte, n)
 					copy(frameData, opusBuffer[:n])
 					opusFrames = append(opusFrames, frameData)
 
 					fmt.Printf("已编码一帧 (%d PCM样本)\n", len(pcmBuffer))
-					currentFramePos = 0 // 重置帧位置
+					currentFramePos = 0 // reset frame position
 				}
 			}
 		}
 	}()
 
-	// 创建定时器，每100ms发送一次数据
+	// Create ticker to send data every 100ms
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 
-	// 开始循环读取HTTP数据并写入pipe
+	// Loop reading HTTP data into the pipe
 	for {
 		select {
 		case <-ticker.C:
-			// 从HTTP响应读取数据
+			// Read data from HTTP response
 			n, err := resp.Body.Read(buffer)
 
-			// 如果读取到数据，写入pipe
+			// If data was read, write to pipe
 			if n > 0 {
 				_, writeErr := pipeWriter.Write(buffer[:n])
 				if writeErr != nil {
@@ -190,13 +190,13 @@ func processMP3FromHTTP(url string, pcmFile *os.File) error {
 				fmt.Printf("已读取并写入 %d 字节MP3数据\n", n)
 			}
 
-			// 处理EOF或错误
+			// Handle EOF or error
 			if err != nil {
 				if err == io.EOF {
 					fmt.Println("HTTP数据流已读取完毕")
-					pipeWriter.Close() // 关闭pipe写入端
+					pipeWriter.Close() // close pipe writer
 
-					// 等待解码完成或出错
+					// Wait for decode done or error
 					select {
 					case <-doneChan:
 						return nil
@@ -218,7 +218,7 @@ func processMP3FromHTTP(url string, pcmFile *os.File) error {
 }
 
 func exportHTTPToWav(url string, wavFilePath string) {
-	// 发起HTTP请求
+	// Send HTTP request
 	resp, err := http.Get(url)
 	if err != nil {
 		fmt.Printf("HTTP请求失败: %v\n", err)
@@ -226,13 +226,13 @@ func exportHTTPToWav(url string, wavFilePath string) {
 	}
 	defer resp.Body.Close()
 
-	// 检查HTTP响应状态
+	// Check HTTP response status
 	if resp.StatusCode != http.StatusOK {
 		fmt.Printf("HTTP请求返回非200状态码: %d\n", resp.StatusCode)
 		return
 	}
 
-	// 解码MP3
+	// Decode MP3
 	streamer, format, err := mp3.Decode(resp.Body)
 	if err != nil {
 		fmt.Printf("无法解码MP3数据: %v\n", err)
@@ -240,7 +240,7 @@ func exportHTTPToWav(url string, wavFilePath string) {
 	}
 	defer streamer.Close()
 
-	// 创建WAV文件
+	// Create WAV file
 	wavFile, err := os.Create(wavFilePath)
 	if err != nil {
 		fmt.Printf("无法创建WAV文件: %v\n", err)
@@ -248,7 +248,7 @@ func exportHTTPToWav(url string, wavFilePath string) {
 	}
 	defer wavFile.Close()
 
-	// 使用beep/wav包将流编码为WAV
+	// Encode stream to WAV with beep/wav
 	err = wav.Encode(wavFile, streamer, format)
 	if err != nil {
 		fmt.Printf("WAV编码失败: %v\n", err)

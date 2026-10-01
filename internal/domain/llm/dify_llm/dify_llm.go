@@ -194,7 +194,7 @@ func (p *DifyLLMProvider) ResponseWithContext(ctx context.Context, sessionID str
 
 			var streamEvent difyStreamEvent
 			if err := json.Unmarshal([]byte(data), &streamEvent); err != nil {
-				log.Warnf("解析dify流事件失败: %v, data=%s", err, previewString(data, 256))
+				log.Warnf("failed to parse dify stream event: %v, data=%s", err, previewString(data, 256))
 				continue
 			}
 
@@ -260,7 +260,7 @@ func (p *DifyLLMProvider) stopTask(taskID, userID string) {
 
 	resp, err := p.httpClient.Do(req)
 	if err != nil {
-		log.Debugf("dify stop task请求失败: %v", err)
+		log.Debugf("dify stop task request failed: %v", err)
 		return
 	}
 	defer resp.Body.Close()
@@ -295,7 +295,7 @@ func buildDifyQuery(dialogue []*schema.Message) string {
 		return ""
 	}
 
-	// Dify会话模式下仅发送当前轮输入，不在query中拼接历史。
+	// In Dify session mode, send only the current-turn input; do not concatenate history into query.
 	for i := len(dialogue) - 1; i >= 0; i-- {
 		msg := dialogue[i]
 		if msg == nil || msg.Role != schema.User {
@@ -306,7 +306,7 @@ func buildDifyQuery(dialogue []*schema.Message) string {
 		}
 	}
 
-	// 兜底：若不存在user消息，使用最后一条可提取文本的消息。
+	// Fallback: if no user message, use the last message with extractable text.
 	for i := len(dialogue) - 1; i >= 0; i-- {
 		if text := extractDifyMessageText(dialogue[i]); text != "" {
 			return text

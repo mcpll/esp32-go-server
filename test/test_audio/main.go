@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	//读取文件，使用参数传入，输入输出文件
+	// Read file; input/output paths come from flags
 	inputFilePath := flag.String("input", "", "输入文件路径")
 	outputFilePath := flag.String("output", "", "输出文件路径")
 	sampleRate := flag.Int("sampleRate", 24000, "采样率")
@@ -19,7 +19,7 @@ func main() {
 		return
 	}
 
-	//读取文件所有内容
+	// Read entire file contents
 	content, err := os.ReadFile(*inputFilePath)
 	if err != nil {
 		fmt.Println("读取文件失败:", err)

@@ -68,38 +68,38 @@ func NewMcpServer(sendMsgChan chan []byte, recvMsgChan chan []byte) {
 		),
 	)
 
-	// 新增查询天气工具
+	// Add weather query tool
 	weatherTool := mcp.NewTool("query_weather",
-		mcp.WithDescription("查询大连天气"),
+		mcp.WithDescription("Query Dalian weather"),
 	)
 
-	// 新增生成随机数工具（参数类型为 string，handler 内部转换）
+	// Add random number tool (param type string; handler converts)
 	randomNumberTool := mcp.NewTool("random_number",
-		mcp.WithDescription("生成指定范围的随机整数"),
+		mcp.WithDescription("Generate a random integer in a range"),
 		mcp.WithNumber("min",
 			mcp.Required(),
-			mcp.Description("最小值"),
+			mcp.Description("Minimum"),
 		),
 		mcp.WithNumber("max",
 			mcp.Required(),
-			mcp.Description("最大值"),
+			mcp.Description("Maximum"),
 		),
 	)
 
 
 
-	// 注册所有工具及其handler
+	// Register all tools and handlers
 	s.AddTool(tool, helloHandler)
 	s.AddTool(weatherTool, queryWeatherHandler)
 	s.AddTool(randomNumberTool, randomNumberHandler)*/
 
-	// 新增讲笑话工具
+	// Add tell-joke tool
 	jokeTool := mcp.NewTool("tell_joke",
 		mcp.WithDescription("讲一个笑话"),
 	)
 	s.AddTool(jokeTool, jokeHandler)
 
-	// 新增讲笑话工具
+	// Add tell-joke tool
 	visionTool := mcp.NewTool("vision_tool",
 		mcp.WithDescription("拍照分析图片"),
 	)
@@ -126,14 +126,14 @@ func helloHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallTo
 	return mcp.NewToolResultText(fmt.Sprintf("Hello, %s!", name)), nil
 }
 
-// 查询天气 handler
+// Weather query handler
 func queryWeatherHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return mcp.NewToolResultText("天气晴朗 20度 北风3级"), nil
 }
 
-// 生成随机数 handler
+// Random number handler
 func randomNumberHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	//重新实现
+	// Reimplemented
 	min := request.GetInt("min", 0)
 	max := request.GetInt("max", 100)
 
@@ -147,7 +147,7 @@ func randomNumberHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp
 	return mcp.NewToolResultText(fmt.Sprintf("随机数：%d", rnd)), nil
 }
 
-// 讲笑话 handler
+// Tell-joke handler
 func jokeHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	joke := "有一天小明去上学，老师问他为什么迟到，小明说：因为作业太难，梦里都在写作业，结果一觉醒来就迟到了。"
 	return mcp.NewToolResultText(joke), nil
@@ -158,7 +158,7 @@ func visionHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallT
 	question := "图片中有什么？"
 	url := GetServerVisionURL()
 	if url == "" {
-		url = "http://192.168.208.214:8989/xiaozhi/api/vision" // 未收到服务器下发时使用默认
+		url = "http://192.168.208.214:8989/xiaozhi/api/vision" // Use default when server did not send one
 	}
 	deviceId := "shijingbo"
 	responseText, err := requestVllm(image, question, url, deviceId)

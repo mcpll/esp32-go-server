@@ -13,7 +13,7 @@ import (
 	log "xiaozhi-esp32-server-golang/logger"
 )
 
-// Mem0Client 实现 MemoryProvider 和 EnhancedMemoryProvider 接口
+// Mem0Client implements MemoryProvider and EnhancedMemoryProvider
 type Mem0Client struct {
 	client          *client.MemoryClient
 	config          Mem0Config
@@ -23,7 +23,7 @@ type Mem0Client struct {
 	SearchTopk      int     `mapstructure:"search_topk"`
 }
 
-// Mem0Config 配置结构
+// Mem0Config config struct
 type Mem0Config struct {
 	APIKey           string `mapstructure:"api_key"`
 	BaseUrl          string `mapstructure:"base_url"`
@@ -39,14 +39,14 @@ var (
 	configOnce   sync.Once
 )
 
-// GetMem0ClientWithConfig 使用配置获取 Mem0 客户端单例
+// GetMem0ClientWithConfig returns the Mem0 client singleton from config
 func GetMem0ClientWithConfig(config map[string]interface{}) (*Mem0Client, error) {
 	var err error
 	configOnce.Do(func() {
 		var enableSearch bool = true
 		var searchThreshold float64 = 0.5
 		var searchTopk int = 3
-		// 解析配置到结构体
+		// parse config into the struct
 		var mem0Cfg Mem0Config
 
 		if enableSearchInterface, exists := config["enable_search"]; exists {
@@ -67,7 +67,7 @@ func GetMem0ClientWithConfig(config map[string]interface{}) (*Mem0Client, error)
 			}
 		}
 
-		// 读取 API Key
+		// read API Key
 		if apiKeyInterface, exists := config["api_key"]; exists {
 			if apiKey, ok := apiKeyInterface.(string); ok {
 				mem0Cfg.APIKey = apiKey
@@ -77,7 +77,7 @@ func GetMem0ClientWithConfig(config map[string]interface{}) (*Mem0Client, error)
 			}
 		}
 
-		// 读取 Host
+		// read Host
 		if hostInterface, exists := config["base_url"]; exists {
 			if host, ok := hostInterface.(string); ok {
 				mem0Cfg.BaseUrl = host
@@ -87,18 +87,18 @@ func GetMem0ClientWithConfig(config map[string]interface{}) (*Mem0Client, error)
 			}
 		}
 
-		// 验证必要配置
+		// validate required config
 		if mem0Cfg.APIKey == "" {
 			err = fmt.Errorf("mem0.api_key 配置缺失或为空")
 			return
 		}
 
-		// 设置默认值
+		// set defaults
 		if mem0Cfg.BaseUrl == "" {
 			mem0Cfg.BaseUrl = "https://api.mem0.ai"
 		}
 
-		// 创建 mem0 客户端
+		// create mem0 client
 		clientOptions := client.ClientOptions{
 			APIKey: mem0Cfg.APIKey,
 			/*Host:             mem0Cfg.Host,
@@ -122,27 +122,27 @@ func GetMem0ClientWithConfig(config map[string]interface{}) (*Mem0Client, error)
 			SearchTopk:      searchTopk,
 		}
 
-		log.Log().Infof("Mem0 客户端初始化成功, base_url: %s", mem0Cfg.BaseUrl)
+		log.Log().Infof("Mem0 client initialized, base_url: %s", mem0Cfg.BaseUrl)
 	})
 
 	return mem0Instance, err
 }
 
-// Init 初始化客户端
+// Init initializes the client
 func (m *Mem0Client) Init() error {
-	// 客户端已在创建时初始化
+	// client was already initialized at creation
 	log.Log().Info("Mem0 client initialized successfully")
 	return nil
 }
 
-// Get 获取记忆（内部方法）
+// Get fetches memories (internal)
 func (m *Mem0Client) Get(userID string) (interface{}, error) {
-	// 搜索用户的所有记忆
+	// search all memories for the user
 	results, err := m.client.Search("", &types.SearchOptions{
 		MemoryOptions: types.MemoryOptions{
 			UserID: userID,
 		},
-		Limit: 100, // 获取更多记忆
+		Limit: 100, // fetch more memories
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to search memories for user %s: %w", userID, err)
@@ -151,13 +151,13 @@ func (m *Mem0Client) Get(userID string) (interface{}, error) {
 	return results, nil
 }
 
-// AddMessage 添加消息到记忆
+// AddMessage adds a message to memory
 func (m *Mem0Client) AddMessage(ctx context.Context, agentID string, msg schema.Message) error {
 	message := types.Message{
 		Role:    string(msg.Role),
 		Content: msg.Content,
 	}
-	// 添加记忆
+	// add memory
 	_, err := m.client.Add([]types.Message{message}, types.MemoryOptions{
 		AgentID:   agentID,
 		AsyncMode: true,
@@ -170,7 +170,7 @@ func (m *Mem0Client) AddMessage(ctx context.Context, agentID string, msg schema.
 	return nil
 }
 
-// GetMessages 获取用户的消息历史
+// GetMessages returns the user's message history
 func (m *Mem0Client) GetMessages(ctx context.Context, agentID string, count int) ([]*schema.Message, error) {
 	var memoryOptions = types.MemoryOptions{
 		AgentID: agentID,
@@ -184,11 +184,11 @@ func (m *Mem0Client) GetMessages(ctx context.Context, agentID string, count int)
 		return nil, fmt.Errorf("failed to get messages for user %s: %w", agentID, err)
 	}
 
-	// 转换为 schema.Message 格式
+	// convert to schema.Message
 	var messages []*schema.Message
 	for _, result := range results {
-		// 从 metadata 中提取 role 和 content
-		role := schema.Assistant // 默认角色
+		// extract role and content from metadata
+		role := schema.Assistant // default role
 		content := result.Memory
 
 		if result.Metadata != nil {
@@ -216,10 +216,10 @@ func (m *Mem0Client) GetMessages(ctx context.Context, agentID string, count int)
 	return messages, nil
 }
 
-// ResetMemory 重置用户记忆
+// ResetMemory resets user memory
 func (m *Mem0Client) ResetMemory(ctx context.Context, userID string) error {
 
-	// 删除用户的所有记忆
+	// delete all memories for the user
 	err := m.client.DeleteUser(userID)
 	if err != nil {
 		return fmt.Errorf("failed to reset memory for user %s: %w", userID, err)
@@ -229,7 +229,7 @@ func (m *Mem0Client) ResetMemory(ctx context.Context, userID string) error {
 	return nil
 }
 
-// GetContext 获取上下文（实现 EnhancedMemoryProvider 接口）
+// GetContext returns context (EnhancedMemoryProvider)
 func (m *Mem0Client) GetContext(ctx context.Context, agentID string, maxToken int) (string, error) {
 	return "", nil
 }
@@ -248,7 +248,7 @@ func (m *Mem0Client) Search(ctx context.Context, agentId string, query string, t
 		return "", err
 	}
 
-	// 构建上下文字符串
+	// build the context string
 	var msgList []string
 	for _, result := range results {
 		msgList = append(msgList, fmt.Sprintf("- %s [%s]", result.Memory, result.CreatedAt))
@@ -262,33 +262,33 @@ func (m *Mem0Client) Flush(ctx context.Context, agentID string) error {
 }
 
 func (m *Mem0Client) actionSearch(ctx context.Context, agentID string, query string, topK int, threshold float64) ([]types.Memory, error) {
-	// 搜索相关记忆
+	// search related memories
 	results, err := m.client.Search(query, &types.SearchOptions{
 		MemoryOptions: types.MemoryOptions{
 			AgentID: agentID,
 		},
-		Limit:     topK,      // 获取topK条记忆
-		Threshold: threshold, // 设置相似度阈值
+		Limit:     topK,      // fetch topK memories
+		Threshold: threshold, // set similarity threshold
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get context for user %s: %w", agentID, err)
 	}
 
-	log.Log().Debugf("成功从mem0获取上下文, agentID: %s, results长度: %d", agentID, len(results))
+	log.Log().Debugf("got context from mem0, agentID: %s, results_len: %d", agentID, len(results))
 	return results, nil
 }
 
-// AddBatchMessages 批量添加消息
+// AddBatchMessages adds messages in batch
 func (m *Mem0Client) AddBatchMessages(ctx context.Context, agentID string, messages []schema.Message) error {
 
-	// 准备批量消息
+	// prepare batch messages
 	var batchMessages []string
 	for _, msg := range messages {
 		message := fmt.Sprintf("%s: %s", msg.Role, msg.Content)
 		batchMessages = append(batchMessages, message)
 	}
 
-	// 逐个添加记忆（mem0-go 可能不支持批量添加）
+	// add memories one by one (mem0-go may lack batch add)
 	for _, message := range batchMessages {
 		_, err := m.client.Add(message, types.MemoryOptions{
 			AgentID: agentID,
@@ -306,13 +306,13 @@ func (m *Mem0Client) AddBatchMessages(ctx context.Context, agentID string, messa
 	return nil
 }
 
-// Close 关闭客户端
+// Close closes the client
 func (m *Mem0Client) Close() error {
-	// mem0-go 客户端不需要显式关闭
+	// mem0-go client does not need an explicit close
 	log.Log().Info("Mem0 client closed")
 	return nil
 }
 
-// 确保 Mem0Client 实现了所需的接口
-// 注意：这里不能直接引用 memory 包，因为会造成循环导入
-// 接口实现会在编译时自动检查
+// ensure Mem0Client implements the required interfaces
+// Note: cannot import the memory package here (would create an import cycle)
+// interface conformance is checked at compile time

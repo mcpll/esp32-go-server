@@ -26,7 +26,7 @@ var status = "idle"
 
 const defaultDetectText = "你好小智"
 
-// 消息类型常量
+// Message type constants
 const (
 	MessageTypeHello   = "hello"
 	MessageTypeListen  = "listen"
@@ -36,7 +36,7 @@ const (
 	MessageTypeGoodBye = "goodbye"
 )
 
-// 服务器消息类型常量
+// Server message type constants
 const (
 	ServerMessageTypeSTT  = "stt"
 	ServerMessageTypeTTS  = "tts"
@@ -44,7 +44,7 @@ const (
 	ServerMessageTypeText = "text"
 )
 
-// 消息状态常量
+// Message status constants
 const (
 	MessageStateStart         = "start"
 	MessageStateStop          = "stop"
@@ -56,7 +56,7 @@ const (
 	MessageStateSentenceEnd   = "sentence_end"
 )
 
-// ClientMessage 表示客户端消息
+// ClientMessage is a client message
 type ClientMessage struct {
 	Type           string               `json:"type"`
 	DeviceID       string               `json:"device_id,omitempty"`
@@ -74,7 +74,7 @@ type ClientMessage struct {
 	PayLoad        json.RawMessage      `json:"payload,omitempty"`
 }
 
-// ServerMessage 表示服务器消息
+// ServerMessage is a server message
 type ServerMessage struct {
 	Type        string              `json:"type"`
 	Text        string              `json:"text,omitempty"`
@@ -100,7 +100,7 @@ type SpeakReadyUDPConfig struct {
 	ReuseExisting bool `json:"reuse_existing,omitempty"`
 }
 
-// AudioFormat 表示音频格式
+// AudioFormat describes audio format
 type AudioFormat struct {
 	SampleRate    int    `json:"sample_rate"`
 	Channels      int    `json:"channels"`
@@ -108,15 +108,15 @@ type AudioFormat struct {
 	Format        string `json:"format"`
 }
 
-// Opus编码常量
+// Opus encoding constants
 var (
-	// Opus编码的采样率
+	// Opus sample rate
 	SampleRate = 16000
-	// 音频通道数
+	// Audio channel count
 	Channels = 1
-	// 每帧持续时间(毫秒)
+	// Frame duration (ms)
 	FrameDurationMs = 20
-	// PCM缓冲区大小 = 采样率 * 通道数 * 帧持续时间(秒)
+	// PCM buffer size = sampleRate * channels * frameDuration(sec)
 	PCMBufferSize = SampleRate * Channels * FrameDurationMs / 1000
 
 	mode = "auto"
@@ -136,13 +136,13 @@ var clientId = "e4b0c442-98fc-4e1b-8c3d-6a5b6a5b6a6d"
 var token = "test-token"
 var ttsProviderName = "edge_offline"
 
-// serverVisionURL 从服务器 MCP initialize 消息中解析得到的 vision 接口地址
+// serverVisionURL vision API URL parsed from server MCP initialize
 var (
 	serverVisionURL   string
 	serverVisionURLMu sync.RWMutex
 )
 
-// parseAndSaveVisionURL 从 MCP initialize 的 payload 中解析 params.capabilities.vision.url 并保存
+// parseAndSaveVisionURL parses and saves params.capabilities.vision.url from MCP initialize payload
 func parseAndSaveVisionURL(payload json.RawMessage) {
 	var mcpMsg struct {
 		Method string `json:"method"`
@@ -165,7 +165,7 @@ func parseAndSaveVisionURL(payload json.RawMessage) {
 	}
 }
 
-// GetServerVisionURL 返回服务器下发的 vision 接口地址，未下发时返回空字符串
+// GetServerVisionURL returns server vision URL, or empty if not sent
 func GetServerVisionURL() string {
 	serverVisionURLMu.RLock()
 	defer serverVisionURLMu.RUnlock()
@@ -180,7 +180,7 @@ func resetSignals() {
 }
 
 func main() {
-	// 解析命令行参数
+	// Parse command-line flags
 	serverAddr := flag.String("server", "ws://localhost:8989/xiaozhi/v1/", "服务器地址")
 	deviceID := flag.String("device", "test-device-001", "设备ID")
 	audioFile := flag.String("audio", "", "音频文件路径")
@@ -206,7 +206,7 @@ func main() {
 	FrameDurationMs = *frameDurationsMs
 	normalizedMode, err := normalizeLocalMode(*modeFlag)
 	if err != nil {
-		log.Fatalf("模式无效: %v", err)
+		log.Fatalf("invalid mode: %v", err)
 	}
 	mode = normalizedMode
 	runnerMode = strings.ToLower(strings.TrimSpace(*runnerFlag))
@@ -224,31 +224,31 @@ func main() {
 
 	if runnerMode == "auto" {
 		if err := runAutomationSuite(*serverAddr, *deviceID, *audioFile); err != nil {
-			log.Fatalf("自动化测试失败: %v", err)
+			log.Fatalf("auto test failed: %v", err)
 		}
 		return
 	}
 	if runnerMode != "manual" {
-		log.Fatalf("不支持的运行方式: %s, 可选: manual|auto", runnerMode)
+		log.Fatalf("unsupported run mode: %s, options: manual|auto", runnerMode)
 	}
 
-	// 运行客户端
+	// Run the client
 	if err := runClient(*serverAddr, *deviceID, *audioFile, nil); err != nil {
-		log.Fatalf("客户端运行失败: %v", err)
+		log.Fatalf("client run failed: %v", err)
 	}
 }
 
 var OpusData [][]byte
 var firstRecvFrame bool
 
-// runClient 运行小智客户端
+// runClient runs the Xiaozhi client
 func runClient(serverAddr, deviceID, audioFile string, testCase *protocolTestCase) error {
 	OpusData = [][]byte{}
-	// 构建WebSocket URL
+	// Build WebSocket URL
 	wsURL := serverAddr
 	fmt.Printf("正在连接服务器: %s\n", wsURL)
 
-	// 连接WebSocket服务器
+	// Connect to WebSocket server
 	conn, _, err := dialServer(wsURL, deviceID)
 	if err != nil {
 		return err
@@ -258,7 +258,7 @@ func runClient(serverAddr, deviceID, audioFile string, testCase *protocolTestCas
 
 	fmt.Println("已连接到服务器")
 
-	// 发送hello消息
+	// Send hello message
 	effectiveAddMcp := addMcp || (testCase != nil && testCase.EnableMCP)
 	if err := sendHello(runtime, deviceID, effectiveAddMcp, "websocket", defaultAudioFormat()); err != nil {
 		return fmt.Errorf("发送hello消息失败: %v", err)
@@ -275,28 +275,28 @@ func runClient(serverAddr, deviceID, audioFile string, testCase *protocolTestCas
 		}
 	}
 
-	// 如果指定了音频文件，则发送音频文件
+	// If audio file given, send it
 	if audioFile != "" {
 		if err := sendListenStart(runtime, protocolMode()); err != nil {
 			return fmt.Errorf("发送listen start消息失败: %v", err)
 		}
 		fmt.Printf("已发送 listen start %s 信令\n", protocolMode())
 
-		// 等待一小段时间，确保服务器准备好接收音频
+		// Short wait so server is ready for audio
 		time.Sleep(100 * time.Millisecond)
 
 		fmt.Println("开始发送音频数据...")
-		// 读取并发送音频文件（使用Opus编码）
+		// Read and send audio file (Opus-encoded)
 		if err := sendWavFileWithOpusEncoding(conn, audioFile); err != nil {
 			return fmt.Errorf("发送音频数据失败: %v\n", err)
 		}
 		fmt.Println("音频数据发送完成，等待服务器响应...")
-		// 等待10秒后退出
+		// Wait 10 seconds then exit
 		time.Sleep(10 * time.Second)
 		return nil
 	}
 
-	// 如果没有指定音频文件，则使用TTS模式
+	// If no audio file, use TTS mode
 	if err := sendTextToSpeech(runtime, testCase); err != nil {
 		return fmt.Errorf("发送文本到语音失败: %v", err)
 	}
@@ -453,7 +453,7 @@ func sendHello(runtime *sessionRuntime, deviceID string, enableMCP bool, transpo
 }
 
 func sendListenStart(runtime *sessionRuntime, mode string) error {
-	// 发送listen start消息
+	// Send listen start message
 	listenStartMsg := ClientMessage{
 		Type:     MessageTypeListen,
 		DeviceID: runtime.deviceID,
@@ -468,7 +468,7 @@ func sendListenStart(runtime *sessionRuntime, mode string) error {
 }
 
 func sendListenStop(runtime *sessionRuntime) error {
-	// 发送listen start消息
+	// Send listen start message
 	listenStartMsg := ClientMessage{
 		Type:     MessageTypeListen,
 		DeviceID: runtime.deviceID,
@@ -484,7 +484,7 @@ func sendListenStop(runtime *sessionRuntime) error {
 }
 
 func sendAbort(runtime *sessionRuntime) error {
-	// 发送listen start消息
+	// Send listen start message
 	listenStartMsg := ClientMessage{
 		Type:     MessageTypeAbort,
 		DeviceID: runtime.deviceID,
@@ -520,7 +520,7 @@ func sendGoodbye(runtime *sessionRuntime) error {
 }
 
 func sendListenDetect(runtime *sessionRuntime, text string) error {
-	// 发送listen start消息
+	// Send listen start message
 	listenStartMsg := ClientMessage{
 		Type:     MessageTypeListen,
 		DeviceID: runtime.deviceID,
@@ -622,7 +622,7 @@ func handleTTSStopForStrategy(runtime *sessionRuntime) error {
 	return nil
 }
 
-// 发送JSON消息
+// Send JSON message
 func sendJSONMessage(runtime *sessionRuntime, msg interface{}) error {
 	data, err := json.Marshal(msg)
 	if err != nil {
@@ -635,16 +635,16 @@ func sendJSONMessage(runtime *sessionRuntime, msg interface{}) error {
 	return runtime.writeText(data)
 }
 
-// 读取WAV文件并使用Opus编码发送
+// Read WAV and send Opus-encoded
 func sendWavFileWithOpusEncoding(conn *websocket.Conn, filePath string) error {
-	// 打开WAV文件
+	// Open WAV file
 	file, err := os.Open(filePath)
 	if err != nil {
 		return fmt.Errorf("打开WAV文件失败: %v", err)
 	}
 	defer file.Close()
 
-	// 读取文件内容
+	// Read file contents
 	fileContent, err := io.ReadAll(file)
 	if err != nil {
 		return fmt.Errorf("读取文件内容失败: %v", err)
@@ -661,31 +661,31 @@ func sendWavFileWithOpusEncoding(conn *websocket.Conn, filePath string) error {
 
 	for i, frame := range opusFrames {
 		fmt.Printf("Opus帧 %d 长度: %d\n", i, len(frame))
-		// 发送Opus帧
+		// Send Opus frame
 		if err := conn.WriteMessage(websocket.BinaryMessage, frame); err != nil {
 			return fmt.Errorf("发送Opus帧失败: %v", err)
 		}
-		// 控制发送速率，模拟实时音频流
+		// Pace sends to simulate realtime audio
 		time.Sleep(time.Duration(FrameDurationMs) * time.Millisecond)
 	}
 
-	// 发送200ms静音音频数据
+	// Send 200ms of silence
 	silenceDurationMs := 1000
 	silenceFrameCount := silenceDurationMs / FrameDurationMs
 	fmt.Printf("开始发送 %dms 静音音频数据，共 %d 帧\n", silenceDurationMs, silenceFrameCount)
 
-	// 生成静音Opus数据
+	// Generate silent Opus data
 	emptyOpusData := genEmptyOpusData(SampleRate, Channels, FrameDurationMs, 1)
 	if emptyOpusData == nil {
 		return fmt.Errorf("生成静音Opus数据失败")
 	}
 
-	// 循环发送静音帧
+	// Loop sending silence frames
 	for i := 0; i < silenceFrameCount; i++ {
 		if err := conn.WriteMessage(websocket.BinaryMessage, emptyOpusData); err != nil {
 			return fmt.Errorf("发送静音Opus帧失败: %v", err)
 		}
-		// 控制发送速率，模拟实时音频流
+		// Pace sends to simulate realtime audio
 		time.Sleep(time.Duration(FrameDurationMs) * time.Millisecond)
 	}
 	fmt.Printf("静音音频数据发送完成\n")
@@ -693,7 +693,7 @@ func sendWavFileWithOpusEncoding(conn *websocket.Conn, filePath string) error {
 	return nil
 }
 
-// 读取并发送音频文件（原始方式，不使用Opus编码）
+// Read and send audio file (raw; no Opus)
 func sendAudioFile(conn *websocket.Conn, filePath string) error {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -701,8 +701,8 @@ func sendAudioFile(conn *websocket.Conn, filePath string) error {
 	}
 	defer file.Close()
 
-	// 直接读取文件内容并分块发送
-	// 每次读取并发送一个固定大小的块
+	// Read file and send in chunks
+	// Read and send one fixed-size chunk at a time
 	const chunkSize = 4096
 	buffer := make([]byte, chunkSize)
 
@@ -716,12 +716,12 @@ func sendAudioFile(conn *websocket.Conn, filePath string) error {
 		}
 
 		if n > 0 {
-			// 发送二进制音频数据
+			// Send binary audio data
 			if err := conn.WriteMessage(websocket.BinaryMessage, buffer[:n]); err != nil {
 				return fmt.Errorf("发送音频数据失败: %v", err)
 			}
 
-			// 控制发送速率，模拟实时音频流
+			// Pace sends to simulate realtime audio
 			time.Sleep(100 * time.Millisecond)
 		}
 	}
@@ -750,7 +750,7 @@ func genEmptyOpusData(sampleRate int, channels int, frameDurationMs int, count i
 	return tmp
 }
 
-// 调用tts服务生成语音, 并编码至opus发送至服务端
+// Call TTS to synthesize speech, Opus-encode, send to server
 func sendTextToSpeech(runtime *sessionRuntime, testCase *protocolTestCase) error {
 	cosyVoiceConfig := map[string]interface{}{
 		"api_url":        "https://tts.linkerai.cn/tts",
@@ -792,12 +792,12 @@ func sendTextToSpeech(runtime *sessionRuntime, testCase *protocolTestCase) error
 	}
 
 	/*
-		audioData, err := ttsProvider.TextToSpeech(context.Background(), "你叫什么名字?")
+		audioData, err := ttsProvider.TextToSpeech(context.Background(), "What is your name?")
 		if err != nil {
-			fmt.Printf("生成语音失败: %v\n", err)
-			return fmt.Errorf("生成语音失败: %v", err)
+			fmt.Printf("speech synthesis failed: %v\n", err)
+			return fmt.Errorf("speech synthesis failed: %v", err)
 		}
-	*/
+	}*/
 
 	emptyOpusData := genEmptyOpusData(SampleRate, 1, FrameDurationMs, 1000)
 
@@ -809,7 +809,7 @@ func sendTextToSpeech(runtime *sessionRuntime, testCase *protocolTestCase) error
 		}
 
 		for audioData := range audioChan {
-			//fmt.Printf("发送语音数据长度: %d\n", len(audioData))
+			//fmt.Printf("sent audio data length: %d\n", len(audioData))
 			if err := runtime.writeBinary(audioData); err != nil {
 				return fmt.Errorf("发送语音帧失败: %v", err)
 			}
@@ -835,14 +835,14 @@ func sendTextToSpeech(runtime *sessionRuntime, testCase *protocolTestCase) error
 		allowNextInput()
 	}
 
-	// 新增：等待用户输入文本
+	// Added: wait for user text input
 	reader := bufio.NewReader(os.Stdin)
 
 	var stopEmptyOpusChan = make(chan struct{})
 	var resumeChan = make(chan struct{})
 	go func() {
 		if mode == LocalModeRealtime {
-			//持续发送emptyOpusData, 直到收到 停止信号
+			// Keep sending emptyOpusData until stop signal
 			for {
 				select {
 				case <-stopEmptyOpusChan:
@@ -901,7 +901,7 @@ func sendTextToSpeech(runtime *sessionRuntime, testCase *protocolTestCase) error
 		}
 		input = strings.TrimSpace(input)
 		if input == "" {
-			//发送abort
+			// Send abort
 			sendAbort(runtime)
 			allowNextInput()
 			status = "idle"

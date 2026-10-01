@@ -12,23 +12,23 @@ import (
 	log "xiaozhi-esp32-server-golang/logger"
 )
 
-// HTTP接口响应结构体
+// HTTP API response structs
 
-// CheckActivationResponse 检查激活状态响应
+// CheckActivationResponse check-activation response
 type CheckActivationResponse struct {
 	Activated bool   `json:"activated"`
 	Message   string `json:"message"`
 }
 
-// GetActivationInfoResponse 获取激活信息响应
+// GetActivationInfoResponse get-activation-info response
 type GetActivationInfoResponse struct {
 	Activated bool   `json:"activated"`
-	Code      string `json:"code,omitempty"` // 修改为string类型以匹配后端API
+	Code      string `json:"code,omitempty"` // Use string to match backend API
 	Challenge string `json:"challenge,omitempty"`
 	Message   string `json:"message,omitempty"`
 }
 
-// ActivateDeviceRequest 设备激活请求
+// ActivateDeviceRequest device activation request
 type ActivateDeviceRequest struct {
 	DeviceId     string `json:"device_id"`
 	ClientId     string `json:"client_id"`
@@ -39,7 +39,7 @@ type ActivateDeviceRequest struct {
 	Hmac         string `json:"hmac"`
 }
 
-// ActivateDeviceResponse 设备激活响应
+// ActivateDeviceResponse device activation response
 type ActivateDeviceResponse struct {
 	Success bool        `json:"success"`
 	Message string      `json:"message"`
@@ -47,82 +47,82 @@ type ActivateDeviceResponse struct {
 	Data    interface{} `json:"data,omitempty"`
 }
 
-// IsDeviceActivated 检查设备是否已激活
+// IsDeviceActivated checks whether the device is activated
 func (am *ConfigManager) IsDeviceActivated(ctx context.Context, deviceId string, clientId string) (bool, error) {
-	// 直接调用后端管理系统的HTTP接口
+	// Call backend management HTTP API directly
 	activated, err := am.callCheckActivationAPI(ctx, deviceId, clientId)
 	if err != nil {
-		log.Log().Errorf("检查设备 %s 激活状态失败: %v", deviceId, err)
+		log.Log().Errorf("failed to check activation status for device %s: %v", deviceId, err)
 		return false, err
 	}
 
-	log.Log().Debugf("设备 %s 激活状态: %v", deviceId, activated)
+	log.Log().Debugf("device %s activation status: %v", deviceId, activated)
 	return activated, nil
 }
 
-// GetActivationInfo 获取设备激活信息
+// GetActivationInfo returns device activation info
 func (am *ConfigManager) GetActivationInfo(ctx context.Context, deviceId string, clientId string) (string, string, string, int) {
-	// 直接调用后端管理系统的HTTP接口
+	// Call backend management HTTP API directly
 	activated, codeStr, challenge, message, err := am.callGetActivationInfoAPI(ctx, deviceId, clientId)
 	if err != nil {
-		log.Log().Errorf("获取设备 %s 激活信息失败: %v", deviceId, err)
+		log.Log().Errorf("failed to get activation info for device %s: %v", deviceId, err)
 		return "", "", "", 0
 	}
 
-	// 如果设备已激活，直接返回
+	// If already activated, return immediately
 	if activated {
-		log.Log().Debugf("设备 %s 已激活", deviceId)
+		log.Log().Debugf("device %s already activated", deviceId)
 		return "", "", message, 0
 	}
 
-	// 检查Challenge是否为空
+	// Check whether Challenge is empty
 	if challenge == "" {
-		log.Log().Errorf("设备 %s 的Challenge字段为空", deviceId)
+		log.Log().Errorf("device %s Challenge field is empty", deviceId)
 		return "", "", "Challenge字段为空，请联系管理员", 0
 	}
 
-	// 设备未激活，返回激活信息
-	timeoutMs := 300 // 默认5分钟超时
-	log.Log().Debugf("获取设备 %s 激活信息: code=%s, challenge=%s", deviceId, codeStr, challenge)
+	// Device not activated; return activation info
+	timeoutMs := 300 // Default 5-minute timeout
+	log.Log().Debugf("got activation info for device %s: code=%s, challenge=%s", deviceId, codeStr, challenge)
 	if codeStr == "" {
-		log.Log().Warnf("设备 %s 激活码为空", deviceId)
+		log.Log().Warnf("device %s activation code is empty", deviceId)
 	}
 
 	return codeStr, challenge, message, timeoutMs
 }
 
-// VerifyChallenge 验证挑战码和HMAC
+// VerifyChallenge verifies challenge and HMAC
 func (am *ConfigManager) VerifyChallenge(ctx context.Context, deviceId string, clientId string, activationPayload types.ActivationPayload) (bool, error) {
-	// 验证HMAC（如果提供了HMAC）
+	// Verify HMAC when provided
 	if activationPayload.HMAC != "" {
 		if !am.verifyHMAC(activationPayload.Challenge, activationPayload.HMAC) {
-			log.Log().Warnf("设备 %s HMAC验证失败", deviceId)
+			log.Log().Warnf("device %s HMAC verification failed", deviceId)
 			return false, fmt.Errorf("HMAC验证失败")
 		}
 	}
 
-	// 直接调用后端管理系统的激活接口
+	// Call backend management activation API directly
 	verified, err := am.callActivateDeviceAPI(ctx, deviceId, clientId, activationPayload)
 	if err != nil {
-		log.Log().Errorf("设备激活失败: %v", err)
+		log.Log().Errorf("device activation failed: %v", err)
 		return false, err
 	}
 
 	if verified {
-		log.Log().Infof("设备 %s 激活验证成功", deviceId)
+		log.Log().Infof("device %s activation verified successfully", deviceId)
 	}
 
 	return verified, nil
 }
 
-// verifyHMAC 验证HMAC签名
+// verifyHMAC verifies the HMAC signature
 func (am *ConfigManager) verifyHMAC(challenge, providedHmac string) bool {
-	// 这里可以根据实际需求配置密钥
-	// 暂时使用空密钥，实际应用中应该从配置中获取
+	// Configure the key as needed
+	// Empty key for now; production should load from config
 	secretKey := ""
 
 	if secretKey == "" {
-		// 如果没有配置密钥，直接通过验证
+		// If no key configured, pass verification
 		return true
 	}
 
@@ -133,13 +133,13 @@ func (am *ConfigManager) verifyHMAC(challenge, providedHmac string) bool {
 	return expectedHmac == providedHmac
 }
 
-// HTTP API 调用方法
+// HTTP API call helpers
 
-// callCheckActivationAPI 调用检查激活状态接口
+// callCheckActivationAPI calls the check-activation API
 func (am *ConfigManager) callCheckActivationAPI(ctx context.Context, deviceId, clientId string) (bool, error) {
 	var response CheckActivationResponse
 
-	// 发送HTTP请求
+	// Send HTTP request
 	err := am.client.DoRequest(ctx, http.RequestOptions{
 		Method: "GET",
 		Path:   "/api/internal/device/check-activation",
@@ -153,15 +153,15 @@ func (am *ConfigManager) callCheckActivationAPI(ctx context.Context, deviceId, c
 		return false, fmt.Errorf("请求失败: %w", err)
 	}
 
-	log.Log().Debugf("检查激活状态响应: %+v", response)
+	log.Log().Debugf("check activation status response: %+v", response)
 	return response.Activated, nil
 }
 
-// callGetActivationInfoAPI 调用获取激活信息接口
+// callGetActivationInfoAPI calls the get-activation-info API
 func (am *ConfigManager) callGetActivationInfoAPI(ctx context.Context, deviceId, clientId string) (bool, string, string, string, error) {
 	var response GetActivationInfoResponse
 
-	// 发送HTTP请求
+	// Send HTTP request
 	err := am.client.DoRequest(ctx, http.RequestOptions{
 		Method: "GET",
 		Path:   "/api/internal/device/activation-info",
@@ -175,7 +175,7 @@ func (am *ConfigManager) callGetActivationInfoAPI(ctx context.Context, deviceId,
 		return false, "", "", "", fmt.Errorf("请求失败: %w", err)
 	}
 
-	log.Log().Debugf("获取激活信息响应: %+v", response)
+	log.Log().Debugf("get activation info response: %+v", response)
 
 	if response.Activated {
 		return true, "", "", response.Message, nil
@@ -184,9 +184,9 @@ func (am *ConfigManager) callGetActivationInfoAPI(ctx context.Context, deviceId,
 	return false, response.Code, response.Challenge, response.Message, nil
 }
 
-// callActivateDeviceAPI 调用设备激活接口
+// callActivateDeviceAPI calls the device activation API
 func (am *ConfigManager) callActivateDeviceAPI(ctx context.Context, deviceId, clientId string, activationPayload types.ActivationPayload) (bool, error) {
-	// 构建请求体
+	// Build request body
 	request := ActivateDeviceRequest{
 		DeviceId:     deviceId,
 		ClientId:     clientId,
@@ -198,7 +198,7 @@ func (am *ConfigManager) callActivateDeviceAPI(ctx context.Context, deviceId, cl
 
 	var response ActivateDeviceResponse
 
-	// 发送HTTP请求
+	// Send HTTP request
 	err := am.client.DoRequest(ctx, http.RequestOptions{
 		Method:   "POST",
 		Path:     "/api/internal/device/activate",
@@ -209,7 +209,7 @@ func (am *ConfigManager) callActivateDeviceAPI(ctx context.Context, deviceId, cl
 		return false, fmt.Errorf("请求失败: %w", err)
 	}
 
-	log.Log().Debugf("设备激活响应: %+v", response)
+	log.Log().Debugf("device activation response: %+v", response)
 
 	if !response.Success {
 		return false, nil

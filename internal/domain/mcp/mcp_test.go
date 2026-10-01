@@ -34,7 +34,7 @@ func newTestMcpClientPool() *McpClientPool {
 }
 
 func TestGlobalMCPManager_Singleton(t *testing.T) {
-	// 测试单例模式
+	// test singleton pattern
 	manager1 := GetGlobalMCPManager()
 	manager2 := GetGlobalMCPManager()
 
@@ -43,24 +43,24 @@ func TestGlobalMCPManager_Singleton(t *testing.T) {
 
 func TestDeviceMCPManager_Singleton(t *testing.T) {
 	t.Skip("GetDeviceMCPManager function not implemented yet")
-	// // 测试单例模式
+	// // test singleton pattern
 	// manager1 := GetDeviceMCPManager()
 	// manager2 := GetDeviceMCPManager()
 	//
-	// assert.Equal(t, manager1, manager2, "应该返回同一个实例")
+	// assert.Equal(t, manager1, manager2, "should return the same instance")
 }
 
 func TestGlobalMCPManager_StartStop(t *testing.T) {
-	// 设置测试配置
+	// set test config
 	viper.Set("mcp.global.enabled", false)
 
 	manager := GetGlobalMCPManager()
 
-	// 测试启动（禁用状态）
+	// test Start when disabled
 	err := manager.Start()
 	assert.NoError(t, err)
 
-	// 测试停止
+	// test Stop
 	err = manager.Stop()
 	assert.NoError(t, err)
 }
@@ -72,7 +72,7 @@ func TestMCPTool_Info(t *testing.T) {
 			Desc: "测试工具",
 		},
 		serverName: "test_server",
-		client:     nil, // 测试中不需要真实客户端
+		client:     nil, // no real client needed in this test
 	}
 
 	info, err := tool.Info(context.Background())
@@ -89,21 +89,21 @@ func TestMCPTool_InvokableRun(t *testing.T) {
 			Desc: "测试工具",
 		},
 		serverName: "test_server",
-		client:     nil, // 测试中不需要真实客户端
+		client:     nil, // no real client needed in this test
 	}
 
-	// 这个测试会失败，因为客户端为nil
-	// 但可以验证方法签名和基本逻辑
+	// this test will fail because the client is nil
+	// but it can still check method signatures and basic logic
 	_, err := tool.InvokableRun(context.Background(), `{"query": "test"}`)
-	assert.Error(t, err)                         // 预期会有错误，因为客户端为nil
-	assert.Contains(t, err.Error(), "调用MCP工具失败") // 验证错误消息包含预期文本
+	assert.Error(t, err)                         // expect an error because the client is nil
+	assert.Contains(t, err.Error(), "调用MCP工具失败") // verify the error message contains the expected text
 }
 
 func TestDeviceMCPManager_GetDeviceTools(t *testing.T) {
 	t.Skip("GetDeviceMCPManager function not implemented yet")
 	// manager := GetDeviceMCPManager()
 	//
-	// // 测试获取不存在设备的工具
+	// // test getting tools for a non-existent device
 	// tools := manager.GetDeviceTools("non_existent_device")
 	// assert.Empty(t, tools)
 }
@@ -111,7 +111,7 @@ func TestDeviceMCPManager_GetDeviceTools(t *testing.T) {
 func TestGlobalMCPManager_GetAllTools(t *testing.T) {
 	manager := GetGlobalMCPManager()
 
-	// 测试获取所有工具（初始状态应该为空）
+	// test GetAllTools (initially empty)
 	tools := manager.GetAllTools()
 	assert.NotNil(t, tools)
 }
@@ -119,7 +119,7 @@ func TestGlobalMCPManager_GetAllTools(t *testing.T) {
 func TestGlobalMCPManager_GetToolByName(t *testing.T) {
 	manager := GetGlobalMCPManager()
 
-	// 测试获取不存在的工具
+	// test getting a non-existent tool
 	tool, exists := manager.GetToolByName("non_existent_tool")
 	assert.False(t, exists)
 	assert.Nil(t, tool)
@@ -370,7 +370,7 @@ func TestGlobalMCPConnectionFailsWhenInitialToolsListFails(t *testing.T) {
 	conn.mu.RUnlock()
 }
 
-// TestMCPGoStructures 测试 mcp-go 库结构体的使用
+// TestMCPGoStructures tests use of mcp-go library structs
 func TestMCPGoStructures(t *testing.T) {
 	t.Run("InitializeRequest", func(t *testing.T) {
 		initRequest := mcp.InitializeRequest{
@@ -417,7 +417,7 @@ func TestMCPGoStructures(t *testing.T) {
 	})
 }
 
-// 创建测试工具
+// create a test tool
 func TestMCPTool_InvokableRun_NewTool(t *testing.T) {
 	testTool := &McpTool{
 		info: &schema.ToolInfo{
@@ -425,13 +425,13 @@ func TestMCPTool_InvokableRun_NewTool(t *testing.T) {
 			Desc: "测试工具",
 		},
 		serverName: "test_server",
-		client:     nil, // 测试中不需要真实客户端
+		client:     nil, // no real client needed in this test
 	}
 
-	// 这个测试会失败，因为没有真实的MCP服务器
-	// 但可以验证方法签名和基本逻辑
+	// this test will fail without a real MCP server
+	// but it can still check method signatures and basic logic
 	_, err := testTool.InvokableRun(context.Background(), `{"query": "test"}`)
-	assert.Error(t, err) // 预期会有网络错误
+	assert.Error(t, err) // expect a network error
 }
 
 func TestIsRetryableRemoteCallError(t *testing.T) {

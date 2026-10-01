@@ -337,44 +337,24 @@ cd asr_server
 
 在开始 AIO 打包前，请先确认你已经理解并跑通过第 4 章中的分离部署流程。
 
-当前仓库的 AIO 形态会先构建前端，再通过 Go build tags 把下列能力一起打进主程序：
+当前仓库的 AIO 形态通过 Go build tag 把声纹服务打进主程序：
 
-- `manager`
 - `asr_server`
-- `embed_ui`
 
-因此，最终产物里的 `xiaozhi_server` 实际上是“主程序 + 控制台后端 + 声纹服务 + 已嵌入的控制台前端”。
-
-### 5.1 前端先构建
-
-```bash
-cd manager/frontend
-npm ci
-npm run build
-```
-
-然后把前端产物复制到后端静态目录：
-
-```bash
-mkdir -p ../backend/static/dist
-cp -r dist/* ../backend/static/dist/
-```
-
-### 5.2 编译带内嵌服务的主程序
+### 5.1 编译带内嵌声纹服务的主程序
 
 回到仓库根目录执行：
 
 ```bash
 go mod tidy
-go build -tags "nolibopusfile asr_server manager embed_ui" -ldflags "-s -w" -o xiaozhi_server ./cmd/server
+go build -tags "nolibopusfile asr_server" -ldflags "-s -w" -o xiaozhi_server ./cmd/server
 ```
 
-### 5.3 启动 AIO 包
+### 5.2 启动 AIO 包
 
 CI 打包时会把以下文件一起放到发布目录：
 
 - `main_config.yaml`
-- `manager.json`
 - `asr_server.json`
 - `models/`
 - `data/`
@@ -384,11 +364,10 @@ CI 打包时会把以下文件一起放到发布目录：
 ```bash
 ./xiaozhi_server \
   -c main_config.yaml \
-  -manager-config manager.json \
   -asr-config asr_server.json
 ```
 
-### 5.4 AIO 打包补充说明
+### 5.3 AIO 打包补充说明
 
 实际发布时通常还会额外完成：
 

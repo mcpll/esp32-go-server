@@ -181,14 +181,14 @@ func (p *DoubaoTTSProvider) streamHTTP(ctx context.Context, text string, sampleR
 	go func() {
 		resp, err := client.Do(req)
 		if err != nil {
-			log.Errorf("豆包 HTTP TTS 请求失败: %v", err)
+			log.Errorf("Doubao HTTP TTS request failed: %v", err)
 			close(outputChan)
 			return
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode >= http.StatusBadRequest {
 			body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-			log.Errorf("豆包 HTTP TTS 返回错误: status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(body)))
+			log.Errorf("Doubao HTTP TTS error: status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(body)))
 			close(outputChan)
 			return
 		}
@@ -203,7 +203,7 @@ func (p *DoubaoTTSProvider) decodeStreamResponse(ctx context.Context, body io.Re
 
 	decoder, err := util.CreateAudioDecoderWithSampleRate(ctx, pipeReader, outputChan, frameDuration, defaultDoubaoAudioFmt, sampleRate)
 	if err != nil {
-		log.Errorf("创建豆包音频解码器失败: %v", err)
+		log.Errorf("failed to create Doubao audio decoder: %v", err)
 		_ = pipeReader.Close()
 		_ = pipeWriter.Close()
 		close(outputChan)
@@ -211,7 +211,7 @@ func (p *DoubaoTTSProvider) decodeStreamResponse(ctx context.Context, body io.Re
 	}
 	go func() {
 		if err := decoder.Run(startTs); err != nil {
-			log.Errorf("豆包音频解码失败: %v", err)
+			log.Errorf("Doubao audio decode failed: %v", err)
 		}
 	}()
 

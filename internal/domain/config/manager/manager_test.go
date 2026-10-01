@@ -9,9 +9,9 @@ import (
 )
 
 func TestConfigManager_GetSystemConfig(t *testing.T) {
-	// 创建配置管理器
+	// create the config manager
 	config := map[string]interface{}{
-		"backend_url": "http://192.168.208.214:8080", // 根据实际backend地址调整
+		"backend_url": "http://192.168.208.214:8080", // adjust to the actual backend address
 	}
 
 	manager, err := NewManagerUserConfigProvider(config)
@@ -19,23 +19,23 @@ func TestConfigManager_GetSystemConfig(t *testing.T) {
 		t.Fatalf("创建配置管理器失败: %v", err)
 	}
 
-	// 创建上下文
+	// create a context
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// 获取系统配置
+	// get system config
 	configJSON, err := manager.GetSystemConfig(ctx)
 	if err != nil {
 		t.Fatalf("获取系统配置失败: %v", err)
 	}
 
-	// 验证返回的JSON格式
+	// validate the returned JSON
 	var configMap map[string]interface{}
 	if err := json.Unmarshal([]byte(configJSON), &configMap); err != nil {
 		t.Fatalf("解析配置JSON失败: %v", err)
 	}
 
-	// 检查是否包含预期的配置项
+	// check for expected config keys
 	expectedKeys := []string{"mqtt", "mqtt_server", "udp", "ota"}
 	for _, key := range expectedKeys {
 		if _, exists := configMap[key]; !exists {

@@ -4,33 +4,33 @@ import (
 	"context"
 )
 
-// MusicPlayerInterface 音乐播放器接口
+// MusicPlayerInterface music player interface
 type MusicPlayerInterface interface {
-	// PlayMusicStream 从URL播放音乐，返回音频流通道
+	// PlayMusicStream plays music from a URL and returns an audio stream channel
 	PlayMusicStream(ctx context.Context, url string) (chan []byte, error)
 
-	// GetPlayerInfo 获取播放器信息
+	// GetPlayerInfo returns player info
 	GetPlayerInfo() map[string]interface{}
 
-	// Stop 停止播放器
+	// Stop stops the player
 	Stop() error
 }
 
-// MusicPlayerConfig 音乐播放器配置
+// MusicPlayerConfig music player config
 type MusicPlayerConfig struct {
-	FrameDuration int    `json:"frame_duration"` // 帧时长(ms)，默认20ms
-	AudioFormat   string `json:"audio_format"`   // 音频格式，默认"mp3"
+	FrameDuration int    `json:"frame_duration"` // frame duration (ms), default 20ms
+	AudioFormat   string `json:"audio_format"`   // audio format, default "mp3"
 }
 
-// DefaultMusicPlayerConfig 默认音乐播放器配置
+// DefaultMusicPlayerConfig default music player config
 func DefaultMusicPlayerConfig() *MusicPlayerConfig {
 	return &MusicPlayerConfig{
 		FrameDuration: 20,    // 20ms
-		AudioFormat:   "mp3", // MP3格式
+		AudioFormat:   "mp3", // MP3 format
 	}
 }
 
-// ToMap 将配置转换为map
+// ToMap converts config to a map
 func (c *MusicPlayerConfig) ToMap() map[string]interface{} {
 	return map[string]interface{}{
 		"frame_duration": c.FrameDuration,
@@ -38,17 +38,17 @@ func (c *MusicPlayerConfig) ToMap() map[string]interface{} {
 	}
 }
 
-// AudioStreamInfo 音频流信息
+// AudioStreamInfo audio stream info
 type AudioStreamInfo struct {
 	URL           string `json:"url"`
-	Format        string `json:"format"`         // 音频格式，如 "mp3", "wav"
-	SampleRate    int    `json:"sample_rate"`    // 采样率
-	Channels      int    `json:"channels"`       // 声道数
-	Duration      int64  `json:"duration"`       // 时长(毫秒)
-	ContentLength int64  `json:"content_length"` // 内容长度(字节)
+	Format        string `json:"format"`         // audio format, e.g. "mp3", "wav"
+	SampleRate    int    `json:"sample_rate"`    // sample rate
+	Channels      int    `json:"channels"`       // channel count
+	Duration      int64  `json:"duration"`       // duration (ms)
+	ContentLength int64  `json:"content_length"` // content length (bytes)
 }
 
-// PlaybackStatus 播放状态
+// PlaybackStatus playback status
 type PlaybackStatus int
 
 const (
@@ -59,7 +59,7 @@ const (
 	StatusError
 )
 
-// String 返回状态的字符串表示
+// String returns the string form of the status
 func (s PlaybackStatus) String() string {
 	switch s {
 	case StatusIdle:
@@ -77,21 +77,21 @@ func (s PlaybackStatus) String() string {
 	}
 }
 
-// PlaybackEvent 播放事件
+// PlaybackEvent playback event
 type PlaybackEvent struct {
-	Type      string      `json:"type"`      // 事件类型: "started", "progress", "finished", "error"
-	Timestamp int64       `json:"timestamp"` // 时间戳
-	Message   string      `json:"message"`   // 事件消息
-	Data      interface{} `json:"data"`      // 额外数据
+	Type      string      `json:"type"`      // event type: "started", "progress", "finished", "error"
+	Timestamp int64       `json:"timestamp"` // timestamp
+	Message   string      `json:"message"`   // event message
+	Data      interface{} `json:"data"`      // extra data
 }
 
-// StreamingStats 流式播放统计信息
+// StreamingStats streaming playback stats
 type StreamingStats struct {
-	BytesDownloaded int64          `json:"bytes_downloaded"` // 已下载字节数
-	BytesDecoded    int64          `json:"bytes_decoded"`    // 已解码字节数
-	FramesGenerated int64          `json:"frames_generated"` // 已生成帧数
-	StartTime       int64          `json:"start_time"`       // 开始时间
-	FirstFrameTime  int64          `json:"first_frame_time"` // 首帧时间
-	Status          PlaybackStatus `json:"status"`           // 当前状态
-	ErrorCount      int            `json:"error_count"`      // 错误次数
+	BytesDownloaded int64          `json:"bytes_downloaded"` // bytes downloaded
+	BytesDecoded    int64          `json:"bytes_decoded"`    // bytes decoded
+	FramesGenerated int64          `json:"frames_generated"` // frames generated
+	StartTime       int64          `json:"start_time"`       // start time
+	FirstFrameTime  int64          `json:"first_frame_time"` // first-frame time
+	Status          PlaybackStatus `json:"status"`           // current status
+	ErrorCount      int            `json:"error_count"`      // error count
 }

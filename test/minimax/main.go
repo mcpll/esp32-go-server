@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	// 解析命令行参数
+	// Parse command-line flags
 	text := flag.String("text", "真正的危险不是计算机开始像人一样思考，而是人开始像计算机一样思考。计算机只是可以帮我们处理一些简单事务。", "要合成的文本")
 	outputFile := flag.String("output", "output.mp3", "输出音频文件名")
 	apiKey := flag.String("api_key", "", "Minimax API Key（如果未提供，将从环境变量 MINIMAX_API_KEY 读取）")
@@ -21,7 +21,7 @@ func main() {
 	format := flag.String("format", "mp3", "音频格式 (mp3/wav/pcm)")
 	flag.Parse()
 
-	// 获取 API Key
+	// Get API Key
 	if *apiKey == "" {
 		*apiKey = os.Getenv("MINIMAX_API_KEY")
 		if *apiKey == "" {
@@ -30,7 +30,7 @@ func main() {
 		}
 	}
 
-	// 创建配置
+	// Build config
 	config := map[string]interface{}{
 		"api_key":     *apiKey,
 		"model":       *model,
@@ -44,14 +44,14 @@ func main() {
 		"channel":     1,
 	}
 
-	// 创建 Minimax TTS Provider
+	// Create Minimax TTS Provider
 	provider := minimax.NewMinimaxTTSProvider(config)
 
-	// 创建上下文，支持取消操作
+	// Create context with cancel support
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// 设置信号处理，支持 Ctrl+C 中断
+	// Handle signals for Ctrl+C interrupt
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 	go func() {
@@ -64,7 +64,7 @@ func main() {
 	fmt.Printf("使用配置: 模型=%s, 音色=%s, 格式=%s\n", *model, *voiceID, *format)
 	fmt.Println("正在连接并合成音频...")
 
-	// 调用流式 TTS
+	// Call streaming TTS
 	startTime := time.Now()
 	outputChan, err := provider.TextToSpeechStream(ctx, *text, 16000, 1, 60)
 	if err != nil {
@@ -72,7 +72,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// 收集音频数据
+	// Collect audio data
 	var audioFrames [][]byte
 	chunkCount := 0
 
@@ -88,19 +88,19 @@ func main() {
 	elapsed := time.Since(startTime)
 	fmt.Printf("音频合成完成！共接收 %d 个音频帧，耗时: %v\n", chunkCount, elapsed)
 
-	// 合并所有音频帧
+	// Merge all audio frames
 	if len(audioFrames) == 0 {
 		fmt.Fprintf(os.Stderr, "错误: 未接收到任何音频数据\n")
 		os.Exit(1)
 	}
 
-	// 计算总大小
+	// Compute total size
 	totalSize := 0
 	for _, frame := range audioFrames {
 		totalSize += len(frame)
 	}
 
-	// 合并音频数据
+	// Merge audio data
 	audioData := make([]byte, 0, totalSize)
 	for _, frame := range audioFrames {
 		audioData = append(audioData, frame...)
@@ -108,10 +108,10 @@ func main() {
 
 	fmt.Printf("音频数据总大小: %d 字节 (%.2f KB)\n", totalSize, float64(totalSize)/1024)
 
-	// 保存到文件
-	// 注意：系统内部使用 Opus 编码，所以接收到的音频帧是 Opus 格式
-	// 如果需要其他格式（如 WAV/MP3），需要额外的解码和编码步骤
-	// 这里我们直接保存 Opus 帧，可以使用支持 Opus 的播放器播放（如 VLC、ffplay 等）
+	// Save to file
+	// Note: system uses Opus internally, so received frames are Opus
+	// Other formats (WAV/MP3) need extra decode/encode steps
+	// Save Opus frames directly; play with Opus-capable players (VLC, ffplay, etc.)
 
 	fmt.Printf("正在保存音频到文件: %s\n", *outputFile)
 	fmt.Println("注意: 保存的是 Opus 编码的音频帧，可以使用支持 Opus 的播放器播放")
@@ -123,7 +123,7 @@ func main() {
 	fmt.Printf("音频已成功保存到: %s\n", *outputFile)
 	fmt.Printf("文件大小: %d 字节 (%.2f KB)\n", len(audioData), float64(len(audioData))/1024)
 
-	// 清理资源
+	// Clean up resources
 	if err := provider.Close(); err != nil {
 		fmt.Fprintf(os.Stderr, "关闭 Provider 失败: %v\n", err)
 	}

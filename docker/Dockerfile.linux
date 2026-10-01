@@ -1,14 +1,5 @@
 ﻿# syntax=docker/dockerfile:1
 ARG UBUNTU_VERSION=18.04
-ARG NODE_VERSION=20
-FROM node:${NODE_VERSION}-bullseye AS frontend
-
-WORKDIR /src/manager/frontend
-COPY manager/frontend/package*.json ./
-RUN npm ci
-COPY manager/frontend ./
-RUN npm run build
-
 FROM ubuntu:${UBUNTU_VERSION} AS builder
 
 ARG GO_VERSION=1.24.4
@@ -32,9 +23,6 @@ ENV PATH=/usr/local/go/bin:$PATH
 
 WORKDIR /src
 COPY . .
-
-RUN mkdir -p manager/backend/static/dist
-COPY --from=frontend /src/manager/frontend/dist /src/manager/backend/static/dist
 
 RUN test -f asr_server/server/setup.go
 
@@ -65,7 +53,7 @@ ENV LIBRARY_PATH=/opt/sherpa-onnx-go-linux/x86_64-unknown-linux-gnu
 ENV CGO_LDFLAGS="-lm -L/opt/sherpa-onnx-go-linux/x86_64-unknown-linux-gnu"
 
 RUN go mod tidy \
-    && go build -v -tags "nolibopusfile asr_server manager embed_ui" \
+    && go build -v -tags "nolibopusfile asr_server" \
        -ldflags "-s -w" \
        -o xiaozhi_server ./cmd/server
 
@@ -79,7 +67,7 @@ RUN PACK_DIR="/out/linux-amd64/xiaozhi_server-linux-amd64" \
     && cp /opt/sherpa-onnx-go-linux/x86_64-unknown-linux-gnu/libsherpa-onnx-c-api.so "$PACK_DIR/ten-vad/lib/Linux/x64/" \
     && cp /opt/sherpa-onnx-go-linux/x86_64-unknown-linux-gnu/libsherpa-onnx-cxx-api.so "$PACK_DIR/ten-vad/lib/Linux/x64/" \
     && cp /opt/sherpa-onnx-go-linux/x86_64-unknown-linux-gnu/libonnxruntime.so "$PACK_DIR/ten-vad/lib/Linux/x64/" \
-    && cp build/common/main_config.yaml build/common/manager.json build/common/asr_server.json "$PACK_DIR/" \
+    && cp build/common/main_config.yaml build/common/asr_server.json "$PACK_DIR/" \
     && cp doc/aio/README_linux.md "$PACK_DIR/README.md" \
     && cp -r build/common/models build/common/data "$PACK_DIR/" \
     && chmod +x "$PACK_DIR/xiaozhi_server"

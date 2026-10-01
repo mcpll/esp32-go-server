@@ -9,43 +9,43 @@ import (
 	"strings"
 )
 
-// GeneratePasswordSignature 生成密码签名
-// 基于 clientId + '|' + username 和签名密钥生成HMAC-SHA256签名
+// GeneratePasswordSignature generates a password signature
+// HMAC-SHA256 from clientId + '|' + username and the signing key
 func GeneratePasswordSignature(data, key string) string {
-	// 使用HMAC-SHA256生成签名
+	// generate signature with HMAC-SHA256
 	h := hmac.New(sha256.New, []byte(key))
 	h.Write([]byte(data))
 	signature := h.Sum(nil)
 
-	// 返回base64编码的签名
+	// return the base64-encoded signature
 	return base64.StdEncoding.EncodeToString(signature)
 }
 
-// ValidateMqttCredentials 验证MQTT凭据
-// 根据提供的JavaScript验证逻辑实现
+// ValidateMqttCredentials validates MQTT credentials
+// implements the provided JavaScript validation logic
 func ValidateMqttCredentials(clientId, username, password, signatureKey string) (*MqttCredentialInfo, error) {
-	// 验证签名密钥
+	// validate signing key
 	if signatureKey == "" {
 		return nil, fmt.Errorf("缺少签名密钥配置")
 	}
 
-	// 验证clientId
+	// validate clientId
 	if clientId == "" {
 		return nil, fmt.Errorf("clientId必须是非空字符串")
 	}
 
-	// 验证clientId格式（必须包含@@@分隔符）
+	// validate clientId format (must contain @@@)
 	clientIdParts := strings.Split(clientId, "@@@")
 	if len(clientIdParts) != 3 {
 		return nil, fmt.Errorf("clientId格式错误，必须包含@@@分隔符")
 	}
 
-	// 验证username
+	// validate username
 	if username == "" {
 		return nil, fmt.Errorf("username必须是非空字符串")
 	}
 
-	// 尝试解码username（应该是base64编码的JSON）
+	// try decoding username (should be base64-encoded JSON)
 	var userData map[string]interface{}
 	decodedUsername, err := base64.StdEncoding.DecodeString(username)
 	if err != nil {
@@ -56,19 +56,19 @@ func ValidateMqttCredentials(clientId, username, password, signatureKey string) 
 		return nil, fmt.Errorf("username不是有效的base64编码JSON: %v", err)
 	}
 
-	// 验证密码签名
+	// validate password signature
 	signatureData := clientId + "|" + username
 	expectedSignature := GeneratePasswordSignature(signatureData, signatureKey)
 	if password != expectedSignature {
 		return nil, fmt.Errorf("密码签名验证失败")
 	}
 
-	// 解析clientId中的信息
+	// parse fields from clientId
 	groupId := clientIdParts[0]
 	macAddress := strings.ReplaceAll(clientIdParts[1], "_", ":")
 	uuid := clientIdParts[2]
 
-	// 如果验证成功，返回解析后的有用信息
+	// on success, return the parsed useful fields
 	return &MqttCredentialInfo{
 		GroupId:    groupId,
 		MacAddress: macAddress,
@@ -77,7 +77,7 @@ func ValidateMqttCredentials(clientId, username, password, signatureKey string) 
 	}, nil
 }
 
-// MqttCredentialInfo MQTT凭据信息
+// MqttCredentialInfo MQTT credential info
 type MqttCredentialInfo struct {
 	GroupId    string                 `json:"groupId"`
 	MacAddress string                 `json:"macAddress"`
@@ -85,13 +85,13 @@ type MqttCredentialInfo struct {
 	UserData   map[string]interface{} `json:"userData"`
 }
 
-// GenerateMqttCredentials 生成MQTT凭据
-// 用于OTA接口生成MQTT连接信息
+// GenerateMqttCredentials generates MQTT credentials
+// used by the OTA API to build MQTT connection info
 func GenerateMqttCredentials(deviceId, clientId, ip, signatureKey string) (*MqttCredentials, error) {
-	// 处理deviceId（替换冒号为下划线）
+	// normalize deviceId (replace colons with underscores)
 	deviceId = strings.ReplaceAll(deviceId, ":", "_")
 
-	// 构建用户名数据（包含IP信息）
+	// build username payload (includes IP info)
 	userName := struct {
 		Ip string `json:"ip"`
 	}{
@@ -103,17 +103,17 @@ func GenerateMqttCredentials(deviceId, clientId, ip, signatureKey string) (*Mqtt
 	}
 	base64UserName := base64.StdEncoding.EncodeToString(userNameJson)
 
-	// 构建clientId，格式：GID_test@@@deviceId@@@clientId
+	// build clientId as GID_test@@@deviceId@@@clientId
 	mqttClientId := fmt.Sprintf("GID_test@@@%s@@@%s", deviceId, clientId)
 
-	// 生成密码签名
+	// generate password signature
 	var pwd string
 	if signatureKey != "" {
-		// 使用签名密钥生成密码
+		// generate password with the signing key
 		signatureData := mqttClientId + "|" + base64UserName
 		pwd = GeneratePasswordSignature(signatureData, signatureKey)
 	} else {
-		// 如果没有配置签名密钥，使用原来的逻辑作为fallback
+		// if no signing key is configured, fall back to the previous logic
 		pwd = Sha256Digest([]byte(mqttClientId))
 	}
 
@@ -124,7 +124,7 @@ func GenerateMqttCredentials(deviceId, clientId, ip, signatureKey string) (*Mqtt
 	}, nil
 }
 
-// MqttCredentials MQTT凭据
+// MqttCredentials MQTT credentials
 type MqttCredentials struct {
 	ClientId string `json:"client_id"`
 	Username string `json:"username"`

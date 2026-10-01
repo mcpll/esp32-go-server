@@ -531,7 +531,7 @@ func (m *Manager) HandleResponse(
 	isSnapshotFrame := isOpenClawSnapshotFrame(streamPhase, streamContentType)
 	isStreaming := streamDone || streamSeq > 0 || streamID != "" || streamPhase != "" || streamContentType != ""
 
-	// 非流式默认视为一次性完成；缺失 correlation_id 的流式响应也降级为一次性处理。
+	// non-streaming is treated as one-shot; streaming without correlation_id also falls back to one-shot.
 	if !isStreaming || correlationID == "" {
 		streamDone = true
 	}
@@ -713,7 +713,7 @@ func (m *Manager) HandleResponse(
 		m.AddOfflineMessage(deviceID, text, correlationID, isEnd)
 	}
 
-	// 对话测试设备（__openclaw_test__）直接透传分片，避免拆句导致离线队列条目暴涨并触发20条上限截断。
+	// dialogue test device (__openclaw_test__) passes chunks through to avoid sentence splitting that balloons the offline queue past the 20-entry cap.
 	if isOpenClawTestDevice(deviceID) {
 		if incrementalContent != "" {
 			emit(incrementalContent, isFirst, streamDone)
@@ -775,7 +775,7 @@ func (m *Manager) HandleResponse(
 			state.Buffer = ""
 		}
 	} else {
-		// 结束帧允许空 content，用于驱动接收端收尾。
+		// end frames may have empty content to drive receiver teardown.
 		emit("", finalIsStart, true)
 	}
 
@@ -1294,7 +1294,7 @@ func (m *Manager) AddOfflineMessage(deviceID string, text string, correlationID 
 	m.pruneOfflineLocked(deviceID)
 	msgList := m.offline[deviceID]
 	if text == "" && isEnd {
-		// 结束帧允许空内容：优先标记同 correlation 的最后一条为结束；不存在则写入空结束标记。
+		// end frames may be empty: prefer marking the last same-correlation item as end; otherwise write an empty end marker.
 		for i := len(msgList) - 1; i >= 0; i-- {
 			if correlationID == "" || strings.TrimSpace(msgList[i].CorrelationID) == correlationID {
 				msgList[i].IsEnd = true

@@ -32,7 +32,7 @@ func OpusToWav(opusData [][]byte, sampleRate int, channels int, fileName string)
 	wavEncoder := wav.NewEncoder(wavOut, sampleRate, 16, channels, 1)
 	wavBuffer := audio.IntBuffer{
 		Format: &audio.Format{
-			NumChannels: channels, // 使用传入的通道数
+			NumChannels: channels, // use the provided channel count
 			SampleRate:  sampleRate,
 		},
 		SourceBitDepth: 16,
@@ -50,13 +50,13 @@ func OpusToWav(opusData [][]byte, sampleRate int, channels int, fileName string)
 
 		//fmt.Println("pcmData len: ", len(copyData))
 
-		// 将PCM数据转换为int格式
+		// convert PCM data to int
 		for i := 0; i < len(copyData); i++ {
 			wavBuffer.Data = append(wavBuffer.Data, int(copyData[i]))
 		}
 	}
 
-	// 写入WAV文件
+	// write the WAV file
 	err = wavEncoder.Write(&wavBuffer)
 	if err != nil {
 		return nil, fmt.Errorf("写入WAV文件失败: %v", err)
@@ -68,18 +68,18 @@ func OpusToWav(opusData [][]byte, sampleRate int, channels int, fileName string)
 }
 
 func initLog() error {
-	// 使用标准输出而不是文件
+	// use stdout instead of a file
 	logrus.SetOutput(os.Stdout)
 
-	// 禁用默认的调用者报告，使用自定义的caller字段
+	// disable default caller reporting; use a custom caller field
 	logrus.SetReportCaller(false)
 	logrus.SetFormatter(&logrus.TextFormatter{
-		TimestampFormat: "2006-01-02 15:04:05.000", //时间格式化，添加毫秒
-		ForceColors:     true,                      // 启用颜色输出
+		TimestampFormat: "2006-01-02 15:04:05.000", //time format with milliseconds
+		ForceColors:     true,                      // enable colored output
 	})
 	logLevel, _ := logrus.ParseLevel(viper.GetString("log.level"))
 	if logLevel == 0 {
-		logLevel = logrus.DebugLevel // 默认设置为Debug级别
+		logLevel = logrus.DebugLevel // default to Debug level
 	}
 	logrus.SetLevel(logLevel)
 	return nil
@@ -143,7 +143,7 @@ func TestTextToSpeechStream(t *testing.T) {
 		t.Skip("跳过小智在线 TTS 测试，设置 RUN_XIAOZHI_TEST=1 以启用")
 	}
 
-	//初始化log日志输出至标准输出
+	//init logging to stdout
 	//initLog()
 	provider := NewXiaozhiProvider(map[string]interface{}{
 		"server_addr": "wss://api.tenclass.net/xiaozhi/v1/",
@@ -183,17 +183,17 @@ func TestTextToSpeechStream(t *testing.T) {
 
 	/*
 		for _, text := range textList {
-			fmt.Println("开始 speech text: ", text)
+			fmt.Println("start speech text: ", text)
 			ch, err := provider.TextToSpeechStream(context.Background(), text)
 			if err != nil {
-				fmt.Println("TextToSpeechStream 连接失败: ", err)
+				fmt.Println("TextToSpeechStream connect failed: ", err)
 				return
 			}
 			opusDataList := [][]byte{}
 			for frame := range ch {
 				opusDataList = append(opusDataList, frame)
 				if len(frame) == 0 {
-					t.Error("收到空音频帧")
+					t.Error("received empty audio frame")
 				}
 			}
 			//OpusToWav(opusDataList, 24000, 1, "output_24000.wav")

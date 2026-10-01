@@ -19,15 +19,15 @@ import (
 )
 
 func genFloat32Empty(sampleRate int, durationMs int, channels int, count int) [][]float32 {
-	// 计算样本数
+	// Compute sample count
 	numSamples := int(float64(sampleRate) * float64(durationMs) / 1000.0)
-	// 创建静音缓冲区
+	// Create silence buffer
 	var buf bytes.Buffer
-	// 32位浮点静音值为0.0
+	// 32-bit float silence value is 0.0
 	for i := 0; i < numSamples*channels; i++ {
 		binary.Write(&buf, binary.LittleEndian, float32(0.0))
 	}
-	//将数据转换为float32
+	// Convert data to float32
 	float32Data := make([]float32, numSamples*channels)
 	for i := 0; i < numSamples*channels; i++ {
 		float32Data[i] = float32(buf.Bytes()[i])
@@ -40,7 +40,7 @@ func genFloat32Empty(sampleRate int, durationMs int, channels int, count int) []
 }
 
 func genOpusFloat32Empty(sampleRate int, durationMs int, channels int, count int) [][]float32 {
-	// 计算样本数
+	// Compute sample count
 	numSamples := int(float64(sampleRate) * float64(durationMs) / 1000.0)
 
 	audioProcesser, err := audio.GetAudioProcesser(sampleRate, channels, 20)
@@ -58,7 +58,7 @@ func genOpusFloat32Empty(sampleRate int, durationMs int, channels int, count int
 		return nil
 	}
 
-	//将opus数据转换为float32
+	// Convert Opus data to float32
 	pcmFloat32 := make([]float32, n)
 	for i := 0; i < n; i++ {
 		pcmFloat32[i] = float32(opusFrame[i])
@@ -74,80 +74,80 @@ func genOpusFloat32Empty(sampleRate int, durationMs int, channels int, count int
 }
 
 func main() {
-	// 检查命令行参数
+	// Check command-line args
 	if len(os.Args) < 2 {
-		log.Fatalf("用法: %s <wav文件路径> [hop_size] [threshold]\n示例: %s test.wav 512 0.3", os.Args[0], os.Args[0])
+		log.Fatalf("usage: %s <wav_path> [hop_size] [threshold]\nexample: %s test.wav 512 0.3", os.Args[0], os.Args[0])
 	}
 
 	wavFilePath := os.Args[1]
 
-	// 解析可选参数
+	// Parse optional args
 	hopSize := 512
 	threshold := 0.3
 	if len(os.Args) >= 3 {
 		_, err := fmt.Sscanf(os.Args[2], "%d", &hopSize)
 		if err != nil {
-			log.Printf("无效的 hop_size 参数，使用默认值 512")
+			log.Printf("invalid hop_size, using default 512")
 			hopSize = 512
 		}
 	}
 	if len(os.Args) >= 4 {
 		_, err := fmt.Sscanf(os.Args[3], "%f", &threshold)
 		if err != nil {
-			log.Printf("无效的 threshold 参数，使用默认值 0.3")
+			log.Printf("invalid threshold, using default 0.3")
 			threshold = 0.3
 		}
 	}
 
-	// 读取WAV文件
+	// Read WAV file
 	wavFile, err := os.Open(wavFilePath)
 	if err != nil {
-		log.Fatalf("无法打开WAV文件: %v", err)
+		log.Fatalf("failed to open WAV file: %v", err)
 	}
 	defer wavFile.Close()
 
-	// 读取整个文件内容
+	// Read entire file contents
 	wavData, err := io.ReadAll(wavFile)
 	if err != nil {
-		log.Fatalf("无法读取WAV文件: %v", err)
+		log.Fatalf("failed to read WAV file: %v", err)
 	}
 
 	fmt.Printf("成功读取WAV文件: %s (%d 字节)\n", wavFilePath, len(wavData))
 
-	// 调用 Wav2Pcm 函数转换WAV数据为PCM数据
-	// 使用TEN-VAD支持的标准参数：16000Hz采样率，单声道
+	// Call Wav2Pcm to convert WAV to PCM
+	// Use TEN-VAD standard params: 16000Hz sample rate, mono
 	sampleRate := 16000
 	channels := 1
 
 	pcmFloat32, pcmBytes, err := Wav2Pcm(wavData, sampleRate, channels)
 	if err != nil {
-		log.Fatalf("WAV转PCM失败: %v", err)
+		log.Fatalf("WAV to PCM failed: %v", err)
 	}
 
 	_ = pcmBytes
 
 	fmt.Printf("成功转换为PCM数据，共 %d 帧（每帧20ms）\n", len(pcmFloat32))
 
-	// 创建TEN-VAD实例
+	// Create TEN-VAD instance
 	config := map[string]interface{}{
 		"hop_size":  hopSize,
 		"threshold": threshold,
 	}
 	vadImpl, err := ten_vad.NewTenVAD(config)
 	if err != nil {
-		log.Fatalf("创建TEN-VAD失败: %v", err)
+		log.Fatalf("failed to create TEN-VAD: %v", err)
 	}
 	defer vadImpl.Close()
 
 	fmt.Printf("TEN-VAD创建成功 (hop_size=%d, threshold=%.2f)，开始测试...\n", hopSize, threshold)
 
-	// 直接测试VAD是否能正常工作
+	// Directly test whether VAD works
 	if len(pcmFloat32) == 0 {
-		log.Fatalf("没有PCM数据可供处理")
+		log.Fatalf("no PCM data to process")
 	}
 
-	// 将所有帧合并成连续的音频数据
-	// 因为 TEN-VAD 需要按 hopSize 分帧，而不是按 20ms 分帧
+	// Merge all frames into continuous audio
+	// TEN-VAD frames by hopSize, not by 20ms
 	totalSamples := 0
 	for _, frame := range pcmFloat32 {
 		totalSamples += len(frame)
@@ -159,7 +159,7 @@ func main() {
 
 	fmt.Printf("合并后的音频数据: %d 个样本 (%.2f 秒)\n", len(allPcmData), float64(len(allPcmData))/float64(sampleRate))
 
-	// 检查音频数据范围（用于调试）
+	// Check audio data range (for debugging)
 	if len(allPcmData) > 0 {
 		minVal := allPcmData[0]
 		maxVal := allPcmData[0]
@@ -172,7 +172,7 @@ func main() {
 			}
 		}
 		fmt.Printf("音频数据范围: [%.6f, %.6f]\n", minVal, maxVal)
-		// 如果数据不在 [-1.0, 1.0] 范围内，可能需要归一化
+		// If data is outside [-1.0, 1.0], normalization may be needed
 		if maxVal > 1.0 || minVal < -1.0 {
 			fmt.Printf("警告: 音频数据超出 [-1.0, 1.0] 范围，可能需要归一化\n")
 		}
@@ -180,13 +180,13 @@ func main() {
 
 	fmt.Println("开始进行语音活动检测...")
 
-	// 按 hopSize 分帧进行检测
+	// Detect in hopSize frames
 	detectVoice := func(pcmData []float32) {
 		speechFrames := 0
 		totalFrames := 0
-		var speechFramesData []float32 // 收集所有有声音的帧
+		var speechFramesData []float32 // Collect all speech frames
 
-		// 按 hopSize 分帧处理
+		// Process in hopSize frames
 		for i := 0; i < len(pcmData); i += hopSize {
 			end := i + hopSize
 			if end > len(pcmData) {
@@ -195,9 +195,9 @@ func main() {
 
 			frame := pcmData[i:end]
 
-			// 如果帧长度不足 hopSize，填充零或跳过
+			// If frame is shorter than hopSize, zero-pad or skip
 			if len(frame) < hopSize {
-				// 填充零到 hopSize 长度
+				// Zero-pad to hopSize
 				paddedFrame := make([]float32, hopSize)
 				copy(paddedFrame, frame)
 				frame = paddedFrame
@@ -205,20 +205,20 @@ func main() {
 
 			totalFrames++
 
-			// 进行VAD检测
+			// Run VAD detection
 			isVoice, err := vadImpl.IsVADExt(frame, sampleRate, hopSize)
 			if err != nil {
-				log.Printf("第%d帧VAD检测失败: %v", totalFrames, err)
-				// 如果是第一帧就失败，说明VAD未正确初始化
+				log.Printf("VAD detect failed on frame %d: %v", totalFrames, err)
+				// Failure on the first frame means VAD was not initialized correctly
 				if totalFrames == 1 {
-					log.Fatalf("VAD初始化失败，请检查TEN-VAD配置和库文件")
+					log.Fatalf("VAD init failed, check TEN-VAD config and library")
 				}
 				continue
 			}
 
 			if isVoice {
 				speechFrames++
-				// 收集有声音的帧数据（使用原始帧，不包含填充）
+				// Collect speech frame data (original frames, no padding)
 				originalFrame := pcmData[i:end]
 				speechFramesData = append(speechFramesData, originalFrame...)
 				fmt.Printf("第%d帧: 检测到语音活动 (样本范围: %d-%d)\n", totalFrames, i, end-1)
@@ -227,7 +227,7 @@ func main() {
 			}
 		}
 
-		// 输出统计结果
+		// Print stats
 		speechPercentage := float64(speechFrames) / float64(totalFrames) * 100
 		nonSpeechFrames := totalFrames - speechFrames
 		fmt.Printf("\n=== TEN-VAD检测结果统计 ===\n")
@@ -239,11 +239,11 @@ func main() {
 		if speechFrames > 0 {
 			fmt.Println("结论: 检测到语音活动")
 
-			// 保存有声音的帧到WAV文件
+			// Save speech frames to a WAV file
 			outputFileName := generateOutputFileName(wavFilePath)
 			err := saveFloat32ToWav(speechFramesData, outputFileName, sampleRate, channels)
 			if err != nil {
-				log.Printf("保存有声音的帧到WAV文件失败: %v", err)
+				log.Printf("failed to save voiced frames to WAV: %v", err)
 			} else {
 				fmt.Printf("成功将有声音的帧保存到: %s (共 %d 个样本, %.2f 秒)\n",
 					outputFileName, len(speechFramesData), float64(len(speechFramesData))/float64(sampleRate))
@@ -253,7 +253,7 @@ func main() {
 		}
 	}
 
-	// 使用合并后的完整音频数据进行测试
+	// Test with the merged full audio
 	detectVoice(allPcmData)
 }
 
@@ -265,7 +265,7 @@ func float32ToByte(pcmFrame []float32) []byte {
 	return byteData
 }
 
-// generateOutputFileName 生成输出文件名，在原文件名基础上添加 "_speech" 后缀
+// generateOutputFileName builds the output name by adding a "_speech" suffix
 func generateOutputFileName(inputPath string) string {
 	dir := filepath.Dir(inputPath)
 	baseName := filepath.Base(inputPath)
@@ -275,30 +275,30 @@ func generateOutputFileName(inputPath string) string {
 	return filepath.Join(dir, outputName)
 }
 
-// saveFloat32ToWav 将 float32 PCM 数据保存为 WAV 文件
+// saveFloat32ToWav saves float32 PCM data as a WAV file
 func saveFloat32ToWav(pcmData []float32, fileName string, sampleRate int, channels int) error {
-	// 创建输出文件
+	// Create output file
 	wavFile, err := os.Create(fileName)
 	if err != nil {
 		return fmt.Errorf("创建WAV文件失败: %v", err)
 	}
 	defer wavFile.Close()
 
-	// 创建WAV编码器
+	// Create WAV encoder
 	wavEncoder := wav.NewEncoder(wavFile, sampleRate, 16, channels, 1)
 
-	// 将 float32 转换为 int16
-	// float32 范围通常是 [-1.0, 1.0]，需要缩放到 int16 范围 [-32768, 32767]
+	// Convert float32 to int16
+	// float32 is usually [-1.0, 1.0]; scale to int16 [-32768, 32767]
 	intData := make([]int, len(pcmData))
 	for i, sample := range pcmData {
-		// 限制范围到 [-1.0, 1.0]
+		// Clamp to [-1.0, 1.0]
 		if sample > 1.0 {
 			sample = 1.0
 		}
 		if sample < -1.0 {
 			sample = -1.0
 		}
-		// 转换为 int16 范围
+		// Convert to int16 range
 		intSample := int(sample * 32767.0)
 		if intSample > 32767 {
 			intSample = 32767
@@ -309,7 +309,7 @@ func saveFloat32ToWav(pcmData []float32, fileName string, sampleRate int, channe
 		intData[i] = intSample
 	}
 
-	// 创建音频缓冲区
+	// Create audio buffer
 	audioBuf := &goaudio.IntBuffer{
 		Format: &goaudio.Format{
 			NumChannels: channels,
@@ -319,13 +319,13 @@ func saveFloat32ToWav(pcmData []float32, fileName string, sampleRate int, channe
 		Data:           intData,
 	}
 
-	// 写入WAV文件
+	// Write WAV file
 	err = wavEncoder.Write(audioBuf)
 	if err != nil {
 		return fmt.Errorf("写入WAV文件失败: %v", err)
 	}
 
-	// 关闭编码器
+	// Close encoder
 	err = wavEncoder.Close()
 	if err != nil {
 		return fmt.Errorf("关闭WAV编码器失败: %v", err)

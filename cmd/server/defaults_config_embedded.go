@@ -1,4 +1,4 @@
-//go:build asr_server && manager
+//go:build asr_server
 
 package main
 

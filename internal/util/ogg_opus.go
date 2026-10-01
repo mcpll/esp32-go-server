@@ -11,7 +11,7 @@ import (
 
 var supportedOpusSampleRates = []int{8000, 12000, 16000, 24000, 48000}
 
-// NormalizeOpusSampleRate 将采样率规整到 Opus 支持的标准采样率。
+// NormalizeOpusSampleRate snaps a sample rate to a standard Opus-supported rate.
 func NormalizeOpusSampleRate(sampleRate int) int {
 	if sampleRate <= 0 {
 		return 16000
@@ -29,7 +29,7 @@ func NormalizeOpusSampleRate(sampleRate int) int {
 	return best
 }
 
-// PCM16ToOggOpus 将 PCM16 数据编码为 Ogg/Opus。
+// PCM16ToOggOpus encodes PCM16 data as Ogg/Opus.
 func PCM16ToOggOpus(samples []int16, sampleRate int, channels int, frameDurationMs int) ([]byte, error) {
 	if channels < 1 || channels > 2 {
 		return nil, fmt.Errorf("Opus 仅支持 1 或 2 声道，当前: %d", channels)
@@ -74,7 +74,7 @@ func PCM16ToOggOpus(samples []int16, sampleRate int, channels int, frameDuration
 	return WrapOggOpusPackets(packets, sampleRate, channels, frameSizePerChannel), nil
 }
 
-// WrapOggOpusPackets 将原始 Opus packet 包装为 Ogg/Opus 数据流。
+// WrapOggOpusPackets wraps raw Opus packets into an Ogg/Opus stream.
 func WrapOggOpusPackets(packets [][]byte, sampleRate int, channels int, frameSizePerChannel int) []byte {
 	var out bytes.Buffer
 	const serial = uint32(0x58495a48)

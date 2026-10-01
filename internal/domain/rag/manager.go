@@ -24,7 +24,7 @@ const (
 	defaultKnowledgeSearchMaxParallel   = 8
 )
 
-// Search 按知识库 provider 分组检索并聚合排序。
+// Search groups retrieval by knowledge-base provider and merges/sorts results.
 func Search(
 	ctx context.Context,
 	query string,
@@ -125,7 +125,7 @@ func Search(
 	}
 
 	if len(errs) > 0 {
-		log.Warnf("知识库检索部分 provider 失败: %s", strings.Join(errs, "; "))
+		log.Warnf("knowledge base search partially failed for provider(s): %s", strings.Join(errs, "; "))
 	}
 	return hits, nil
 }

@@ -10,7 +10,7 @@ import (
 	log "xiaozhi-esp32-server-golang/logger"
 )
 
-// ExampleConfig 示例配置
+// ExampleConfig sample config
 var ExampleConfig = map[string]interface{}{
 	"type":       "eino_llm",
 	"model_name": "gpt-3.5-turbo",
@@ -20,9 +20,9 @@ var ExampleConfig = map[string]interface{}{
 	"streamable": true,
 }
 
-// ExampleUsage 展示如何使用EinoLLMProvider
+// ExampleUsage shows how to use EinoLLMProvider
 func ExampleUsage() {
-	// 1. OpenAI配置示例
+	// 1. OpenAI config example
 	openaiConfig := map[string]interface{}{
 		"type":       "openai",
 		"model_name": "gpt-3.5-turbo",
@@ -32,7 +32,7 @@ func ExampleUsage() {
 		"streamable": true,
 	}
 
-	// 2. Ollama配置示例
+	// 2. Ollama config example
 	ollamaConfig := map[string]interface{}{
 		"type":       "ollama",
 		"model_name": "llama2",
@@ -41,20 +41,20 @@ func ExampleUsage() {
 		"streamable": true,
 	}
 
-	// 3. 创建提供者
+	// 3. Create providers
 	openaiProvider, err := NewEinoLLMProvider(openaiConfig)
 	if err != nil {
-		log.Errorf("创建OpenAI提供者失败: %v", err)
+		log.Errorf("failed to create OpenAI provider: %v", err)
 		return
 	}
 
 	ollamaProvider, err := NewEinoLLMProvider(ollamaConfig)
 	if err != nil {
-		log.Errorf("创建Ollama提供者失败: %v", err)
+		log.Errorf("failed to create Ollama provider: %v", err)
 		return
 	}
 
-	// 4. 使用Eino原生消息类型
+	// 4. Use Eino-native message types
 	messages := []*schema.Message{
 		{
 			Role:    schema.System,
@@ -66,7 +66,7 @@ func ExampleUsage() {
 		},
 	}
 
-	// 5. 基本对话
+	// 5. Basic chat
 	fmt.Println("=== OpenAI 基本对话 ===")
 	responseChan := openaiProvider.ResponseWithContext(context.Background(), "example_session", messages, nil)
 	for resp := range responseChan {
@@ -91,12 +91,12 @@ func ExampleUsage() {
 	}
 	fmt.Println()
 
-	// 6. 工具调用示例
+	// 6. Tool-call example
 	tools := []*schema.ToolInfo{
 		{
 			Name:        "get_weather",
 			ParamsOneOf: &schema.ParamsOneOf{
-				// 工具参数定义
+				// Tool parameter definition
 			},
 		},
 	}
@@ -113,7 +113,7 @@ func ExampleUsage() {
 	}
 	fmt.Println()
 
-	// 7. 链式调用示例
+	// 7. Chained-call example
 	fmt.Println("=== 链式调用示例 ===")
 	enhancedProvider := openaiProvider.
 		WithMaxTokens(1000).
@@ -123,7 +123,7 @@ func ExampleUsage() {
 	fmt.Printf("模型信息: %+v\n", enhancedProvider.GetModelInfo())
 }
 
-// ExampleAdvancedUsage 高级用法示例
+// ExampleAdvancedUsage advanced usage example
 func ExampleAdvancedUsage() {
 	config := map[string]interface{}{
 		"type":       "openai",
@@ -135,11 +135,11 @@ func ExampleAdvancedUsage() {
 
 	provider, err := NewEinoLLMProvider(config)
 	if err != nil {
-		log.Errorf("创建提供者失败: %v", err)
+		log.Errorf("failed to create provider: %v", err)
 		return
 	}
 
-	// 使用上下文控制
+	// Use context control
 	ctx := context.Background()
 	messages := []*schema.Message{
 		{
@@ -160,22 +160,22 @@ func ExampleAdvancedUsage() {
 	}
 	fmt.Println()
 
-	// 直接使用Eino ChatModel
+	// Use Eino ChatModel directly
 	chatModel := provider.GetChatModel()
 	result, err := chatModel.Generate(ctx, messages)
 	if err != nil {
-		log.Errorf("直接调用ChatModel失败: %v", err)
+		log.Errorf("direct ChatModel call failed: %v", err)
 		return
 	}
 
 	fmt.Printf("直接调用结果: %s\n", result.Content)
 }
 
-// ExampleMultiProvider 多提供者示例
+// ExampleMultiProvider multi-provider example
 func ExampleMultiProvider() {
 	providers := make(map[string]*EinoLLMProvider)
 
-	// 创建多个提供者
+	// Create multiple providers
 	configs := map[string]map[string]interface{}{
 		"openai": {
 			"type":       "openai",
@@ -192,13 +192,13 @@ func ExampleMultiProvider() {
 	for name, config := range configs {
 		provider, err := NewEinoLLMProvider(config)
 		if err != nil {
-			log.Errorf("创建%s提供者失败: %v", name, err)
+			log.Errorf("failed to create %s provider: %v", name, err)
 			continue
 		}
 		providers[name] = provider
 	}
 
-	// 使用不同提供者处理相同请求
+	// Handle the same request with different providers
 	messages := []*schema.Message{
 		{
 			Role:    schema.User,
@@ -221,15 +221,15 @@ func ExampleMultiProvider() {
 	}
 }
 
-// ExampleWithTools 工具调用示例
+// ExampleWithTools tool-call example
 func ExampleWithTools() {
 	provider, err := NewEinoLLMProvider(ExampleConfig)
 	if err != nil {
-		log.Errorf("创建提供者失败: %v", err)
+		log.Errorf("failed to create provider: %v", err)
 		return
 	}
 
-	// 使用Eino原生消息类型
+	// Use Eino-native message types
 	messages := []*schema.Message{
 		{
 			Role:    schema.User,
@@ -237,20 +237,20 @@ func ExampleWithTools() {
 		},
 	}
 
-	// 使用Eino原生工具类型
+	// Use Eino-native tool types
 	tools := []*schema.ToolInfo{
 		{
 			Name:        "get_weather",
 			ParamsOneOf: &schema.ParamsOneOf{
-				// 简化的工具参数定义
-				// 在实际使用中，这里需要正确定义参数结构
+				// Simplified tool parameter definition
+				// In real use, define the parameter structure correctly here
 			},
 		},
 	}
 
 	fmt.Println("=== 工具调用示例 ===")
 
-	// 使用Eino原生工具调用接口
+	// Use Eino-native tool-call API
 	fmt.Println("--- Eino原生工具调用 ---")
 	responseChan := provider.ResponseWithContext(context.Background(), "tool_session", messages, tools)
 	for resp := range responseChan {
@@ -258,9 +258,9 @@ func ExampleWithTools() {
 	}
 }
 
-// MultiProviderExample 多提供者示例
+// MultiProviderExample multi-provider example
 func MultiProviderExample() {
-	// OpenAI提供者示例
+	// OpenAI provider example
 	fmt.Println("=== OpenAI 提供者示例 ===")
 	openaiConfig := map[string]interface{}{
 		"type":       "openai",
@@ -272,13 +272,13 @@ func MultiProviderExample() {
 
 	openaiProvider, err := NewEinoLLMProvider(openaiConfig)
 	if err != nil {
-		log.Errorf("创建OpenAI提供者失败: %v", err)
+		log.Errorf("failed to create OpenAI provider: %v", err)
 		return
 	}
 
 	fmt.Printf("提供者类型: %s\n", openaiProvider.GetProviderType())
 
-	// Ollama提供者示例
+	// Ollama provider example
 	fmt.Println("\n=== Ollama 提供者示例 ===")
 	ollamaConfig := map[string]interface{}{
 		"type":       "ollama",
@@ -289,13 +289,13 @@ func MultiProviderExample() {
 
 	ollamaProvider, err := NewEinoLLMProvider(ollamaConfig)
 	if err != nil {
-		log.Errorf("创建Ollama提供者失败: %v", err)
+		log.Errorf("failed to create Ollama provider: %v", err)
 		return
 	}
 
 	fmt.Printf("提供者类型: %s\n", ollamaProvider.GetProviderType())
 
-	// 使用Eino原生消息类型
+	// Use Eino-native message types
 	messages := []*schema.Message{
 		{
 			Role:    schema.User,
@@ -303,7 +303,7 @@ func MultiProviderExample() {
 		},
 	}
 
-	// 分别测试两个提供者
+	// Test both providers separately
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -331,7 +331,7 @@ func MultiProviderExample() {
 	fmt.Println()
 }
 
-// EinoFrameworkAdvantages Eino框架的优势说明
+// EinoFrameworkAdvantages describes Eino framework strengths
 func EinoFrameworkAdvantages() string {
 	return `
 Eino框架的主要优势：
@@ -391,35 +391,35 @@ Eino框架的主要优势：
 `
 }
 
-// BasicUsageExample 基础用法示例
+// BasicUsageExample basic usage example
 func BasicUsageExample() {
 	provider, err := NewEinoLLMProvider(ExampleConfig)
 	if err != nil {
-		log.Errorf("创建提供者失败: %v", err)
+		log.Errorf("failed to create provider: %v", err)
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	// 演示链式配置
+	// Demonstrate chained config
 	enhancedProvider := provider.
 		WithMaxTokens(2000).
 		WithStreamable(true)
 
-	// 获取底层的Eino ChatModel
+	// Get underlying Eino ChatModel
 	chatModel := enhancedProvider.GetChatModel()
 	fmt.Printf("底层ChatModel: %+v\n", chatModel)
 
-	// 获取提供者类型
+	// Get provider type
 	providerType := enhancedProvider.GetProviderType()
 	fmt.Printf("提供者类型: %s\n", providerType)
 
-	// 获取增强后的模型信息
+	// Get enhanced model info
 	modelInfo := enhancedProvider.GetModelInfo()
 	fmt.Printf("增强模型信息: %+v\n", modelInfo)
 
-	// 复杂对话示例 - 使用Eino原生消息类型
+	// Complex chat example - Eino-native messages
 	messages := []*schema.Message{
 		{
 			Role:    schema.System,
@@ -431,7 +431,7 @@ func BasicUsageExample() {
 		},
 	}
 
-	// 使用增强配置进行调用
+	// Call with enhanced config
 	responseChan := enhancedProvider.ResponseWithContext(ctx, "basic_example", messages, nil)
 	fmt.Printf("架构设计响应:\n")
 	for resp := range responseChan {
@@ -445,18 +445,18 @@ func BasicUsageExample() {
 	fmt.Println()
 }
 
-// EinoNativeExample Eino原生API示例
+// EinoNativeExample Eino-native API example
 func EinoNativeExample() {
 	provider, err := NewEinoLLMProvider(ExampleConfig)
 	if err != nil {
-		log.Errorf("创建提供者失败: %v", err)
+		log.Errorf("failed to create provider: %v", err)
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// 使用Eino原生消息类型
+	// Use Eino-native message types
 	messages := []*schema.Message{
 		{
 			Role:    schema.System,
@@ -470,7 +470,7 @@ func EinoNativeExample() {
 
 	fmt.Println("=== Eino原生API示例 ===")
 
-	// 1. 使用EinoResponse
+	// 1. Use EinoResponse
 	fmt.Println("--- EinoResponse ---")
 	responseChan := provider.ResponseWithContext(ctx, "eino_session", messages, nil)
 	for resp := range responseChan {
@@ -483,13 +483,13 @@ func EinoNativeExample() {
 	}
 	fmt.Println()
 
-	// 2. 使用EinoResponseWithTools
+	// 2. Use EinoResponseWithTools
 	fmt.Println("\n--- EinoResponseWithTools ---")
 	tools := []*schema.ToolInfo{
 		{
 			Name:        "search_docs",
 			ParamsOneOf: &schema.ParamsOneOf{
-				// 工具参数定义
+				// Tool parameter definition
 			},
 		},
 	}

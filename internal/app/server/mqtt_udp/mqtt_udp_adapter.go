@@ -27,7 +27,7 @@ type MqttConfig struct {
 	Password string
 }
 
-// MqttUdpAdapter MQTT-UDP适配器结构
+// MqttUdpAdapter MQTT-UDP adapter
 type MqttUdpAdapter struct {
 	client             mqtt.Client
 	udpServer          *UdpServer
@@ -55,10 +55,10 @@ type mqttDeviceLifecycleState struct {
 
 const defaultOfflineGracePeriod = 2 * time.Minute
 
-// MqttUdpAdapterOption 用于可选参数
+// MqttUdpAdapterOption optional parameters
 type MqttUdpAdapterOption func(*MqttUdpAdapter)
 
-// WithUdpServer 设置 udpServer
+// WithUdpServer sets udpServer
 func WithUdpServer(udpServer *UdpServer) MqttUdpAdapterOption {
 	return func(s *MqttUdpAdapter) {
 		s.udpServer = udpServer
@@ -95,7 +95,7 @@ func WithOfflineGracePeriod(gracePeriod time.Duration) MqttUdpAdapterOption {
 	}
 }
 
-// NewMqttUdpAdapter 创建新的MQTT-UDP适配器，config为必传，其它参数用Option
+// NewMqttUdpAdapter creates MQTT-UDP adapter; config required, other args via Option
 func NewMqttUdpAdapter(config *MqttConfig, opts ...MqttUdpAdapterOption) *MqttUdpAdapter {
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &MqttUdpAdapter{
@@ -179,14 +179,14 @@ func (s *MqttUdpAdapter) clearLifecycleStates() {
 	})
 }
 
-// Start 启动 MQTT 客户端（非阻塞）：在后台 goroutine 中连接并重试，不阻塞程序运行
+// Start starts MQTT client (non-blocking): connect/retry in background goroutine
 func (s *MqttUdpAdapter) Start() error {
 	Infof("MqttUdpAdapter开始启动，后台连接MQTT服务器 Broker=%s:%d ClientID=%s", s.mqttConfig.Broker, s.mqttConfig.Port, s.mqttConfig.ClientID)
 	go s.connectAndRetry()
 	return nil
 }
 
-// connectAndRetry 在后台循环连接 MQTT，连接失败时按间隔重试，与 mqtt_server 解耦不阻塞主流程
+// connectAndRetry loops MQTT connect in background with retry; decoupled from mqtt_server
 func (s *MqttUdpAdapter) connectAndRetry() {
 	const retryInterval = 5 * time.Second
 
@@ -275,7 +275,7 @@ func (s *MqttUdpAdapter) getDeviceSession(deviceId string) *MqttUdpConn {
 	return nil
 }
 
-// handleMessage 将消息丢进队列
+// handleMessage enqueues the message
 func (s *MqttUdpAdapter) handleMessage(client mqtt.Client, msg mqtt.Message) {
 	select {
 	case s.msgChan <- msg:
@@ -285,7 +285,7 @@ func (s *MqttUdpAdapter) handleMessage(client mqtt.Client, msg mqtt.Message) {
 	}
 }
 
-// 断开连接，超时或goodbye主动断开
+// Disconnect on timeout or active goodbye
 func (s *MqttUdpAdapter) handleDisconnect(deviceId string, closingConn *MqttUdpConn) {
 	Debugf("handleDisconnect, deviceId: %s", deviceId)
 
@@ -329,7 +329,7 @@ func (s *MqttUdpAdapter) handleDisconnect(deviceId string, closingConn *MqttUdpC
 	}
 }
 
-// Stop 停止适配器：取消 context、断开 MQTT、关闭 UDP、清理会话（供热更前调用）
+// Stop stops adapter: cancel context, disconnect MQTT, close UDP, clear sessions (before hot reload)
 func (s *MqttUdpAdapter) Stop() {
 	Debugf("enter MqttUdpAdapter Stop ")
 	defer Debugf("exit MqttUdpAdapter Stop ")
@@ -349,7 +349,7 @@ func (s *MqttUdpAdapter) Stop() {
 	s.clearDeviceSessions()
 }
 
-// ReloadMqttClient 仅重连 MQTT（保持 UDP 服务器实例）
+// ReloadMqttClient reconnects MQTT only (keep UDP server)
 func (s *MqttUdpAdapter) ReloadMqttClient(newConfig *MqttConfig) {
 	if newConfig == nil {
 		return
@@ -366,7 +366,7 @@ func (s *MqttUdpAdapter) ReloadMqttClient(newConfig *MqttConfig) {
 	go s.connectAndRetry()
 }
 
-// ReloadUdpServer 仅重启 UDP（保持 MQTT 连接）
+// ReloadUdpServer restarts UDP only (keep MQTT connection)
 func (s *MqttUdpAdapter) ReloadUdpServer(newUdpServer *UdpServer) {
 	if newUdpServer == nil {
 		return
@@ -565,8 +565,8 @@ func (s *MqttUdpAdapter) handleLifecycleMessage(payload []byte) {
 		if notifyOnline && s.onDeviceOnline != nil {
 			s.onDeviceOnline(deviceID)
 		}
-		// 设备重启后即便 broker 在线状态没有翻转，online 广播仍然意味着设备侧 runtime 可能已重建，
-		// 需要触发 transport ready 链路重置 IoT MCP runtime 并重新 initialize。
+		// After device reboot, even if broker online state did not flip, online broadcast still means device runtime may have been rebuilt,
+		// so trigger transport-ready to reset IoT MCP runtime and re-initialize.
 		if s.onTransportReady != nil {
 			s.onTransportReady(deviceID)
 		}
@@ -587,7 +587,7 @@ func (s *MqttUdpAdapter) handleLifecycleMessage(payload []byte) {
 	}
 }
 
-// 处理消息
+// Handle messages
 func (s *MqttUdpAdapter) processMessage() {
 	for {
 		select {
@@ -679,16 +679,16 @@ func (s *MqttUdpAdapter) rotateDeviceUdpSession(deviceSession *MqttUdpConn, devi
 
 func (s *MqttUdpAdapter) getDeviceIdByTopic(topic string) (string, string) {
 	var topicMacAddr, deviceId string
-	//根据topic(/p2p/device_public/mac_addr)解析出来mac_addr
+	//Parse mac_addr from topic (/p2p/device_public/mac_addr)
 	strList := strings.Split(topic, "/")
 	if len(strList) == 4 {
 		topicMacAddr = strList[3]
 
-		// 检查是否为新格式: "GID_test@@@ba_8f_17_de_94_94@@@e4b0c442-98fc-4e1b-8c3d-6a5b6a5b6a6d"
+		// Check for new format: "GID_test@@@ba_8f_17_de_94_94@@@e4b0c442-98fc-4e1b-8c3d-6a5b6a5b6a6d"
 		if strings.Contains(topicMacAddr, "@@@") {
 			parts := strings.Split(topicMacAddr, "@@@")
 			if len(parts) >= 2 {
-				// 提取中间部分作为MAC地址
+				// Extract middle part as MAC address
 				macAddr := parts[1]
 				deviceId = strings.ReplaceAll(macAddr, "_", ":")
 			}

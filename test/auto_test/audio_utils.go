@@ -11,23 +11,23 @@ import (
 	"gopkg.in/hraban/opus.v2"
 )
 
-// WavToOpus 将WAV音频数据转换为标准Opus格式
-// 返回Opus帧的切片集合，每个切片是一个Opus编码帧
+// WavToOpus converts WAV audio to standard Opus
+// returns a slice of Opus frames; each slice is one encoded frame
 func WavToOpus(wavData []byte, sampleRate int, channels int, bitRate int) ([][]byte, error) {
-	// 创建WAV解码器
+	// create the WAV decoder
 	wavReader := bytes.NewReader(wavData)
 	wavDecoder := wav.NewDecoder(wavReader)
 	if !wavDecoder.IsValidFile() {
 		return nil, fmt.Errorf("无效的WAV文件")
 	}
 
-	// 读取WAV文件信息
+	// read WAV file info
 	wavDecoder.ReadInfo()
 	format := wavDecoder.Format()
 	wavSampleRate := int(format.SampleRate)
 	wavChannels := int(format.NumChannels)
 
-	// 如果提供的参数与文件参数不一致，使用文件中的参数
+	// if args disagree with the file, use the file params
 	if sampleRate == 0 {
 		sampleRate = wavSampleRate
 	}
@@ -35,7 +35,7 @@ func WavToOpus(wavData []byte, sampleRate int, channels int, bitRate int) ([][]b
 		channels = wavChannels
 	}
 
-	//打印wavDecoder信息
+	//print wavDecoder info
 	fmt.Println("WAV格式:", format)
 
 	enc, err := opus.NewEncoder(sampleRate, channels, opus.AppAudio)
@@ -43,28 +43,28 @@ func WavToOpus(wavData []byte, sampleRate int, channels int, bitRate int) ([][]b
 		return nil, fmt.Errorf("创建Opus编码器失败: %v", err)
 	}
 
-	// 设置比特率
+	// set bitrate
 	if bitRate > 0 {
 		if err := enc.SetBitrate(bitRate); err != nil {
 			return nil, fmt.Errorf("设置比特率失败: %v", err)
 		}
 	}
 
-	// 创建输出帧切片数组
+	// create the output frame slice
 	opusFrames := make([][]byte, 0)
 
 	perFrameDuration := 60
-	// PCM缓冲区 - Opus帧大小(60ms)
+	// PCM buffer — Opus frame size (60ms)
 	frameSize := sampleRate * perFrameDuration / 1000
 	pcmBuffer := make([]int16, frameSize*channels)
-	opusBuffer := make([]byte, 1000) // 足够大的缓冲区存储编码后的数据
+	opusBuffer := make([]byte, 1000) // buffer large enough for encoded data
 
-	// 读取音频缓冲区
+	// read the audio buffer
 	audioBuf := &audio.IntBuffer{Data: make([]int, frameSize*channels), Format: format}
 
 	fmt.Println("开始转换...")
 	for {
-		// 读取WAV数据
+		// read WAV data
 		n, err := wavDecoder.PCMBuffer(audioBuf)
 		if err == io.EOF || n == 0 {
 			break
@@ -73,20 +73,20 @@ func WavToOpus(wavData []byte, sampleRate int, channels int, bitRate int) ([][]b
 			return nil, fmt.Errorf("读取WAV数据失败: %v", err)
 		}
 
-		// 将int转换为int16
+		// convert int to int16
 		for i := 0; i < len(audioBuf.Data); i++ {
 			if i < len(pcmBuffer) {
 				pcmBuffer[i] = int16(audioBuf.Data[i])
 			}
 		}
 
-		// 编码为Opus格式
+		// encode as Opus
 		n, err = enc.Encode(pcmBuffer, opusBuffer)
 		if err != nil {
 			return nil, fmt.Errorf("编码失败: %v", err)
 		}
 
-		// 将当前帧复制到新的切片中并添加到帧数组
+		// copy the current frame into a new slice and append
 		frameData := make([]byte, n)
 		copy(frameData, opusBuffer[:n])
 		opusFrames = append(opusFrames, frameData)
@@ -112,7 +112,7 @@ func OpusToWav(opusData [][]byte, sampleRate int, channels int, fileName string)
 	wavEncoder := wav.NewEncoder(wavOut, sampleRate, 16, channels, 1)
 	wavBuffer := audio.IntBuffer{
 		Format: &audio.Format{
-			NumChannels: channels, // 使用传入的通道数
+			NumChannels: channels, // use the provided channel count
 			SampleRate:  sampleRate,
 		},
 		SourceBitDepth: 16,
@@ -131,13 +131,13 @@ func OpusToWav(opusData [][]byte, sampleRate int, channels int, fileName string)
 
 		//fmt.Println("pcmData len: ", len(copyData))
 
-		// 将PCM数据转换为int格式
+		// convert PCM data to int
 		for i := 0; i < len(copyData); i++ {
 			wavBuffer.Data = append(wavBuffer.Data, int(copyData[i]))
 		}
 	}
 
-	// 写入WAV文件
+	// write the WAV file
 	err = wavEncoder.Write(&wavBuffer)
 	if err != nil {
 		return nil, fmt.Errorf("写入WAV文件失败: %v", err)

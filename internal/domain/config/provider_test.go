@@ -8,7 +8,7 @@ import (
 func TestMemoryProvider(t *testing.T) {
 	ctx := context.Background()
 
-	// 创建内存provider
+	// Create in-memory provider
 	config := map[string]interface{}{
 		"max_entries": 10,
 	}
@@ -17,53 +17,53 @@ func TestMemoryProvider(t *testing.T) {
 	if err != nil {
 		t.Fatalf("创建内存provider失败: %v", err)
 	}
-	// 注意：接口中没有Close方法，所以不需要调用
+	// Note: interface has no Close method, so no call needed
 
 	userID := "test_user_123"
 
-	// 由于接口中没有SetUserConfig方法，我们只测试GetUserConfig方法
-	// 测试获取不存在用户的配置（应该返回空配置）
+	// No SetUserConfig on interface; only test GetUserConfig
+	// Test get config for missing user (expect empty config)
 	retrievedConfig, err := provider.GetUserConfig(ctx, userID)
 	if err != nil {
 		t.Fatalf("获取用户配置失败: %v", err)
 	}
 
-	// 验证返回的是空配置
+	// Verify empty config was returned
 	if retrievedConfig.Llm.Provider != "" {
 		t.Errorf("期望空配置，但得到了 LLM Provider: %s", retrievedConfig.Llm.Provider)
 	}
 
-	// 测试系统配置获取
+	// Test system config fetch
 	systemConfig, err := provider.GetSystemConfig(ctx)
 	if err != nil {
 		t.Fatalf("获取系统配置失败: %v", err)
 	}
-	_ = systemConfig // 系统配置可能为空，这是正常的
+	_ = systemConfig // system config may be empty; that is normal
 }
 
 func TestProviderAdapter(t *testing.T) {
 	ctx := context.Background()
 
-	// 创建内存provider
+	// Create in-memory provider
 	provider, err := GetUserConfigProvider("memory", map[string]interface{}{
 		"max_entries": 5,
 	})
 	if err != nil {
 		t.Fatalf("创建内存provider失败: %v", err)
 	}
-	// 注意：接口中没有Close方法，所以不需要调用
+	// Note: interface has no Close method, so no call needed
 
-	// 测试适配器获取配置
+	// Test adapter config fetch
 	userID := "adapter_test_user"
 
-	// 使用适配器获取配置（可能为空配置）
+	// Fetch config via adapter (may be empty)
 	adapter := NewUserConfigAdapter(provider)
 	retrievedConfig, err := adapter.GetUserConfig(ctx, userID)
 	if err != nil {
 		t.Fatalf("通过适配器获取配置失败: %v", err)
 	}
 
-	// 验证适配器正常工作（获取到配置结构）
+	// Verify adapter works (got a config struct)
 	if retrievedConfig.SystemPrompt == "" {
 		t.Logf("适配器获取到空的系统提示，这是正常的")
 	} else {
@@ -72,19 +72,19 @@ func TestProviderAdapter(t *testing.T) {
 }
 
 func TestDefaultConfig(t *testing.T) {
-	// 测试Redis默认配置
+	// Test Redis default config
 	redisConfig := DefaultConfig("redis")
 	if redisConfig["host"] != "localhost" {
 		t.Errorf("Redis默认host配置错误，期望: localhost, 实际: %v", redisConfig["host"])
 	}
 
-	// 测试Memory默认配置
+	// Test Memory default config
 	memoryConfig := DefaultConfig("memory")
 	if memoryConfig["max_entries"] != 1000 {
 		t.Errorf("Memory默认max_entries配置错误，期望: 1000, 实际: %v", memoryConfig["max_entries"])
 	}
 
-	// 测试不支持的类型
+	// Test unsupported type
 	unknownConfig := DefaultConfig("unknown")
 	if len(unknownConfig) != 0 {
 		t.Errorf("未知类型应返回空配置，实际: %v", unknownConfig)
@@ -92,7 +92,7 @@ func TestDefaultConfig(t *testing.T) {
 }
 
 func TestValidateConfig(t *testing.T) {
-	// 测试有效的Redis配置
+	// Test valid Redis config
 	validRedisConfig := map[string]interface{}{
 		"host": "localhost",
 		"port": 6379,
@@ -102,7 +102,7 @@ func TestValidateConfig(t *testing.T) {
 		t.Errorf("有效Redis配置验证失败: %v", err)
 	}
 
-	// 测试无效的Redis配置（缺少host）
+	// Test invalid Redis config (missing host)
 	invalidRedisConfig := map[string]interface{}{
 		"port": 6379,
 	}
@@ -111,7 +111,7 @@ func TestValidateConfig(t *testing.T) {
 		t.Error("缺少host的Redis配置应该验证失败")
 	}
 
-	// 测试Memory配置（无需验证）
+	// Test Memory config (no validation needed)
 	err = ValidateConfig("memory", map[string]interface{}{})
 	if err != nil {
 		t.Errorf("Memory配置验证失败: %v", err)

@@ -1,6 +1,6 @@
 package speaker
 
-// IdentifyResult 声纹识别结果
+// IdentifyResult speaker identification result
 type IdentifyResult struct {
 	Identified  bool    `json:"identified"`
 	SpeakerID   string  `json:"speaker_id"`

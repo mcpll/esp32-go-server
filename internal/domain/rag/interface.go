@@ -6,7 +6,7 @@ import (
 	config_types "xiaozhi-esp32-server-golang/internal/domain/config/types"
 )
 
-// Searcher 按 provider 实现知识库检索。
+// Searcher knowledge-base search implemented per provider.
 type Searcher interface {
 	Search(
 		ctx context.Context,

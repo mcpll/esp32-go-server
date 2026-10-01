@@ -44,15 +44,15 @@ func NewWebsocketTransport(conn *websocket.Conn) (*WebsocketTransport, error) {
 	return &WebsocketTransport{conn: conn}, nil
 }
 
-// 实现 Interface 接口
+// Implements Interface
 func (t *WebsocketTransport) Start(ctx context.Context) error {
-	// TODO: 启动连接/监听消息等
+	// TODO: start connection / listen for messages, etc.
 
 	return nil
 }
 
 func (t *WebsocketTransport) SendRequest(ctx context.Context, request transport.JSONRPCRequest) (*transport.JSONRPCResponse, error) {
-	// TODO: 发送请求并同步等待响应
+	// TODO: send request and wait synchronously for response
 	err := t.conn.WriteJSON(request)
 	if err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func (t *WebsocketTransport) SendRequest(ctx context.Context, request transport.
 }
 
 func (t *WebsocketTransport) SendNotification(ctx context.Context, notification mcp.JSONRPCNotification) error {
-	// TODO: 发送通知消息
+	// TODO: send notification message
 	if t.notifyHandler != nil {
 		t.notifyHandler(notification)
 	}

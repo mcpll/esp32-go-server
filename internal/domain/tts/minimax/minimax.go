@@ -16,19 +16,19 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// 常量定义
+// Constants
 const (
 	wsURL = "wss://api.minimaxi.com/ws/v1/t2a_v2"
 )
 
-// 全局WebSocket Dialer
+// Global WebSocket Dialer
 var wsDialer = websocket.Dialer{
-	ReadBufferSize:   16384, // 16KB 读取缓冲区
-	WriteBufferSize:  16384, // 16KB 写入缓冲区
+	ReadBufferSize:   16384, // 16KB read buffer
+	WriteBufferSize:  16384, // 16KB write buffer
 	HandshakeTimeout: 45 * time.Second,
 }
 
-// MinimaxTTSProvider Minimax TTS提供者
+// MinimaxTTSProvider Minimax TTS provider
 type MinimaxTTSProvider struct {
 	APIKey     string
 	Model      string
@@ -41,14 +41,14 @@ type MinimaxTTSProvider struct {
 	Format     string
 	Channel    int
 
-	// 连接管理
+	// Connection management
 	conn      *websocket.Conn
 	connMutex sync.RWMutex
-	// 发送锁，确保同一时间只有一个请求在使用连接
+	// Send lock so only one request uses the connection at a time
 	sendMutex sync.Mutex
 }
 
-// WebSocket 消息结构
+// WebSocket message structs
 type minimaxMessage struct {
 	Event           string        `json:"event,omitempty"`
 	Model           string        `json:"model,omitempty"`
@@ -105,7 +105,7 @@ type minimaxData struct {
 	Audio string `json:"audio"`
 }
 
-// NewMinimaxTTSProvider 创建新的Minimax TTS提供者
+// NewMinimaxTTSProvider creates a Minimax TTS provider
 func NewMinimaxTTSProvider(config map[string]interface{}) *MinimaxTTSProvider {
 	apiKey, _ := config["api_key"].(string)
 	model, _ := config["model"].(string)
@@ -121,7 +121,7 @@ func NewMinimaxTTSProvider(config map[string]interface{}) *MinimaxTTSProvider {
 	format, _ := config["format"].(string)
 	channel, _ := config["channel"].(float64)
 
-	// 设置默认值
+	// Set defaults
 	if model == "" {
 		model = "speech-2.8-hd"
 	}
@@ -161,9 +161,9 @@ func NewMinimaxTTSProvider(config map[string]interface{}) *MinimaxTTSProvider {
 	}
 }
 
-// TextToSpeech 一次性合成（暂不支持，使用流式实现）
+// TextToSpeech one-shot synthesis (unsupported; use streaming)
 func (p *MinimaxTTSProvider) TextToSpeech(ctx context.Context, text string, sampleRate int, channels int, frameDuration int) ([][]byte, error) {
-	// Minimax 主要支持流式，这里可以收集流式数据后返回
+	// Minimax is mainly streaming; collect stream data then return
 	outputChan, err := p.TextToSpeechStream(ctx, text, sampleRate, channels, frameDuration)
 	if err != nil {
 		return nil, err
@@ -177,47 +177,47 @@ func (p *MinimaxTTSProvider) TextToSpeech(ctx context.Context, text string, samp
 	return frames, nil
 }
 
-// TextToSpeechStream 流式语音合成实现
+// TextToSpeechStream streaming speech synthesis
 func (p *MinimaxTTSProvider) TextToSpeechStream(ctx context.Context, text string, sampleRate int, channels int, frameDuration int) (outputChan chan []byte, err error) {
 	startTs := time.Now().UnixMilli()
 
-	// 使用发送锁保护，确保同一时间只有一个请求在使用连接
+	// Hold send lock so only one request uses the connection
 	p.sendMutex.Lock()
-	// 注意：不在函数返回时释放锁，而是在 goroutine 完成时释放
+	// Note: release the lock when the goroutine finishes, not on function return
 
-	// 获取连接（复用或创建）
+	// Get connection (reuse or create)
 	conn, err := p.getConnection(ctx)
 	if err != nil {
 		p.sendMutex.Unlock()
 		return nil, fmt.Errorf("获取WebSocket连接失败: %v", err)
 	}
 
-	// 创建输出通道
+	// Create output channel
 	outputChan = make(chan []byte, 100)
 
-	// 创建管道用于音频解码
+	// Create pipe for audio decode
 	pipeReader, pipeWriter := io.Pipe()
 
-	// 启动音频解码器 goroutine
+	// Start audio decoder goroutine
 	go func() {
 		decoder, err := util.CreateAudioDecoderWithSampleRate(ctx, pipeReader, outputChan, frameDuration, p.Format, sampleRate)
 		if err != nil {
-			log.Errorf("创建音频解码器失败: %v", err)
+			log.Errorf("failed to create audio decoder: %v", err)
 			pipeReader.Close()
 			close(outputChan)
 			return
 		}
 
 		if err := decoder.Run(startTs); err != nil {
-			log.Errorf("音频解码失败: %v", err)
+			log.Errorf("audio decode failed: %v", err)
 		}
 	}()
 
-	// 使用 WaitGroup 等待读取 goroutine 完成
+	// Use WaitGroup to wait for the read goroutine
 	var wg sync.WaitGroup
 	wg.Add(1)
 
-	// 启动读取和处理 goroutine；锁在此 goroutine 内统一由 defer 释放，确保无论正常结束、错误或 panic 都会释放
+	// Start read/process goroutine; release lock via defer in that goroutine on normal end, error, or panic
 	go func() {
 		defer wg.Done()
 		defer p.sendMutex.Unlock()
@@ -229,18 +229,18 @@ func (p *MinimaxTTSProvider) TextToSpeechStream(ctx context.Context, text string
 		p.processStreamTTS(ctx, conn, text, pipeWriter)
 	}()
 
-	// 在后台等待 goroutine 完成并释放锁
+	// Wait in background for goroutine completion and lock release
 	go func() {
 		wg.Wait()
-		log.Debugf("Minimax TTS流式合成完成，耗时: %d ms", time.Now().UnixMilli()-startTs)
+		log.Debugf("Minimax TTS stream synthesis done, elapsed: %d ms", time.Now().UnixMilli()-startTs)
 	}()
 
 	return outputChan, nil
 }
 
-// processStreamTTS 处理流式TTS合成流程
+// processStreamTTS runs the streaming TTS flow
 func (p *MinimaxTTSProvider) processStreamTTS(ctx context.Context, conn *websocket.Conn, text string, pipeWriter *io.PipeWriter) {
-	// 发送任务开始消息
+	// Send task-start message
 	startMsg := minimaxMessage{
 		Event: "task_start",
 		Model: p.Model,
@@ -260,108 +260,108 @@ func (p *MinimaxTTSProvider) processStreamTTS(ctx context.Context, conn *websock
 		ContinuousSound: false,
 	}
 
-	log.Debugf("minimax 发送任务开始消息: model=%s, voice=%s, format=%s", p.Model, p.Voice, p.Format)
+	log.Debugf("minimax sending task_start: model=%s, voice=%s, format=%s", p.Model, p.Voice, p.Format)
 	if err := p.sendMessage(conn, startMsg); err != nil {
-		log.Errorf("发送任务开始消息失败: %v", err)
+		log.Errorf("failed to send task_start: %v", err)
 		p.clearConnection()
 		return
 	}
 
-	// 等待任务开始确认
+	// Wait for task-start ack
 	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	msg, err := p.readMessage(conn)
 	if err != nil {
-		// 检查是否是超时错误
+		// Check for timeout error
 		if netErr, ok := err.(interface{ Timeout() bool }); ok && netErr.Timeout() {
-			log.Errorf("读取任务开始确认超时（10秒内未收到响应）")
+			log.Errorf("timed out waiting for task_start ack (no response within 10s)")
 		} else {
-			log.Errorf("读取任务开始确认失败: %v", err)
+			log.Errorf("failed to read task_start ack: %v", err)
 		}
 		p.clearConnection()
 		return
 	}
 
-	log.Debugf("收到任务开始确认消息: %+v", msg)
+	log.Debugf("received task_start ack: %+v", msg)
 
 	if msg.Event != "task_started" {
-		log.Errorf("任务开始失败，期望 'task_started'，收到: event=%s, 完整消息=%+v", msg.Event, msg)
+		log.Errorf("task_start failed, expected 'task_started', got: event=%s, message=%+v", msg.Event, msg)
 		if msg.BaseResp != nil && msg.BaseResp.StatusCode != 0 {
-			log.Errorf("错误详情: status_code=%d, status_msg=%s", msg.BaseResp.StatusCode, msg.BaseResp.StatusMsg)
+			log.Errorf("error detail: status_code=%d, status_msg=%s", msg.BaseResp.StatusCode, msg.BaseResp.StatusMsg)
 		}
 		p.clearConnection()
 		return
 	}
-	// 重置读取超时
+	// Reset read timeout
 	conn.SetReadDeadline(time.Time{})
 
-	log.Debugf("任务开始确认成功")
+	log.Debugf("task_start ack ok")
 
-	// 发送文本消息
+	// Send text message
 	continueMsg := minimaxMessage{
 		Event: "task_continue",
 		Text:  text,
 	}
 
 	if err := p.sendMessage(conn, continueMsg); err != nil {
-		log.Errorf("发送文本消息失败: %v", err)
+		log.Errorf("failed to send text message: %v", err)
 		p.clearConnection()
 		return
 	}
 
-	// 读取音频数据
+	// Read audio data
 	chunkCount := 0
 	for {
 		select {
 		case <-ctx.Done():
-			log.Debugf("Minimax TTS流式合成取消, 文本: %s", text)
-			// 发送任务结束消息
+			log.Debugf("Minimax TTS stream synthesis canceled, text: %s", text)
+			// Send task-finish message
 			finishMsg := minimaxMessage{Event: "task_finish"}
 			p.sendMessage(conn, finishMsg)
 
-			// 根据文档，服务器收到 task_finish 后会关闭 WebSocket 连接
-			// 尝试读取 task_finished 响应（如果服务器发送的话）
+			// Per docs, server closes the WebSocket after receiving task_finish
+			// Try reading task_finished if the server sends it
 			conn.SetReadDeadline(time.Now().Add(2 * time.Second))
 			if finishResp, err := p.readMessage(conn); err == nil {
-				log.Debugf("收到任务结束确认: event=%s, 完整消息=%+v", finishResp.Event, finishResp)
+				log.Debugf("received task_finish ack: event=%s, message=%+v", finishResp.Event, finishResp)
 			} else {
-				// 连接可能已经关闭，这是正常行为
+				// Connection may already be closed; that is normal
 				if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
-					log.Debugf("服务器已关闭连接（正常行为）")
+					log.Debugf("server closed the connection (expected)")
 					if closeErr, ok := err.(*websocket.CloseError); ok {
-						log.Debugf("关闭帧详情: code=%d, text=%s", closeErr.Code, closeErr.Text)
+						log.Debugf("close frame detail: code=%d, text=%s", closeErr.Code, closeErr.Text)
 					}
 				} else {
-					log.Debugf("读取任务结束确认失败: %v", err)
+					log.Debugf("failed to read task_finish ack: %v", err)
 					if closeErr, ok := err.(*websocket.CloseError); ok {
-						log.Debugf("关闭帧详情: code=%d, text=%s", closeErr.Code, closeErr.Text)
+						log.Debugf("close frame detail: code=%d, text=%s", closeErr.Code, closeErr.Text)
 					}
 				}
 			}
 
-			// 清空连接状态，因为服务器已经关闭了连接
+			// Clear connection state because the server closed it
 			p.clearConnection()
 			return
 		default:
 		}
 
-		// 设置读取超时
+		// Set read timeout
 		conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 
 		msg, err := p.readMessage(conn)
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Errorf("读取WebSocket消息失败: %v", err)
-				// 尝试获取关闭帧信息
+				log.Errorf("failed to read WebSocket message: %v", err)
+				// Try to get close-frame info
 				if closeErr, ok := err.(*websocket.CloseError); ok {
-					log.Errorf("WebSocket关闭帧详情: code=%d, text=%s", closeErr.Code, closeErr.Text)
+					log.Errorf("WebSocket close frame detail: code=%d, text=%s", closeErr.Code, closeErr.Text)
 				}
 				p.clearConnection()
 				return
 			}
-			// 正常关闭或读取错误
-			log.Debugf("WebSocket连接关闭或读取错误: %v", err)
+			// Normal close or read error
+			log.Debugf("WebSocket connection closed or read error: %v", err)
 			if closeErr, ok := err.(*websocket.CloseError); ok {
-				log.Debugf("WebSocket关闭帧详情: code=%d, text=%s", closeErr.Code, closeErr.Text)
+				log.Debugf("WebSocket close frame detail: code=%d, text=%s", closeErr.Code, closeErr.Text)
 			}
 			return
 		}
@@ -370,53 +370,53 @@ func (p *MinimaxTTSProvider) processStreamTTS(ctx context.Context, conn *websock
 			log.Errorf("BaseResp: status_code=%d, status_msg=%s", msg.BaseResp.StatusCode, msg.BaseResp.StatusMsg)
 		}
 
-		// 检查是否有错误消息
+		// Check for error message
 		if msg.Event == "error" || msg.Event == "task_error" {
-			log.Errorf("收到错误消息: %+v", msg)
+			log.Errorf("received error message: %+v", msg)
 			if msg.BaseResp != nil && msg.BaseResp.StatusCode != 0 {
-				log.Errorf("错误详情: status_code=%d, status_msg=%s", msg.BaseResp.StatusCode, msg.BaseResp.StatusMsg)
+				log.Errorf("error detail: status_code=%d, status_msg=%s", msg.BaseResp.StatusCode, msg.BaseResp.StatusMsg)
 			}
 			p.clearConnection()
 			return
 		}
 
-		// 处理音频数据
+		// Process audio data
 		if msg.Data != nil && msg.Data.Audio != "" {
 			chunkCount++
 
-			// 将 hex 编码的音频数据转换为二进制
+			// Convert hex-encoded audio to binary
 			audioBytes, err := hex.DecodeString(msg.Data.Audio)
 			if err != nil {
-				log.Errorf("解码音频数据失败: %v", err)
+				log.Errorf("failed to decode audio data: %v", err)
 				continue
 			}
 
-			// 写入管道供解码器处理
+			// Write to pipe for the decoder
 			if _, err := pipeWriter.Write(audioBytes); err != nil {
-				log.Errorf("写入音频数据到管道失败: %v", err)
+				log.Errorf("failed to write audio data to pipe: %v", err)
 				p.clearConnection()
 				return
 			}
 		}
 
-		// 检查是否完成
+		// Check whether finished
 		if msg.IsFinal {
-			log.Debugf("收到最后一个音频片段，共%d个片段", chunkCount)
-			// 发送任务结束消息
+			log.Debugf("received last audio chunk, total chunks=%d", chunkCount)
+			// Send task-finish message
 			finishMsg := minimaxMessage{Event: "task_finish"}
 			p.sendMessage(conn, finishMsg)
 
-			// 清空连接状态，因为服务器已经关闭了连接
-			// 下次使用时需要创建新连接
+			// Clear connection state because the server closed it
+			// Next use must create a new connection
 			p.clearConnection()
 			return
 		}
 	}
 }
 
-// getConnection 获取连接，如果不存在则创建
+// getConnection returns a connection, creating one if needed
 func (p *MinimaxTTSProvider) getConnection(ctx context.Context) (*websocket.Conn, error) {
-	// 先尝试读取现有连接
+	// Try reading the existing connection first
 	p.connMutex.RLock()
 	conn := p.conn
 	p.connMutex.RUnlock()
@@ -425,37 +425,37 @@ func (p *MinimaxTTSProvider) getConnection(ctx context.Context) (*websocket.Conn
 		return conn, nil
 	}
 
-	// 需要创建新连接
+	// Need to create a new connection
 	p.connMutex.Lock()
 	defer p.connMutex.Unlock()
 
-	// 双重检查，可能其他 goroutine 已经创建了连接
+	// Double-check; another goroutine may have created it
 	if p.conn != nil {
 		return p.conn, nil
 	}
 
-	// 创建HTTP头
+	// Create HTTP headers
 	header := http.Header{}
 	header.Set("Authorization", fmt.Sprintf("Bearer %s", p.APIKey))
 
-	// 创建新连接
+	// Create new connection
 	conn, resp, err := wsDialer.DialContext(ctx, wsURL, header)
 	if err != nil {
 		if resp != nil {
-			log.Errorf("WebSocket连接失败，状态码: %d", resp.StatusCode)
+			log.Errorf("WebSocket connect failed, status code: %d", resp.StatusCode)
 		}
 		return nil, fmt.Errorf("WebSocket连接失败: %v", err)
 	}
 
-	// 设置消息读取限制
-	conn.SetReadLimit(1024 * 1024) // 1MB 最大消息大小
+	// Set message read limit
+	conn.SetReadLimit(1024 * 1024) // 1MB max message size
 
-	// 设置保持连接
+	// Enable keep-alive
 	conn.SetPingHandler(func(appData string) error {
 		return conn.WriteControl(websocket.PongMessage, []byte(appData), time.Now().Add(1*time.Second))
 	})
 
-	// 等待连接成功消息
+	// Wait for connection-success message
 	conn.SetReadDeadline(time.Now().Add(10 * time.Second))
 	_, message, err := conn.ReadMessage()
 	if err != nil {
@@ -463,29 +463,29 @@ func (p *MinimaxTTSProvider) getConnection(ctx context.Context) (*websocket.Conn
 		return nil, fmt.Errorf("读取连接确认消息失败: %v", err)
 	}
 
-	log.Debugf("收到连接确认消息（原始）: %s", string(message))
+	log.Debugf("received connection ack (raw): %s", string(message))
 
 	var connectMsg minimaxResp
 	if err := json.Unmarshal(message, &connectMsg); err != nil {
 		conn.Close()
-		log.Errorf("解析连接确认消息失败，原始消息: %s, 错误: %v", string(message), err)
+		log.Errorf("failed to parse connection ack, raw: %s, error: %v", string(message), err)
 		return nil, fmt.Errorf("解析连接确认消息失败: %v", err)
 	}
 
-	log.Debugf("收到连接确认消息（解析后）: %+v", connectMsg)
+	log.Debugf("received connection ack (parsed): %+v", connectMsg)
 
 	if connectMsg.Event != "connected_success" {
 		conn.Close()
-		log.Errorf("连接失败，期望 'connected_success'，收到: %+v", connectMsg)
+		log.Errorf("connect failed, expected 'connected_success', got: %+v", connectMsg)
 		return nil, fmt.Errorf("连接失败，收到: %+v", connectMsg)
 	}
 
 	p.conn = conn
-	log.Infof("Minimax WebSocket 连接已建立")
+	log.Infof("Minimax WebSocket connection established")
 	return conn, nil
 }
 
-// clearConnection 清空连接（用于断线重连）
+// clearConnection clears the connection (for reconnect)
 func (p *MinimaxTTSProvider) clearConnection() {
 	p.connMutex.Lock()
 	defer p.connMutex.Unlock()
@@ -493,11 +493,11 @@ func (p *MinimaxTTSProvider) clearConnection() {
 	if p.conn != nil {
 		p.conn.Close()
 		p.conn = nil
-		log.Infof("Minimax WebSocket 连接已清空，等待下次重连")
+		log.Infof("Minimax WebSocket connection cleared, will reconnect next time")
 	}
 }
 
-// sendMessage 发送JSON消息
+// sendMessage sends a JSON message
 func (p *MinimaxTTSProvider) sendMessage(conn *websocket.Conn, msg minimaxMessage) error {
 	p.connMutex.RLock()
 	defer p.connMutex.RUnlock()
@@ -511,41 +511,41 @@ func (p *MinimaxTTSProvider) sendMessage(conn *websocket.Conn, msg minimaxMessag
 		return fmt.Errorf("序列化消息失败: %v", err)
 	}
 
-	log.Debugf("minimax 发送消息: %s", string(data))
+	log.Debugf("minimax sending message: %s", string(data))
 
 	return conn.WriteMessage(websocket.TextMessage, data)
 }
 
-// readMessage 读取JSON消息
+// readMessage reads a JSON message
 func (p *MinimaxTTSProvider) readMessage(conn *websocket.Conn) (*minimaxResp, error) {
 	messageType, message, err := conn.ReadMessage()
 	if err != nil {
 		return nil, err
 	}
 	_ = messageType
-	//log.Debugf("minimax 读取到WebSocket消息: type=%d, 原始内容长度=%d, 内容=%s", messageType, len(message), string(message))
+	//log.Debugf("minimax read WebSocket message: type=%d, raw_len=%d, content=%s", messageType, len(message), string(message))
 
 	var msg minimaxResp
 	if err := json.Unmarshal(message, &msg); err != nil {
-		log.Errorf("解析消息失败，原始消息: %s, 错误: %v", string(message), err)
+		log.Errorf("failed to parse message, raw: %s, error: %v", string(message), err)
 		return nil, fmt.Errorf("解析消息失败: %v", err)
 	}
 
 	return &msg, nil
 }
 
-// SetVoice 设置音色参数
+// SetVoice sets voice parameters
 func (p *MinimaxTTSProvider) SetVoice(voiceConfig map[string]interface{}) error {
 	return nil
 }
 
-// Close 关闭资源，释放连接
+// Close releases resources and the connection
 func (p *MinimaxTTSProvider) Close() error {
 	p.clearConnection()
 	return nil
 }
 
-// IsValid 检查资源是否有效
+// IsValid checks whether the resource is valid
 func (p *MinimaxTTSProvider) IsValid() bool {
 	p.connMutex.RLock()
 	conn := p.conn

@@ -14,12 +14,12 @@ import (
 )
 
 func TestOpenAITTS(t *testing.T) {
-	// 跳过实际的网络请求测试，除非设置了环境变量
+	// Skip live network tests unless the env var is set
 	if os.Getenv("RUN_OPENAI_TEST") != "1" {
 		t.Skip("跳过OpenAI API测试，设置环境变量RUN_OPENAI_TEST=1以启用")
 	}
 
-	// 从环境变量获取API密钥
+	// Get API key from environment
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
 		t.Skip("跳过OpenAI API测试，需要设置环境变量OPENAI_API_KEY")
@@ -37,7 +37,7 @@ func TestOpenAITTS(t *testing.T) {
 
 	provider := NewOpenAITTSProvider(config)
 
-	// 测试文本转语音
+	// Test text-to-speech
 	t.Run("TestTextToSpeech", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -54,7 +54,7 @@ func TestOpenAITTS(t *testing.T) {
 		t.Logf("成功生成 %d 个音频帧", len(frames))
 	})
 
-	// 测试流式文本转语音
+	// Test streaming text-to-speech
 	t.Run("TestTextToSpeechStream", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -64,7 +64,7 @@ func TestOpenAITTS(t *testing.T) {
 			t.Fatalf("TextToSpeechStream失败: %v", err)
 		}
 
-		// 接收所有帧
+		// Receive all frames
 		var receivedFrames [][]byte
 		timeout := time.After(20 * time.Second)
 
@@ -89,7 +89,7 @@ func TestOpenAITTS(t *testing.T) {
 		t.Logf("成功接收 %d 个音频帧", len(receivedFrames))
 	})
 
-	// 测试不同的语音
+	// Test different voices
 	t.Run("TestDifferentVoices", func(t *testing.T) {
 		voices := []string{"alloy", "echo", "fable", "onyx", "nova", "shimmer"}
 
@@ -122,7 +122,7 @@ func TestOpenAITTS(t *testing.T) {
 		}
 	})
 
-	// 测试不同的速度
+	// Test different speeds
 	t.Run("TestDifferentSpeeds", func(t *testing.T) {
 		speeds := []float64{0.5, 1.0, 1.5, 2.0}
 
@@ -156,7 +156,7 @@ func TestOpenAITTS(t *testing.T) {
 	})
 }
 
-// TestOpenAITTSProviderDefaults 测试默认值
+// TestOpenAITTSProviderDefaults tests default values
 func TestOpenAITTSProviderDefaults(t *testing.T) {
 	config := map[string]interface{}{
 		"api_key": "test-key",

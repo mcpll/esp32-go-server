@@ -24,17 +24,17 @@ var (
 	once          sync.Once
 )
 
-// UniversalResourcePoolManager 通用资源池管理器
+// UniversalResourcePoolManager universal resource pool manager
 type UniversalResourcePoolManager struct {
-	pools        map[string]*util.ResourcePool // key格式: "resourceType:provider"
-	creators     map[string]interface{}        // 已注册的创建函数
+	pools        map[string]*util.ResourcePool // key format: "resourceType:provider"
+	creators     map[string]interface{}        // registered creator functions
 	closeFuncs   map[string]func(interface{}) error
 	isValidFuncs map[string]func(interface{}) bool
 	resetFuncs   map[string]func(interface{}) error
 	mu           sync.RWMutex
 }
 
-// GetGlobalResourcePoolManager 获取全局资源池管理器（单例）
+// GetGlobalResourcePoolManager returns the global resource pool manager (singleton)
 func GetGlobalResourcePoolManager() *UniversalResourcePoolManager {
 	once.Do(func() {
 		globalManager = &UniversalResourcePoolManager{
@@ -44,46 +44,46 @@ func GetGlobalResourcePoolManager() *UniversalResourcePoolManager {
 			isValidFuncs: make(map[string]func(interface{}) bool),
 			resetFuncs:   make(map[string]func(interface{}) error),
 		}
-		log.Info("通用资源池管理器已初始化")
+		log.Info("generic resource pool manager initialized")
 	})
 	return globalManager
 }
 
-// ResourceTypeOption 资源类型注册选项
+// ResourceTypeOption resource type registration option
 type ResourceTypeOption func(*ResourceTypeConfig)
 
-// ResourceTypeConfig 资源类型配置
+// ResourceTypeConfig resource type config
 type ResourceTypeConfig struct {
 	CloseFunc   func(interface{}) error
 	IsValidFunc func(interface{}) bool
 	ResetFunc   func(interface{}) error
 }
 
-// WithCloseFunc 设置关闭函数
+// WithCloseFunc sets the close function
 func WithCloseFunc(fn func(interface{}) error) ResourceTypeOption {
 	return func(c *ResourceTypeConfig) {
 		c.CloseFunc = fn
 	}
 }
 
-// WithIsValidFunc 设置验证函数
+// WithIsValidFunc sets the validation function
 func WithIsValidFunc(fn func(interface{}) bool) ResourceTypeOption {
 	return func(c *ResourceTypeConfig) {
 		c.IsValidFunc = fn
 	}
 }
 
-// WithResetFunc 设置重置函数
+// WithResetFunc sets the reset function
 func WithResetFunc(fn func(interface{}) error) ResourceTypeOption {
 	return func(c *ResourceTypeConfig) {
 		c.ResetFunc = fn
 	}
 }
 
-// RegisterResourceType 注册资源类型（外部调用）
-// resourceType: 资源类型名称（如 "vad", "asr", "custom_type" 等）
-// creator: 资源创建函数
-// opts: 可选配置（closeFunc, isValidFunc, resetFunc）
+// RegisterResourceType registers a resource type (called externally)
+// resourceType: type name (e.g. "vad", "asr", "custom_type")
+// creator: resource factory function
+// opts: optional config (closeFunc, isValidFunc, resetFunc)
 func RegisterResourceType[T any](
 	resourceType string,
 	creator CreatorFunc[T],
@@ -93,15 +93,15 @@ func RegisterResourceType[T any](
 	mgr.mu.Lock()
 	defer mgr.mu.Unlock()
 
-	// 检查是否已注册
+	// check whether already registered
 	if _, exists := mgr.creators[resourceType]; exists {
 		return fmt.Errorf("资源类型 %s 已注册", resourceType)
 	}
 
-	// 注册 creator
+	// register the creator
 	mgr.creators[resourceType] = creator
 
-	// 应用选项
+	// apply options
 	config := &ResourceTypeConfig{}
 	for _, opt := range opts {
 		opt(config)
@@ -117,30 +117,30 @@ func RegisterResourceType[T any](
 		mgr.resetFuncs[resourceType] = config.ResetFunc
 	}
 
-	log.Infof("注册资源类型: %s", resourceType)
+	log.Infof("registered resource type: %s", resourceType)
 	return nil
 }
 
-// GenerateConfigKey 生成配置键（用于区分不同配置的资源池）
-// 使用 hashstructure 做与 map key 顺序无关的指纹，同一语义配置得到相同 key，避免重复建池。
+// GenerateConfigKey builds a config key (to distinguish pools with different configs)
+// use hashstructure for a map-key-order-independent fingerprint so equivalent configs share a pool.
 func GenerateConfigKey(provider string, config map[string]interface{}) string {
 	input := map[string]interface{}{"provider": provider, "config": config}
 	h, err := hashstructure.Hash(input, hashstructure.FormatV2, nil)
 	if err != nil {
-		log.Warnf("配置指纹计算失败，使用 provider 作为 key: %v", err)
+		log.Warnf("failed to compute config fingerprint, using provider as key: %v", err)
 		return provider
 	}
 	return fmt.Sprintf("%016x", h)
 }
 
-// getOrCreatePool 获取或创建资源池（泛型版本）
-// 使用配置指纹作为 poolKey，同一 config_id 在 host 等配置变更后会使用新池、新配置实例。
+// getOrCreatePool gets or creates a resource pool (generic)
+// use the config fingerprint as poolKey so host/config changes get a new pool and instances.
 func getOrCreatePool[T any](
 	resourceType, provider string,
 	config map[string]interface{},
 ) (*util.ResourcePool, error) {
 	mgr := GetGlobalResourcePoolManager()
-	// 资源池 key 格式统一为：类型:配置指纹（provider+config 的 MD5）
+	// pool key format: type:configFingerprint (MD5 of provider+config)
 	configKey := GenerateConfigKey(provider, config)
 	poolKey := fmt.Sprintf("%s:%s", resourceType, configKey)
 
@@ -155,24 +155,24 @@ func getOrCreatePool[T any](
 	mgr.mu.Lock()
 	defer mgr.mu.Unlock()
 
-	// 双重检查
+	// double-check
 	if pool, exists := mgr.pools[poolKey]; exists {
 		return pool, nil
 	}
 
-	// 获取已注册的 creator
+	// get the registered creator
 	creatorInterface, exists := mgr.creators[resourceType]
 	if !exists {
 		return nil, fmt.Errorf("资源类型未注册: %s (请先调用 RegisterResourceType 注册)", resourceType)
 	}
 
-	// 类型断言获取泛型 creator
+	// type-assert to the generic creator
 	creator, ok := creatorInterface.(CreatorFunc[T])
 	if !ok {
 		return nil, fmt.Errorf("资源类型 %s 的 creator 类型不匹配", resourceType)
 	}
 
-	// 创建泛型资源工厂
+	// create the generic resource factory
 	factory := &ResourceFactory[T]{
 		resourceType: resourceType,
 		provider:     provider,
@@ -199,10 +199,10 @@ func getOrCreatePool[T any](
 		},
 	}
 
-	// 获取资源池配置（所有资源类型共享默认配置）
+	// get pool config (defaults shared by all resource types)
 	poolConfig := getPoolConfig()
 
-	// 创建资源池
+	// create the resource pool
 	pool, err := util.NewResourcePool(poolConfig, factory)
 	if err != nil {
 		return nil, fmt.Errorf("创建资源池失败 [%s:%s]: %w", resourceType, configKey, err)
@@ -213,16 +213,16 @@ func getOrCreatePool[T any](
 	if len(configKey) > 8 {
 		fpShort = configKey[:8] + "..."
 	}
-	log.Infof("创建资源池: type=%s, provider=%s, fingerprint=%s", resourceType, provider, fpShort)
+	log.Infof("created resource pool: type=%s, provider=%s, fingerprint=%s", resourceType, provider, fpShort)
 
 	return pool, nil
 }
 
-// Acquire 获取资源（泛型版本，类型安全，支持懒加载）
-// T: 资源类型
-// resourceType: 资源类型字符串（vad/asr/llm/tts等）
-// provider: 提供者名称
-// config: 配置信息
+// Acquire acquires a resource (generic, type-safe, lazy)
+// T: resource type
+// resourceType: type string (vad/asr/llm/tts, etc.)
+// provider: provider name
+// config: configuration
 func Acquire[T any](
 	resourceType, provider string,
 	config map[string]interface{},
@@ -246,14 +246,14 @@ func Acquire[T any](
 	return wrapper, nil
 }
 
-// Release 归还资源（泛型版本，类型安全）
+// Release releases a resource (generic, type-safe)
 func Release[T any](wrapper *ResourceWrapper[T]) error {
 	if wrapper == nil {
 		return nil
 	}
 
 	mgr := GetGlobalResourcePoolManager()
-	// 所有资源池的 key 格式统一为：类型:provider
+	// all pool keys use type:provider
 	poolKey := fmt.Sprintf("%s:%s", wrapper.resourceType, wrapper.configKey)
 
 	mgr.mu.RLock()
@@ -261,14 +261,14 @@ func Release[T any](wrapper *ResourceWrapper[T]) error {
 	mgr.mu.RUnlock()
 
 	if !exists {
-		log.Warnf("资源池不存在: %s", poolKey)
+		log.Warnf("resource pool not found: %s", poolKey)
 		return nil
 	}
 
 	return pool.Release(wrapper)
 }
 
-// GetStats 获取所有资源池的统计信息
+// GetStats returns stats for all resource pools
 func GetStats() map[string]interface{} {
 	mgr := GetGlobalResourcePoolManager()
 	mgr.mu.RLock()
@@ -283,7 +283,7 @@ func GetStats() map[string]interface{} {
 	return stats
 }
 
-// StartStatsMonitor 启动资源池统计监控，每 interval 输出一次统计信息到日志
+// StartStatsMonitor starts pool stats monitoring; logs stats every interval
 func StartStatsMonitor(ctx context.Context, interval time.Duration) {
 	go func() {
 		ticker := time.NewTicker(interval)
@@ -292,34 +292,34 @@ func StartStatsMonitor(ctx context.Context, interval time.Duration) {
 		for {
 			select {
 			case <-ctx.Done():
-				log.Debugf("资源池统计监控已停止")
+				log.Debugf("resource pool stats monitor stopped")
 				return
 			case <-ticker.C:
 				stats := GetStats()
 				if len(stats) > 0 {
 					statsJSON, err := json.MarshalIndent(stats, "", "  ")
 					if err != nil {
-						log.Errorf("序列化资源池统计信息失败: %v", err)
+						log.Errorf("failed to serialize resource pool stats: %v", err)
 						continue
 					}
-					log.Infof("========== 全局资源池统计信息 ==========")
-					log.Infof("统计时间: %s", time.Now().Format("2006-01-02 15:04:05"))
-					log.Infof("资源池数量: %d", len(stats))
-					log.Infof("详细信息:\n%s", string(statsJSON))
+					log.Infof("========== global resource pool stats ==========")
+					log.Infof("stats time: %s", time.Now().Format("2006-01-02 15:04:05"))
+					log.Infof("resource pool count: %d", len(stats))
+					log.Infof("details:\n%s", string(statsJSON))
 					log.Infof("========================================")
 				} else {
-					log.Infof("========== 全局资源池统计信息 ==========")
-					log.Infof("统计时间: %s", time.Now().Format("2006-01-02 15:04:05"))
-					log.Infof("当前没有活跃的资源池")
+					log.Infof("========== global resource pool stats ==========")
+					log.Infof("stats time: %s", time.Now().Format("2006-01-02 15:04:05"))
+					log.Infof("no active resource pools")
 					log.Infof("========================================")
 				}
 			}
 		}
 	}()
-	log.Infof("资源池统计监控已启动，每 %v 输出一次统计信息到日志", interval)
+	log.Infof("resource pool stats monitor started, logging every %v", interval)
 }
 
-// Close 关闭所有资源池
+// Close closes all resource pools
 func Close() error {
 	mgr := GetGlobalResourcePoolManager()
 	mgr.mu.Lock()
@@ -340,12 +340,12 @@ func Close() error {
 	return nil
 }
 
-// getPoolConfig 从配置中获取资源池配置（所有资源类型共享默认配置）
+// getPoolConfig loads pool config from settings (defaults shared by all types)
 func getPoolConfig() *util.PoolConfig {
-	// 使用默认配置
+	// use default config
 	config := util.DefaultConfig()
 
-	// 如果配置了 resource_pools，则覆盖默认值
+	// if resource_pools is set, override the defaults
 	if viper.IsSet("resource_pools.max_size") {
 		config.MaxSize = viper.GetInt("resource_pools.max_size")
 	}
@@ -371,9 +371,9 @@ func getPoolConfig() *util.PoolConfig {
 	return config
 }
 
-// init 初始化内置资源类型
+// init registers built-in resource types
 func init() {
-	// 注册 VAD 资源类型
+	// register VAD resource type
 	RegisterResourceType[vad_inter.VAD](
 		"vad",
 		func(rt, p string, cfg map[string]interface{}) (vad_inter.VAD, error) {
@@ -406,7 +406,7 @@ func init() {
 		}),
 	)
 
-	// 注册 ASR 资源类型
+	// register ASR resource type
 	RegisterResourceType[asr.AsrProvider](
 		"asr",
 		func(rt, p string, cfg map[string]interface{}) (asr.AsrProvider, error) {
@@ -426,7 +426,7 @@ func init() {
 		}),
 	)
 
-	// 注册 LLM 资源类型
+	// register LLM resource type
 	RegisterResourceType[llm.LLMProvider](
 		"llm",
 		func(rt, p string, cfg map[string]interface{}) (llm.LLMProvider, error) {
@@ -450,7 +450,7 @@ func init() {
 		}),
 	)
 
-	// 注册 TTS 资源类型
+	// register TTS resource type
 	RegisterResourceType[tts.TTSProvider](
 		"tts",
 		func(rt, p string, cfg map[string]interface{}) (tts.TTSProvider, error) {

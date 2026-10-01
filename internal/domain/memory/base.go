@@ -12,44 +12,44 @@ import (
 	"github.com/cloudwego/eino/schema"
 )
 
-// MemoryProvider 记忆提供者接口
-// 定义所有记忆提供者都需要实现的核心方法
+// MemoryProvider is the memory provider interface
+// Core methods every memory provider must implement
 type MemoryProvider interface {
-	// AddMessage 添加一条消息到记忆
+	// AddMessage adds a message to memory
 	AddMessage(ctx context.Context, agentID string, msg schema.Message) error
 
-	// GetMessages 获取用户的历史消息
+	// GetMessages returns the user history messages
 	GetMessages(ctx context.Context, agentId string, count int) ([]*schema.Message, error)
 
-	// GetContext 获取用户的上下文信息，用于增强 LLM prompt
+	// GetContext returns user context to enrich the LLM prompt
 	GetContext(ctx context.Context, agentId string, maxToken int) (string, error)
 
-	// Search 搜索用户的记忆
+	// Search searches the user memory
 	Search(ctx context.Context, agentId string, query string, topK int, timeRangeDays int64) (string, error)
 
-	// Flush 刷新用户的记忆
+	// Flush flushes the user memory
 	Flush(ctx context.Context, agentId string) error
 
-	// ResetMemory 重置用户的记忆
+	// ResetMemory resets the user memory
 	ResetMemory(ctx context.Context, agentId string) error
 }
 
-// MemoryType 记忆类型
+// MemoryType is the memory type
 type MemoryType string
 
 const (
 	MemoryTypeNone     MemoryType = "nomemo"
-	MemoryTypeMemobase MemoryType = "memobase" // Memobase 长期记忆
-	MemoryTypeMem0     MemoryType = "mem0"     // Mem0 记忆服务
-	MemoryTypeMemOS    MemoryType = "memos"    // MemOS（兼容 Mem0 API）
+	MemoryTypeMemobase MemoryType = "memobase" // Memobase long-term memory
+	MemoryTypeMem0     MemoryType = "mem0"     // Mem0 memory service
+	MemoryTypeMemOS    MemoryType = "memos"    // MemOS (Mem0 API compatible)
 )
 
-// GetProvider 获取指定类型的记忆提供者
+// GetProvider returns a memory provider of the given type
 func GetProvider(memoryType MemoryType, config map[string]interface{}) (MemoryProvider, error) {
 	return GetProviderByType(memoryType, config)
 }
 
-// GetProviderByType 根据类型获取记忆提供者
+// GetProviderByType returns a memory provider by type
 func GetProviderByType(memoryType MemoryType, config map[string]interface{}) (MemoryProvider, error) {
 	if memoryType == "" {
 		memoryType = MemoryTypeNone

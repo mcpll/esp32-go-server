@@ -14,18 +14,18 @@ func containsRune(slice []rune, target rune) bool {
 }
 
 func extractSmartSentences(text string, minLen, maxLen int) (sentences []string, remaining string) {
-	// 有效分割符集合（可自定义扩展）
+	// Valid separator set (extensible)
 	splitTokens := []rune{'。', '！', '？', '；', '\n', '.', '!', '?', ';'}
 
 	current := []rune(text)
 	for len(current) >= minLen {
-		// 计算当前窗口大小
+		// Compute current window size
 		windowSize := maxLen
 		if windowSize > len(current) {
 			windowSize = len(current)
 		}
 
-		// 在有效窗口中寻找分割点
+		// Find a split point within the valid window
 		splitPos := -1
 		for i := windowSize - 1; i >= minLen-1; i-- {
 			if containsRune(splitTokens, current[i]) {
@@ -35,10 +35,10 @@ func extractSmartSentences(text string, minLen, maxLen int) (sentences []string,
 		}
 
 		if splitPos == -1 {
-			break // 未找到有效分割点
+			break // No valid split point found
 		}
 
-		// 分割并保存有效句子
+		// Split and save a valid sentence
 		sentences = append(sentences, string(current[:splitPos+1]))
 		current = current[splitPos+1:]
 	}

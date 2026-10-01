@@ -1,4 +1,4 @@
-// 测试 domain/asr/doubao：建立连接后等待12秒，发送10个数据包，再等待3秒，获取结果。
+// Test domain/asr/doubao: after connecting wait 12s, send 10 packets, wait 3s more, then get results.
 package main
 
 import (
@@ -36,12 +36,12 @@ func main() {
 	}
 	asr, err := doubao.NewDoubaoV2ASR(cfg)
 	if err != nil {
-		log.Errorf("创建豆包 ASR 失败: %v", err)
+		log.Errorf("failed to create Doubao ASR: %v", err)
 		os.Exit(1)
 	}
 	defer asr.Close()
 
-	// 200ms 音频块：每块 3200 样本
+	// 200ms audio chunks: 3200 samples each
 	chunkSamples := sampleRate * chunkMs / 1000
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -49,49 +49,49 @@ func main() {
 
 	audioStream := make(chan []float32, 4)
 
-	// 建立连接
-	log.Info("建立连接...")
+	// Establish connection
+	log.Info("establishing connection...")
 	resultChan, err := asr.StreamingRecognize(ctx, audioStream)
 	if err != nil {
-		log.Errorf("StreamingRecognize 失败: %v", err)
+		log.Errorf("StreamingRecognize failed: %v", err)
 		return
 	}
 
-	// 等待12秒
-	log.Info("等待12秒...")
+	// Wait 12 seconds
+	log.Info("waiting 12 seconds...")
 
-	// 发送10个数据包
-	log.Infof("发送 %d 个数据包...", packetCount)
+	// Send 10 packets
+	log.Infof("sending %d packets...", packetCount)
 	go func() {
 		defer close(audioStream)
 		for j := 0; j < packetCount; j++ {
 			chunk := make([]float32, chunkSamples)
-			// 静音，范围 [-1, 1] 的 0
+			// Silence: zeros in range [-1, 1]
 			select {
 			case audioStream <- chunk:
-				log.Infof("已发送第 %d/%d 个数据包", j+1, packetCount)
+				log.Infof("sent packet %d/%d", j+1, packetCount)
 			case <-ctx.Done():
 				return
 			}
 		}
-		log.Info("所有数据包发送完成")
+		log.Info("all packets sent")
 	}()
 
-	// 等待3秒
-	log.Info("等待3秒...")
+	// Wait 3 seconds
+	log.Info("waiting 3 seconds...")
 	time.Sleep(3 * time.Second)
 
-	// 获取结果
-	log.Info("获取结果...")
+	// Get results
+	log.Info("getting results...")
 	for r := range resultChan {
 		if r.Error != nil {
-			log.Errorf("识别错误: %v", r.Error)
+			log.Errorf("recognition error: %v", r.Error)
 			break
 		}
 		if r.Text != "" {
-			log.Infof("识别结果: %s (IsFinal=%v)", r.Text, r.IsFinal)
+			log.Infof("recognition result: %s (IsFinal=%v)", r.Text, r.IsFinal)
 		}
 	}
 
-	log.Info("测试结束")
+	log.Info("test finished")
 }
