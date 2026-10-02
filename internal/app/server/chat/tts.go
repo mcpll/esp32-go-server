@@ -167,8 +167,8 @@ func (t *TTSManager) debugState() string {
 		t.clientState.GetListenPhase(),
 		t.ttsActive.Load(),
 		t.clientState.GetTtsStart(),
-		t.clientState.IsWelcomeSpeaking,
-		t.clientState.IsWelcomePlaying,
+		t.clientState.GetWelcomeSpeaking(),
+		t.clientState.GetWelcomePlaying(),
 	)
 }
 

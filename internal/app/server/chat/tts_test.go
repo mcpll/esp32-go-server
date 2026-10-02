@@ -343,7 +343,7 @@ func TestStopAssistantOutputAfterAsrDrainsPendingUDPAudio(t *testing.T) {
 func TestTtsStopClearsWelcomePlaybackState(t *testing.T) {
 	session, conn, cleanup := newStartedTTSControlTestSession(t)
 	defer cleanup()
-	session.clientState.IsWelcomePlaying = true
+	session.clientState.SetWelcomePlaying(true)
 
 	session.ttsManager.EnqueueTtsStart(context.Background())
 
@@ -358,7 +358,7 @@ func TestTtsStopClearsWelcomePlaybackState(t *testing.T) {
 	if stopMsg.Type != msgdata.ServerMessageTypeTts || stopMsg.State != msgdata.MessageStateStop {
 		t.Fatalf("expected second server message to be tts stop, got type=%s state=%s", stopMsg.Type, stopMsg.State)
 	}
-	if session.clientState.IsWelcomePlaying {
+	if session.clientState.GetWelcomePlaying() {
 		t.Fatal("expected tts stop to clear welcome playing state")
 	}
 }

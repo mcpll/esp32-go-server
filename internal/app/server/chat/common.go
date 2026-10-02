@@ -60,7 +60,7 @@ func (s *ChatSession) stopSpeaking(cancelSession bool, isSendTtsStop bool, suspe
 		}
 	}
 
-	s.clientState.IsWelcomePlaying = false
+	s.clientState.SetWelcomePlaying(false)
 
 	s.ClearChatTextQueue()
 	s.llmManager.ClearLLMResponseQueue()
@@ -92,7 +92,7 @@ func (s *ChatSession) ResetToSilentState() {
 
 	if s.clientState != nil {
 		s.clientState.Abort = false
-		s.clientState.IsWelcomeSpeaking = false
+		s.clientState.SetWelcomeSpeaking(false)
 	}
 
 	s.stopSpeakingWithLock(true, true, true, "ChatSession.ResetToSilentState")
@@ -100,7 +100,7 @@ func (s *ChatSession) ResetToSilentState() {
 	if s.clientState != nil {
 		s.clientState.Destroy()
 		s.clientState.Abort = false
-		s.clientState.IsWelcomeSpeaking = false
-		s.clientState.IsWelcomePlaying = false
+		s.clientState.SetWelcomeSpeaking(false)
+		s.clientState.SetWelcomePlaying(false)
 	}
 }

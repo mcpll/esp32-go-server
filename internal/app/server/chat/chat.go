@@ -851,8 +851,8 @@ func (c *ChatManager) markMqttConversationStateStale(reason string) {
 		log.Infof("Device %s MQTT link rebuild, clear residual client state: reason=%s", c.DeviceID, reason)
 		c.clientState.Destroy()
 		c.clientState.Abort = false
-		c.clientState.IsWelcomeSpeaking = false
-		c.clientState.IsWelcomePlaying = false
+		c.clientState.SetWelcomeSpeaking(false)
+		c.clientState.SetWelcomePlaying(false)
 	}
 
 	c.resetSpeakPathAfterMqttRebootstrap(reason)

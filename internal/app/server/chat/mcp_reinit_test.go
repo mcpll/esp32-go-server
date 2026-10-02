@@ -111,9 +111,16 @@ func TestScheduleMcpInitLocked_DoesNotReinitializeHealthyRuntime(t *testing.T) {
 	case <-time.After(100 * time.Millisecond):
 	}
 
-	if manager.mcpInitState != chatMcpInitStateReady {
-		t.Fatalf("expected MCP init state to stay ready, got %v", manager.mcpInitState)
+	if readMcpInitState(manager) != chatMcpInitStateReady {
+		t.Fatalf("expected MCP init state to stay ready, got %v", readMcpInitState(manager))
 	}
+}
+
+// readMcpInitState reads the state under helloMu, the lock finishMcpInit writes it under.
+func readMcpInitState(manager *ChatManager) chatMcpInitState {
+	manager.helloMu.Lock()
+	defer manager.helloMu.Unlock()
+	return manager.mcpInitState
 }
 
 func waitForMcpInitState(t *testing.T, manager *ChatManager, want chatMcpInitState) {
@@ -121,11 +128,11 @@ func waitForMcpInitState(t *testing.T, manager *ChatManager, want chatMcpInitSta
 
 	deadline := time.Now().Add(time.Second)
 	for time.Now().Before(deadline) {
-		if manager.mcpInitState == want {
+		if readMcpInitState(manager) == want {
 			return
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	t.Fatalf("expected MCP init state %v, got %v", want, manager.mcpInitState)
+	t.Fatalf("expected MCP init state %v, got %v", want, readMcpInitState(manager))
 }

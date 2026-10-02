@@ -137,6 +137,10 @@ type ClientState struct {
 	MqttLastActiveTs int64         //last active timestamp
 	VadLastActiveTs  int64         //VAD last active time; disconnect if idle > 60s and not in TTS
 
+	// stateMu guards Status, ListenPhase, IsTtsStart, IsWelcomeSpeaking and IsWelcomePlaying.
+	// After construction use the accessors; several goroutines touch these fields.
+	stateMu sync.RWMutex
+
 	Status string //status: listening, llmStart, ttsStart
 
 	IsTtsStart        bool //whether TTS has started
@@ -324,11 +328,39 @@ func (c *ClientState) InitMessages(messages []*schema.Message) error {
 //history-message methods end
 
 func (c *ClientState) SetTtsStart(isStart bool) {
+	c.stateMu.Lock()
 	c.IsTtsStart = isStart
+	c.stateMu.Unlock()
 }
 
 func (c *ClientState) GetTtsStart() bool {
+	c.stateMu.RLock()
+	defer c.stateMu.RUnlock()
 	return c.IsTtsStart
+}
+
+func (c *ClientState) SetWelcomeSpeaking(v bool) {
+	c.stateMu.Lock()
+	c.IsWelcomeSpeaking = v
+	c.stateMu.Unlock()
+}
+
+func (c *ClientState) GetWelcomeSpeaking() bool {
+	c.stateMu.RLock()
+	defer c.stateMu.RUnlock()
+	return c.IsWelcomeSpeaking
+}
+
+func (c *ClientState) SetWelcomePlaying(v bool) {
+	c.stateMu.Lock()
+	c.IsWelcomePlaying = v
+	c.stateMu.Unlock()
+}
+
+func (c *ClientState) GetWelcomePlaying() bool {
+	c.stateMu.RLock()
+	defer c.stateMu.RUnlock()
+	return c.IsWelcomePlaying
 }
 
 func (c *ClientState) GetMaxIdleDuration() int64 {
@@ -467,18 +499,26 @@ func (c *ClientState) IsActive() bool {
 }
 
 func (c *ClientState) SetStatus(status string) {
+	c.stateMu.Lock()
 	c.Status = status
+	c.stateMu.Unlock()
 }
 
 func (c *ClientState) GetStatus() string {
+	c.stateMu.RLock()
+	defer c.stateMu.RUnlock()
 	return c.Status
 }
 
 func (c *ClientState) SetListenPhase(phase string) {
+	c.stateMu.Lock()
 	c.ListenPhase = phase
+	c.stateMu.Unlock()
 }
 
 func (c *ClientState) GetListenPhase() string {
+	c.stateMu.RLock()
+	defer c.stateMu.RUnlock()
 	return c.ListenPhase
 }
 

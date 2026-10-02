@@ -75,8 +75,8 @@ func TestHandleGoodByeMessageRetainsSessionAndResetsSilentState(t *testing.T) {
 	}
 	manager.pendingSpeakRequest = pending
 	manager.clientState.Abort = true
-	manager.clientState.IsWelcomeSpeaking = true
-	manager.clientState.IsWelcomePlaying = true
+	manager.clientState.SetWelcomeSpeaking(true)
+	manager.clientState.SetWelcomePlaying(true)
 	manager.clientState.SetStatus(ClientStatusTTSStart)
 	manager.clientState.SetListenPhase(ListenPhaseListening)
 	manager.clientState.SessionCtx.Get(manager.clientState.Ctx)
@@ -112,7 +112,7 @@ func TestHandleGoodByeMessageRetainsSessionAndResetsSilentState(t *testing.T) {
 	if manager.clientState.Abort {
 		t.Fatal("expected goodbye to clear abort flag")
 	}
-	if manager.clientState.IsWelcomeSpeaking || manager.clientState.IsWelcomePlaying {
+	if manager.clientState.GetWelcomeSpeaking() || manager.clientState.GetWelcomePlaying() {
 		t.Fatal("expected goodbye to clear welcome speaking flags")
 	}
 	if session.pendingSpeakerResult != nil {

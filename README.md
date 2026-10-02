@@ -33,6 +33,7 @@ The cgo dependencies (opus, onnxruntime) are in the builder stage of `docker/tes
 docker build --target builder -t esp32-go-builder -f docker/test/Dockerfile.server .
 go() { docker run --rm -v "$PWD":/app -v esp32-gomod:/go/pkg/mod -w /app esp32-go-builder go "$@"; }
 go build ./... && go vet ./... && go test ./...
+go test -race ./internal/app/... ./internal/data/...
 ```
 
 ## Local test stack (Docker)
