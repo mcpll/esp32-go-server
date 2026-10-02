@@ -54,8 +54,15 @@ services:
       context: ../../..
       dockerfile: docker/test/Dockerfile.server
     depends_on:
+      pocketbase:
+        condition: service_healthy
       redis:
         condition: service_healthy
+    # The server logs in to PocketBase with the same superuser the admin UI uses.
+    environment:
+      POCKETBASE_URL: http://pocketbase:8090
+      POCKETBASE_EMAIL: ${ADMIN_EMAIL:-owner@example.com}
+      POCKETBASE_PASSWORD: ${ADMIN_PASSWORD:-console-pass-123}
     volumes:
       - ../config.yaml:/workspace/config/config.yaml:ro
       - ../../../config/models:/workspace/config/models:ro

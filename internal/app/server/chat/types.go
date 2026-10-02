@@ -18,12 +18,6 @@ type ChatSessionOperator interface {
 	// LocalMcpPlayMusic Play music
 	LocalMcpPlayMusic(ctx context.Context, params *PlayMusicParams) error
 
-	// LocalMcpSwitchDeviceRole switch device role by name (fuzzy match)
-	LocalMcpSwitchDeviceRole(ctx context.Context, roleName string) (string, error)
-
-	// LocalMcpRestoreDeviceDefaultRole restore the device default role
-	LocalMcpRestoreDeviceDefaultRole(ctx context.Context) error
-
 	// LocalMcpSearchKnowledge search knowledge bases linked to the current agent
 	LocalMcpSearchKnowledge(ctx context.Context, query string, topK int, knowledgeBaseIDs []uint) ([]config_types.KnowledgeSearchHit, error)
 

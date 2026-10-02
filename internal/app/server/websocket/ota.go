@@ -34,7 +34,7 @@ func (s *WebSocketServer) handleOta(w http.ResponseWriter, r *http.Request) {
 
 	if deviceId == "" || clientId == "" {
 		log.Errorf("missing Device-Id or Client-Id")
-		http.Error(w, "缺少Device-Id或Client-Id", http.StatusBadRequest)
+		http.Error(w, "missing Device-Id or Client-Id", http.StatusBadRequest)
 		return
 	}
 
@@ -54,15 +54,25 @@ func (s *WebSocketServer) handleOta(w http.ResponseWriter, r *http.Request) {
 	log.Debugf("authEnable: %v", authEnable)
 	if authEnable {
 		configProvider, err := user_config.GetProvider(viper.GetString("config_provider.type"))
+		if err != nil {
+			log.Errorf("failed to get config provider: %v", err)
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
 		// Check whether this deviceId is activated
 		isActivited, err := configProvider.IsDeviceActivated(r.Context(), deviceId, clientId)
 		if err != nil {
 			log.Errorf("failed to check device activation: %v", err)
-			http.Error(w, "内部服务器错误", http.StatusInternalServerError)
+			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
 		}
 		if !isActivited {
 			code, challenge, msg, timeoutMs := configProvider.GetActivationInfo(r.Context(), deviceId, clientId)
+			if code == "" {
+				log.Errorf("no activation info for device %s", deviceId)
+				http.Error(w, "internal server error", http.StatusInternalServerError)
+				return
+			}
 			activationInfo = &ActivationInfo{
 				Code:      code,
 				Message:   msg,
@@ -103,7 +113,7 @@ func (s *WebSocketServer) handleOta(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(respData); err != nil {
 		log.Errorf("failed to serialize OTA response: %v", err)
-		http.Error(w, "内部服务器错误", http.StatusInternalServerError)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 	return
@@ -138,18 +148,18 @@ func (s *WebSocketServer) handleOtaActivate(w http.ResponseWriter, r *http.Reque
 	clientId := r.Header.Get("Client-Id")
 	if deviceId == "" || clientId == "" {
 		log.Errorf("missing Device-Id or Client-Id")
-		http.Error(w, "缺少Device-Id或Client-Id", http.StatusBadRequest)
+		http.Error(w, "missing Device-Id or Client-Id", http.StatusBadRequest)
 		return
 	}
 	var req ActivationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		log.Errorf("failed to parse activation request: %v", err)
-		http.Error(w, "请求体解析失败", http.StatusBadRequest)
+		http.Error(w, "failed to parse request body", http.StatusBadRequest)
 		return
 	}
 	// Validate algorithm
 	if req.Payload.Algorithm != "hmac-sha256" {
-		http.Error(w, "不支持的算法", http.StatusBadRequest)
+		http.Error(w, "unsupported algorithm", http.StatusBadRequest)
 		return
 	}
 
@@ -157,21 +167,21 @@ func (s *WebSocketServer) handleOtaActivate(w http.ResponseWriter, r *http.Reque
 	configProvider, err := user_config.GetProvider(viper.GetString("config_provider.type"))
 	if err != nil {
 		log.Errorf("failed to get config Provider: %v", err)
-		http.Error(w, "内部服务器错误", http.StatusInternalServerError)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 	ok, err := configProvider.VerifyChallenge(r.Context(), deviceId, clientId, req.Payload)
 	if err != nil {
 		log.Errorf("device activation verification failed: %v", err)
-		http.Error(w, "设备激活校验失败", http.StatusInternalServerError)
+		http.Error(w, "device activation check failed", http.StatusInternalServerError)
 		return
 	}
 	if !ok {
 		log.Warnf("device activation verification not passed: deviceId=%s, clientId=%s", deviceId, clientId)
-		http.Error(w, "设备激活校验未通过", http.StatusAccepted)
+		http.Error(w, "device activation check not passed", http.StatusAccepted)
 		return
 	}
 	// Activation succeeded, return 200
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("激活成功"))
+	w.Write([]byte("activated"))
 }

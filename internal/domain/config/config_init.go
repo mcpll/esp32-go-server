@@ -3,50 +3,58 @@ package user_config
 import (
 	"context"
 	"fmt"
-	log "xiaozhi-esp32-server-golang/logger"
+	"strings"
+	"sync"
 
-	"xiaozhi-esp32-server-golang/internal/domain/config/manager"
-	"xiaozhi-esp32-server-golang/internal/domain/config/memory"
-	redis_config "xiaozhi-esp32-server-golang/internal/domain/config/redis"
+	log "xiaozhi-esp32-server-golang/logger"
 
 	"github.com/spf13/viper"
 )
 
 var (
-	// managerSystemConfigHandlers callbacks on WebSocket system_config push; main may register multiple (merge to viper, hot-reload services)
-	managerSystemConfigHandlers []func(map[string]interface{})
+	systemConfigMu       sync.RWMutex
+	systemConfigHandlers []func(map[string]interface{})
 )
 
-// RegisterManagerSystemConfigHandler registers system-config push callbacks in manager mode; call before InitConfigSystem; may append multiple
-func RegisterManagerSystemConfigHandler(fn func(map[string]interface{})) {
-	managerSystemConfigHandlers = append(managerSystemConfigHandlers, fn)
+// RegisterSystemConfigHandler registers a callback for system config (the settings blocks) that
+// arrives after startup, for example when PocketBase answers late. Several handlers may be registered.
+func RegisterSystemConfigHandler(fn func(map[string]interface{})) {
+	systemConfigMu.Lock()
+	defer systemConfigMu.Unlock()
+	systemConfigHandlers = append(systemConfigHandlers, fn)
 }
 
-// InitConfigSystem initializes the config system
-// Calls Init on the config package matching config_provider.type
-func InitConfigSystem(ctx context.Context) error {
-	// Get config provider type
-	providerType := viper.GetString("config_provider.type")
-	if providerType == "" {
-		providerType = "redis" // default to redis
-		log.Infof("config_provider.type not set, using default: redis")
+// DispatchSystemConfig hands system config to the registered handlers.
+// It reports false when there is none, so the caller can merge the config itself.
+func DispatchSystemConfig(data map[string]interface{}) bool {
+	systemConfigMu.RLock()
+	handlers := append([]func(map[string]interface{}){}, systemConfigHandlers...)
+	systemConfigMu.RUnlock()
+	for _, h := range handlers {
+		h(data)
 	}
+	return len(handlers) > 0
+}
 
+// InitConfigSystem starts the config provider selected by config_provider.type.
+// onSystemConfig receives the system config: before this returns when PocketBase answers,
+// otherwise from a background retry once it does. The server starts either way.
+func InitConfigSystem(ctx context.Context, onSystemConfig func(map[string]interface{})) error {
+	providerType := strings.TrimSpace(viper.GetString("config_provider.type"))
+	if providerType == "" {
+		providerType = ProviderPocketBase
+		log.Infof("config_provider.type not set, using default: %s", providerType)
+	}
 	log.Infof("Initializing config system with provider: %s", providerType)
 
-	// Call Init for the selected provider type
 	switch providerType {
-	case "manager":
-		manager.SetSystemConfigPushHandler(func(data map[string]interface{}) {
-			for _, h := range managerSystemConfigHandlers {
-				h(data)
-			}
-		})
-		return manager.Init(ctx)
-	case "redis":
-		return redis_config.Init(ctx)
-	case "memory":
-		return memory.Init(ctx)
+	case ProviderPocketBase:
+		provider, err := sharedPocketBase()
+		if err != nil {
+			return err
+		}
+		provider.Start(ctx, onSystemConfig)
+		return nil
 	default:
 		return fmt.Errorf("unsupported config provider type: %s", providerType)
 	}

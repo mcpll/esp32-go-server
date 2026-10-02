@@ -203,7 +203,8 @@ migrate((app) => {
       realtime_mode: 4,
     },
     vad: {
-      provider: "ten_vad",
+      // ten_vad has no linux/arm64 build, and the Pi is arm64; silero_vad runs everywhere.
+      provider: "silero_vad",
     },
   }
   for (const key of Object.keys(settingsSeed)) {

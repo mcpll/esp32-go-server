@@ -2,26 +2,20 @@ package server
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"hash/fnv"
 	"runtime"
 	"sync"
-	"time"
 
 	data_client "xiaozhi-esp32-server-golang/internal/data/client"
-	"xiaozhi-esp32-server-golang/internal/data/history"
 	"xiaozhi-esp32-server-golang/internal/domain/eventbus"
 	"xiaozhi-esp32-server-golang/internal/domain/memory/llm_memory"
-	"xiaozhi-esp32-server-golang/internal/util"
 	log "xiaozhi-esp32-server-golang/logger"
 
-	"github.com/cloudwego/eino/schema"
 	"github.com/spf13/viper"
 )
 
 var (
-	// MessageWorkerNum message worker count (based on CPU cores; shared config for Redis+History)
+	// MessageWorkerNum message worker count (based on CPU cores)
 	// Must be a power of 2 for hash distribution
 	MessageWorkerNum = getMessageWorkerNum()
 )
@@ -49,9 +43,8 @@ func getMessageWorkerNum() int {
 
 // MessageWorker message worker
 // Fixed-size goroutine pool; route by SessionID hash so one session stays ordered
-// Handles Redis, MemoryProvider, and History messages uniformly
+// Handles Redis short memory and the long-term memory provider
 type MessageWorker struct {
-	client  *history.HistoryClient
 	workers []chan *eventbus.AddMessageEvent // channel per worker
 	ctx     context.Context
 	cancel  context.CancelFunc
@@ -59,12 +52,10 @@ type MessageWorker struct {
 }
 
 // NewMessageWorker creates the message worker
-func NewMessageWorker(cfg history.HistoryClientConfig) *MessageWorker {
-	client := history.NewHistoryClient(cfg)
+func NewMessageWorker() *MessageWorker {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	worker := &MessageWorker{
-		client:  client,
 		workers: make([]chan *eventbus.AddMessageEvent, MessageWorkerNum),
 		ctx:     ctx,
 		cancel:  cancel,
@@ -78,7 +69,7 @@ func NewMessageWorker(cfg history.HistoryClientConfig) *MessageWorker {
 	}
 
 	worker.subscribeEvents()
-	log.Infof("MessageWorker initialized, started %d worker goroutines (Redis+MemoryProvider+History)", MessageWorkerNum)
+	log.Infof("MessageWorker initialized, started %d worker goroutines (Redis short memory + memory provider)", MessageWorkerNum)
 	return worker
 }
 
@@ -115,31 +106,22 @@ func (w *MessageWorker) workerLoop(index int) {
 }
 
 // processMessage process message (runs in order on the worker goroutine)
-// Handle Redis, MemoryProvider, and History; keep order per device/session
+// Handles Redis short memory and the memory provider; keeps order per device/session
 func (w *MessageWorker) processMessage(event *eventbus.AddMessageEvent) {
-	// 1. Handle History (all messages)
-	// Use a separate context unaffected by event.ClientState.Ctx so history save survives chat cancel
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	// Decide create vs update
+	// Audio updates of an already-saved message only mattered for the removed history store
 	if event.IsUpdate {
-		// Phase 2: update audio
-		w.updateMessageAudio(ctx, event)
-	} else {
-		// Phase 1: save text message (includes Redis)
-		w.saveMessageText(ctx, event)
+		return
 	}
 
-	// 2. Handle MemoryProvider (only when !IsUpdate; independent of redis/manager)
-	// Long-term memory (memobase/mem0); needed for both redis and manager
-	if !event.IsUpdate {
-		w.processMemoryProvider(event)
-	}
+	// 1. Redis short memory (for LLM context)
+	w.saveShortMemory(event)
+
+	// 2. Long-term memory provider (memobase/mem0)
+	w.processMemoryProvider(event)
 }
 
 // processMemoryProvider handle long-term memory (memobase/mem0)
-// Independent of redis/manager; always process
+// Only acts in long memory mode
 func (w *MessageWorker) processMemoryProvider(event *eventbus.AddMessageEvent) {
 	clientState := event.ClientState
 	if clientState.MemoryProvider == nil {
@@ -208,191 +190,16 @@ func (w *MessageWorker) handleAddMessage(event *eventbus.AddMessageEvent) {
 	}
 }
 
-// saveMessageText save text message (phase 1, or text+audio in one shot)
-// Includes Redis handling when config_provider.type is redis
-func (w *MessageWorker) saveMessageText(ctx context.Context, event *eventbus.AddMessageEvent) {
-	// Handle Redis (only when config_provider.type is redis)
-	// Append to Redis message list (for LLM context)
-	providerType := viper.GetString("config_provider.type")
-	if providerType == "redis" {
-		clientState := event.ClientState
-		llm_memory.Get().AddMessage(
-			clientState.Ctx,
-			clientState.DeviceID,
-			clientState.AgentID,
-			event.Msg)
+// saveShortMemory appends the message to the Redis message list used as LLM context.
+// It only runs when Redis is enabled and the agent's memory mode is not none.
+func (w *MessageWorker) saveShortMemory(event *eventbus.AddMessageEvent) {
+	clientState := event.ClientState
+	if !viper.GetBool("redis.enable") || clientState.GetMemoryMode() == data_client.MemoryModeNone {
 		return
 	}
-
-	// Determine message role
-	var role history.MessageType
-	switch event.Msg.Role {
-	case schema.User:
-		role = history.MessageTypeUser
-	case schema.Assistant:
-		role = history.MessageTypeAssistant
-	case schema.Tool:
-		role = history.MessageTypeTool
-	case schema.System:
-		role = history.MessageTypeSystem
-	default:
-		log.Warnf("unsupported message role: %s", event.Msg.Role)
-		return
-	}
-
-	// Convert audio format if present
-	var audioBase64 string
-	var audioFormat string
-	var audioSize int
-
-	if len(event.AudioData) > 0 {
-		// ASR message: text and audio together, save once
-		var wavData []byte
-		var err error
-
-		// Pick audio conversion by message role
-		if event.Msg.Role == schema.User {
-			// User message (ASR): PCM float32
-			if len(event.AudioData) > 0 {
-				wavData, err = util.PCMFloat32BytesToWav(
-					event.AudioData[0], // User message has a single element
-					event.SampleRate,
-					event.Channels)
-			}
-		} else {
-			// Assistant message (TTS): Opus (should not land here; Assistant uses two-phase save)
-			wavData, err = util.OpusFramesToWav(
-				event.AudioData,
-				event.SampleRate,
-				event.Channels)
-		}
-
-		if err != nil {
-			log.Errorf("audio conversion failed, device_id: %s, message_id: %s, role: %s, error: %v",
-				event.ClientState.DeviceID, event.MessageID, event.Msg.Role, err)
-			// Fallback: concatenate all frames
-			var fallbackData []byte
-			for _, frame := range event.AudioData {
-				fallbackData = append(fallbackData, frame...)
-			}
-			audioBase64 = base64.StdEncoding.EncodeToString(fallbackData)
-			audioSize = event.AudioSize
-			audioFormat = "raw" // Fallback uses raw format
-		} else {
-			audioBase64 = base64.StdEncoding.EncodeToString(wavData)
-			audioSize = len(wavData)
-			audioFormat = "wav"
-		}
-	}
-
-	// Build Metadata (timestamp only)
-	metadata := map[string]interface{}{
-		"timestamp": event.Timestamp.Format(time.RFC3339),
-	}
-
-	// Prepare tool-call fields
-	var toolCallID string
-	var toolCallsJSON *string
-
-	// Tool role: save tool_call_id
-	if event.Msg.Role == schema.Tool && event.Msg.ToolCallID != "" {
-		toolCallID = event.Msg.ToolCallID
-	}
-
-	// Assistant role: save ToolCalls if any
-	if event.Msg.Role == schema.Assistant && len(event.Msg.ToolCalls) > 0 {
-		// Serialize ToolCalls to JSON string
-		toolCallsBytes, err := json.Marshal(event.Msg.ToolCalls)
-		if err != nil {
-			log.Warnf("failed to serialize ToolCalls, device_id: %s, message_id: %s, error: %v",
-				event.ClientState.DeviceID, event.MessageID, err)
-		} else {
-			jsonStr := string(toolCallsBytes)
-			toolCallsJSON = &jsonStr
-		}
-	}
-
-	req := &history.SaveMessageRequest{
-		MessageID:     event.MessageID,
-		DeviceID:      event.ClientState.DeviceID,
-		AgentID:       event.ClientState.AgentID,
-		SessionID:     event.ClientState.SessionID,
-		Role:          role,
-		Content:       event.Msg.Content,
-		ToolCallID:    toolCallID,
-		ToolCallsJSON: toolCallsJSON,
-		AudioData:     audioBase64,
-		AudioFormat:   audioFormat,
-		AudioSize:     audioSize,
-		Metadata:      metadata,
-	}
-
-	if err := w.client.SaveMessage(ctx, req); err != nil {
-		log.Errorf("failed to save message, device_id: %s, message_id: %s, error: %v",
-			event.ClientState.DeviceID, event.MessageID, err)
-	}
-}
-
-// updateMessageAudio update message audio (phase 2)
-func (w *MessageWorker) updateMessageAudio(ctx context.Context, event *eventbus.AddMessageEvent) {
-	// Convert audio format
-	var audioBase64 string
-	var audioSize int
-
-	if len(event.AudioData) > 0 {
-		var wavData []byte
-		var err error
-
-		// Pick audio conversion by message role
-		// User message (ASR): PCM float32 via PCMFloat32BytesToWav
-		// Assistant message (TTS): Opus via OpusFramesToWav
-		if event.Msg.Role == schema.User {
-			// User message: PCM float32
-			// event.AudioData is [][]byte, but User has one element (full PCM float32 bytes)
-			if len(event.AudioData) > 0 {
-				wavData, err = util.PCMFloat32BytesToWav(
-					event.AudioData[0], // User message has a single element
-					event.SampleRate,
-					event.Channels)
-			}
-		} else {
-			// Assistant message: Opus
-			wavData, err = util.OpusFramesToWav(
-				event.AudioData,
-				event.SampleRate,
-				event.Channels)
-		}
-
-		if err != nil {
-			log.Errorf("audio conversion failed, device_id: %s, message_id: %s, role: %s, error: %v",
-				event.ClientState.DeviceID, event.MessageID, event.Msg.Role, err)
-			// Fallback: concatenate all frames
-			var fallbackData []byte
-			for _, frame := range event.AudioData {
-				fallbackData = append(fallbackData, frame...)
-			}
-			audioBase64 = base64.StdEncoding.EncodeToString(fallbackData)
-			audioSize = event.AudioSize
-		} else {
-			audioBase64 = base64.StdEncoding.EncodeToString(wavData)
-			audioSize = len(wavData)
-		}
-	}
-
-	// Build update request
-	req := &history.UpdateMessageAudioRequest{
-		MessageID:   event.MessageID,
-		AudioData:   audioBase64,
-		AudioFormat: "wav",
-		AudioSize:   audioSize,
-		Metadata: map[string]interface{}{
-			"tts_duration": event.TTSDuration,
-		},
-	}
-
-	// Call update API
-	if err := w.client.UpdateMessageAudio(ctx, req); err != nil {
-		log.Errorf("failed to update message audio, device_id: %s, message_id: %s, error: %v",
-			event.ClientState.DeviceID, event.MessageID, err)
-	}
+	llm_memory.Get().AddMessage(
+		clientState.Ctx,
+		clientState.DeviceID,
+		clientState.AgentID,
+		event.Msg)
 }

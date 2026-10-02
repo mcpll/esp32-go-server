@@ -2,7 +2,7 @@
 
 A personal Italian voice server for Xiaozhi ESP32 devices, built as a fork of [hackers365/xiaozhi-esp32-server-golang](https://github.com/hackers365/xiaozhi-esp32-server-golang) (MIT).
 
-> **Status: import.** The upstream code is imported at commit [`21f1a2e`](https://github.com/hackers365/xiaozhi-esp32-server-golang/commit/21f1a2e71ff383723f1464ea9b137016e6feab8d) with its history. Pruning and the PocketBase provider come next, so this tree still builds and behaves as upstream.
+> **Status: import.** The upstream code is imported at commit [`21f1a2e`](https://github.com/hackers365/xiaozhi-esp32-server-golang/commit/21f1a2e71ff383723f1464ea9b137016e6feab8d) with its history. The PocketBase config provider has replaced the upstream manager, history client and role tools; the console and the `commands` channel come next.
 
 ## Fork of upstream
 
@@ -41,7 +41,14 @@ docker compose -f $F up --build                       # PocketBase admin UI at h
 docker compose -f $F down -v                          # reset all data
 ```
 
-The first boot creates the console user (a record in the `users` collection, for the future console, not for the PocketBase admin UI) from `ADMIN_EMAIL` and `ADMIN_PASSWORD` (defaults `owner@example.com` / `console-pass-123`; override them in your shell). The admin UI at `/_/` only accepts a superuser, so every start also upserts a superuser with the same `ADMIN_EMAIL` and `ADMIN_PASSWORD` (password of at least 8 characters); it survives `down -v`. The server does not talk to PocketBase yet and the ASR/LLM/TTS providers in `docker/test/config.yaml` are placeholders, so the stack checks that it boots, not that a voice turn works.
+The first boot creates the console user (a record in the `users` collection, for the future console, not for the PocketBase admin UI) from `ADMIN_EMAIL` and `ADMIN_PASSWORD` (defaults `owner@example.com` / `console-pass-123`; override them in your shell). The admin UI at `/_/` only accepts a superuser, so every start also upserts a superuser with the same `ADMIN_EMAIL` and `ADMIN_PASSWORD` (password of at least 8 characters); it survives `down -v`. The server logs in to PocketBase as that superuser (`POCKETBASE_URL`, `POCKETBASE_EMAIL`, `POCKETBASE_PASSWORD`), reads the `settings` collection at startup and the agent of each device at the start of every session. If PocketBase is down at startup the server still comes up and retries in the background. The ASR/LLM/TTS keys in `docker/test/config.yaml` are placeholders, so the stack checks that it boots and activates devices, not that a voice turn works.
+
+Activating a device by hand:
+
+1. Point the device at `http://<host>:8989/xiaozhi/ota/`. The OTA response carries a six-digit `activation.code`, and a `devices` record appears in PocketBase with `activated=false`.
+2. In the admin UI, open that `devices` record, set `agent` to the seeded agent and tick `activated`.
+3. The next OTA response has no `activation` block and the device can talk. Edits to the agent (prompt, providers) apply to the next session.
+4. In the `settings` collection, record `ota`, fill in `test.websocket.url` (for LAN clients) and `external.websocket.url` so the device gets a WebSocket address.
 
 ## Roadmap
 

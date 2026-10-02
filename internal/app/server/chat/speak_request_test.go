@@ -151,7 +151,7 @@ func TestHandleHelloRejectsUnsupportedTransportBeforeSession(t *testing.T) {
 		},
 	})
 
-	if err == nil || !strings.Contains(err.Error(), "不支持的传输类型") {
+	if err == nil || !strings.Contains(err.Error(), "unsupported transport type") {
 		t.Fatalf("expected unsupported transport error, got %v", err)
 	}
 	if manager.helloInited {
@@ -202,14 +202,14 @@ func TestPrepareSpeakPathForInjectedSpeechSendsSpeakRequestAndWaitsForReady(t *t
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- manager.prepareSpeakPathForInjectedSpeech("主动播报内容", false)
+		errCh <- manager.prepareSpeakPathForInjectedSpeech("contenuto annunciato", false)
 	}()
 
 	serverMsg := waitForServerMessage(t, conn, 0)
 	if serverMsg.Type != msgdata.ServerMessageTypeSpeakRequest {
 		t.Fatalf("expected speak_request, got %s", serverMsg.Type)
 	}
-	if serverMsg.Text != "主动播报内容" {
+	if serverMsg.Text != "contenuto annunciato" {
 		t.Fatalf("expected speak_request text to be forwarded, got %q", serverMsg.Text)
 	}
 	if serverMsg.SessionID != manager.clientState.SessionID {
@@ -253,7 +253,7 @@ func TestPrepareSpeakPathForInjectedSpeechForwardsAutoListenFlag(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- manager.prepareSpeakPathForInjectedSpeech("主动播报自动续听", true)
+		errCh <- manager.prepareSpeakPathForInjectedSpeech("annuncio con ascolto automatico", true)
 	}()
 
 	serverMsg := waitForServerMessage(t, conn, 0)
@@ -292,13 +292,13 @@ func TestPrepareSpeakPathForInjectedSpeechReusesPendingSpeakRequest(t *testing.T
 	errCh1 := make(chan error, 1)
 	errCh2 := make(chan error, 1)
 	go func() {
-		errCh1 <- manager.prepareSpeakPathForInjectedSpeech("第一次播报", false)
+		errCh1 <- manager.prepareSpeakPathForInjectedSpeech("primo annuncio", false)
 	}()
 
 	_ = waitForServerMessage(t, conn, 0)
 
 	go func() {
-		errCh2 <- manager.prepareSpeakPathForInjectedSpeech("第二次播报", false)
+		errCh2 <- manager.prepareSpeakPathForInjectedSpeech("secondo annuncio", false)
 	}()
 
 	time.Sleep(30 * time.Millisecond)
@@ -339,7 +339,7 @@ func TestPrepareSpeakPathForInjectedSpeechAllocatesSessionIDWhenMissing(t *testi
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- manager.prepareSpeakPathForInjectedSpeech("自动分配会话", false)
+		errCh <- manager.prepareSpeakPathForInjectedSpeech("sessione assegnata automaticamente", false)
 	}()
 
 	serverMsg := waitForServerMessage(t, conn, 0)
@@ -382,11 +382,11 @@ func TestPrepareSpeakPathForInjectedSpeechTimesOut(t *testing.T) {
 	manager, conn := newSpeakRequestTestManager(types_conn.TransportTypeMqttUdp)
 	manager.speakReadyTimeout = 30 * time.Millisecond
 
-	err := manager.prepareSpeakPathForInjectedSpeech("超时播报", false)
+	err := manager.prepareSpeakPathForInjectedSpeech("annuncio in timeout", false)
 	if err == nil {
 		t.Fatal("expected prepareSpeakPathForInjectedSpeech to time out")
 	}
-	if !errors.Is(err, context.DeadlineExceeded) && err.Error() != "等待 speak_ready 超时" {
+	if !errors.Is(err, context.DeadlineExceeded) && err.Error() != "timed out waiting for speak_ready" {
 		t.Fatalf("expected speak_ready timeout error, got %v", err)
 	}
 	if conn.sentCmdCount() != 1 {
@@ -406,7 +406,7 @@ func TestInjectMessageWithSkipLlmFalseStillSendsSpeakRequest(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- manager.InjectMessage("需要先过LLM", false, false)
+		errCh <- manager.InjectMessage("passa prima dal LLM", false, false)
 	}()
 
 	serverMsg := waitForServerMessage(t, conn, 0)
@@ -441,7 +441,7 @@ func TestInjectMessageWithSkipLlmFalseStillSendsSpeakRequest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected injected message to enter chat queue, got %v", err)
 	}
-	if item.text != "需要先过LLM" {
+	if item.text != "passa prima dal LLM" {
 		t.Fatalf("expected injected text to be queued, got %q", item.text)
 	}
 }
@@ -453,7 +453,7 @@ func TestInjectMessageWaitsForSessionBootstrapAfterSpeakReady(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- manager.InjectMessage("等待会话建立", false, false)
+		errCh <- manager.InjectMessage("attesa della sessione", false, false)
 	}()
 
 	serverMsg := waitForServerMessage(t, conn, 0)
@@ -500,7 +500,7 @@ func TestInjectMessageWaitsForSessionBootstrapAfterSpeakReady(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected injected message to enter chat queue, got %v", err)
 	}
-	if item.text != "等待会话建立" {
+	if item.text != "attesa della sessione" {
 		t.Fatalf("expected injected text to be queued, got %q", item.text)
 	}
 }
@@ -513,7 +513,7 @@ func TestInjectMessageTimesOutWhenSessionBootstrapDoesNotFinish(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- manager.InjectMessage("会话超时", false, false)
+		errCh <- manager.InjectMessage("sessione in timeout", false, false)
 	}()
 
 	serverMsg := waitForServerMessage(t, conn, 0)
@@ -537,7 +537,7 @@ func TestInjectMessageTimesOutWhenSessionBootstrapDoesNotFinish(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected InjectMessage to time out while waiting for ChatSession")
 		}
-		if !strings.Contains(err.Error(), "等待 ChatSession 建立超时") {
+		if !strings.Contains(err.Error(), "timed out waiting for ChatSession") {
 			t.Fatalf("expected ChatSession wait timeout error, got %v", err)
 		}
 	case <-time.After(time.Second):
@@ -577,7 +577,7 @@ func TestAddAsrResultToQueueWithOptionsCarriesPlaybackStartHook(t *testing.T) {
 	}
 
 	startedCount := 0
-	if err := session.AddAsrResultToQueueWithOptions("需要走LLM", nil, llmResponseChannelOptions{
+	if err := session.AddAsrResultToQueueWithOptions("passa dal LLM", nil, llmResponseChannelOptions{
 		onTTSPlaybackStart: func() {
 			startedCount++
 		},
@@ -612,7 +612,7 @@ func TestAddAsrResultToQueueWithOptionsCarriesTurnEndPolicy(t *testing.T) {
 		chatTextQueue: util.NewQueue[AsrResponseChannelItem](1),
 	}
 
-	if err := session.AddAsrResultToQueueWithOptions("需要走LLM", nil, llmResponseChannelOptions{
+	if err := session.AddAsrResultToQueueWithOptions("passa dal LLM", nil, llmResponseChannelOptions{
 		ttsTurnEndPolicy: ttsTurnEndPolicyGoodbyeAndIdle,
 	}); err != nil {
 		t.Fatalf("AddAsrResultToQueueWithOptions returned error: %v", err)
@@ -634,7 +634,7 @@ func TestAddTextToTTSQueueWithOptionsKeepsPlaybackHookOutOfQueueStart(t *testing
 	llmManager := NewLLMManager(manager.clientState, NewServerTransport(conn, manager.clientState), ttsManager, nil, nil)
 
 	startedCount := 0
-	if err := llmManager.AddTextToTTSQueueWithOptions("直接播报", llmResponseChannelOptions{
+	if err := llmManager.AddTextToTTSQueueWithOptions("annuncio diretto", llmResponseChannelOptions{
 		onTTSPlaybackStart: func() {
 			startedCount++
 		},
@@ -672,7 +672,7 @@ func TestAddTextToTTSQueueWithOptionsCarriesTurnEndPolicy(t *testing.T) {
 	ttsManager := NewTTSManager(manager.clientState, NewServerTransport(conn, manager.clientState), nil)
 	llmManager := NewLLMManager(manager.clientState, NewServerTransport(conn, manager.clientState), ttsManager, nil, nil)
 
-	if err := llmManager.AddTextToTTSQueueWithOptions("直接播报", llmResponseChannelOptions{
+	if err := llmManager.AddTextToTTSQueueWithOptions("annuncio diretto", llmResponseChannelOptions{
 		ttsTurnEndPolicy: ttsTurnEndPolicyGoodbyeAndIdle,
 	}); err != nil {
 		t.Fatalf("AddTextToTTSQueueWithOptions returned error: %v", err)

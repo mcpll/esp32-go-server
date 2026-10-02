@@ -19,9 +19,9 @@ import (
 
 func main() {
 	// parse command-line flags
-	configFile := flag.String("c", defaultConfigFilePath, "配置文件路径")
-	asrEnable := flag.Bool("asr-enable", defaultAsrEnable, "是否启用内嵌 asr_server")
-	asrConfig := flag.String("asr-config", "", "asr_server 配置文件路径，启用时可选，默认 asr_server/config.json")
+	configFile := flag.String("c", defaultConfigFilePath, "config file path")
+	asrEnable := flag.Bool("asr-enable", defaultAsrEnable, "run the embedded asr_server")
+	asrConfig := flag.String("asr-config", "", "asr_server config file path, optional when it is enabled, default asr_server/config.json")
 	flag.Parse()
 
 	if *configFile == "" {
@@ -55,8 +55,8 @@ func main() {
 	appInstance := server.NewApp()
 
 	var lock sync.RWMutex
-	// register system_config hot-reload: compare viper config with pushed config; merge and hot-reload only when content changed
-	user_config.RegisterManagerSystemConfigHandler(func(data map[string]interface{}) {
+	// register system config hot-reload: compare viper config with the new config; merge and hot-reload only when content changed
+	user_config.RegisterSystemConfigHandler(func(data map[string]interface{}) {
 		lock.Lock()
 		defer lock.Unlock()
 		current := viper.AllSettings()
@@ -132,8 +132,6 @@ func main() {
 
 	log.Info("Shutting down server...")
 
-	// stop the periodic config-update service
-	StopPeriodicConfigUpdate()
 	if *asrEnable {
 		StopAsrServerHTTP()
 	}

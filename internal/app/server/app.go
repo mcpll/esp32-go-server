@@ -12,13 +12,11 @@ import (
 	"xiaozhi-esp32-server-golang/internal/app/server/mqtt_udp"
 	"xiaozhi-esp32-server-golang/internal/app/server/types"
 	"xiaozhi-esp32-server-golang/internal/app/server/websocket"
-	"xiaozhi-esp32-server-golang/internal/data/history"
 	user_config "xiaozhi-esp32-server-golang/internal/domain/config"
 	config_types "xiaozhi-esp32-server-golang/internal/domain/config/types"
 	"xiaozhi-esp32-server-golang/internal/domain/mcp"
 	"xiaozhi-esp32-server-golang/internal/domain/openclaw"
 	"xiaozhi-esp32-server-golang/internal/pool"
-	"xiaozhi-esp32-server-golang/internal/util"
 	log "xiaozhi-esp32-server-golang/logger"
 
 	cmap "github.com/orcaman/concurrent-map/v2"
@@ -86,7 +84,7 @@ func (a *App) Run() {
 	ctx := context.Background()
 	pool.StartStatsMonitor(ctx, 5*time.Minute)
 
-	// Start pool stats reporter (every 5s to manager backend)
+	// Start pool stats reporter (every 5s)
 	pool.StartStatsReporter(ctx)
 
 	select {} // Block the main goroutine
@@ -103,14 +101,8 @@ func (app *App) initEventHandle() {
 		return
 	}
 
-	// Init message worker (always on; Redis+MemoryProvider+History)
-	historyCfg := history.HistoryClientConfig{
-		BaseURL:   util.GetBackendURL(),
-		AuthToken: util.GetManagerAuthToken(),
-		Timeout:   viper.GetDuration("manager.history_timeout"),
-		Enabled:   true, // Always enabled
-	}
-	NewMessageWorker(historyCfg)
+	// Init message worker (always on; Redis short memory and long-term memory provider)
+	NewMessageWorker()
 	log.Info("Message handler initialized")
 }
 

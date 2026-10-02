@@ -15,7 +15,6 @@ import (
 	"github.com/spf13/viper"
 
 	. "xiaozhi-esp32-server-golang/internal/data/client"
-	"xiaozhi-esp32-server-golang/internal/data/history"
 	. "xiaozhi-esp32-server-golang/internal/data/msg"
 	chathooks "xiaozhi-esp32-server-golang/internal/domain/chat/hooks"
 	"xiaozhi-esp32-server-golang/internal/domain/chat/streamtransform"
@@ -264,7 +263,7 @@ func (s *ChatSession) Start(pctx context.Context) error {
 	s.ctx, s.cancel = context.WithCancel(pctx)
 
 	if s.clientState.InputAudioFormat.SampleRate <= 0 || s.clientState.InputAudioFormat.Channels <= 0 {
-		return fmt.Errorf("输入音频格式未初始化，请先完成 hello 握手")
+		return fmt.Errorf("input audio format is not initialized, finish the hello handshake first")
 	}
 
 	err := s.InitAsrLlmTts()
@@ -309,42 +308,28 @@ func (s *ChatSession) initHistoryMessages() error {
 		return nil
 	}
 
-	// Pick data source from config (no priority; direct select)
-	useRedis := s.shouldUseRedis()
-	useManager := s.shouldUseManager()
-
 	// Validate required field: DeviceID must not be empty
 	if s.clientState.DeviceID == "" {
 		log.Debugf("DeviceID empty, skip loading history messages (may be called before hello)")
 		return nil
 	}
 
-	// Pick data source from config (no priority; direct select)
-	if useRedis {
-		// Load from Redis
-		historyMessages, err = llm_memory.Get().GetMessages(
-			s.ctx,
-			s.clientState.DeviceID,
-			s.clientState.AgentID,
-			20)
-		if err != nil {
-			log.Warnf("Failed to load history messages from Redis: %v", err)
-			return err
-		}
-		log.Infof("Loaded %d history messages from Redis", len(historyMessages))
-	} else if useManager {
-		// Load from Manager
-		historyMessages, err = s.loadFromManager()
-		if err != nil {
-			log.Warnf("Failed to load history messages from Manager: %v", err)
-			return err
-		}
-		log.Infof("Loaded %d history messages from Manager", len(historyMessages))
-	} else {
-		// Neither data source configured; skip loading history
-		log.Debugf("Neither Redis nor Manager configured, skip loading history messages")
+	// Short memory lives in Redis and only exists when Redis is enabled
+	if !viper.GetBool("redis.enable") {
+		log.Debugf("Redis disabled, skip loading history messages")
 		return nil
 	}
+
+	historyMessages, err = llm_memory.Get().GetMessages(
+		s.ctx,
+		s.clientState.DeviceID,
+		s.clientState.AgentID,
+		20)
+	if err != nil {
+		log.Warnf("Failed to load history messages from Redis: %v", err)
+		return err
+	}
+	log.Infof("Loaded %d history messages from Redis", len(historyMessages))
 
 	if len(historyMessages) > 0 {
 		s.clientState.InitMessages(historyMessages)
@@ -354,75 +339,6 @@ func (s *ChatSession) initHistoryMessages() error {
 	}
 
 	return nil
-}
-
-// shouldUseRedis reports whether Redis is the data source
-func (s *ChatSession) shouldUseRedis() bool {
-	// Decide from config_provider.type
-	providerType := viper.GetString("config_provider.type")
-	return providerType == "redis"
-}
-
-// shouldUseManager reports whether Manager is the data source
-func (s *ChatSession) shouldUseManager() bool {
-	// Decide from config_provider.type
-	providerType := viper.GetString("config_provider.type")
-	return providerType == "manager"
-}
-
-// loadFromManager loads history from the Manager DB
-func (s *ChatSession) loadFromManager() ([]*schema.Message, error) {
-	// Create HistoryClient
-	historyCfg := history.HistoryClientConfig{
-		BaseURL:   util.GetBackendURL(),
-		AuthToken: util.GetManagerAuthToken(),
-		Timeout:   viper.GetDuration("manager.history_timeout"),
-		Enabled:   true,
-	}
-	client := history.NewHistoryClient(historyCfg)
-
-	if s.clientState.DeviceID == "" || s.clientState.AgentID == "" {
-		return []*schema.Message{}, nil
-	}
-
-	req := &history.GetMessagesRequest{
-		DeviceID:  s.clientState.DeviceID,
-		AgentID:   s.clientState.AgentID,
-		SessionID: s.clientState.SessionID,
-		Limit:     20,
-	}
-
-	resp, err := client.GetMessages(s.ctx, req)
-	if err != nil {
-		return nil, err
-	}
-
-	// Convert to schema.Message format
-	messages := make([]*schema.Message, 0, len(resp.Messages))
-	for _, item := range resp.Messages {
-		var msg *schema.Message
-		switch item.Role {
-		case "user":
-			msg = schema.UserMessage(item.Content)
-		case "assistant":
-			msg = schema.AssistantMessage(item.Content, item.ToolCalls)
-		case "tool":
-			msg = schema.ToolMessage(item.Content, item.ToolCallID)
-		case "system":
-			msg = schema.SystemMessage(item.Content)
-		default:
-			log.Warnf("Unknown message role: %s", item.Role)
-			continue
-		}
-
-		messages = append(messages, msg)
-	}
-
-	for _, msg := range messages {
-		log.Debugf("History messages: %+v", msg)
-	}
-
-	return messages, nil
 }
 
 // Run after MQTT receives type: listen, state: start
@@ -440,7 +356,7 @@ func (c *ChatSession) InitAsrLlmTts() error {
 
 	memoryProvider, err := memory.GetProvider(memoryType, memoryConfig.Config)
 	if err != nil {
-		return fmt.Errorf("创建 Memory 提供者失败: %v", err)
+		return fmt.Errorf("failed to create memory provider: %v", err)
 	}
 	c.clientState.MemoryProvider = memoryProvider
 
@@ -808,7 +724,7 @@ func (s *ChatSession) HandleNotActivated() {
 	sessionCtx := s.clientState.SessionCtx.Get(s.clientState.Ctx)
 	ctx := s.clientState.AfterAsrSessionCtx.Get(sessionCtx)
 	err = s.ttsManager.handleTextResponse(ctx, llm_common.LLMResponseStruct{
-		Text: fmt.Sprintf("请在后台添加设备，激活码: %s", code),
+		Text: fmt.Sprintf("Aggiungi il dispositivo dalla console. Codice di attivazione: %s", code),
 	}, false)
 	s.ttsManager.RequestTurnEnd(ctx, err)
 
@@ -850,7 +766,8 @@ func (s *ChatSession) HandleWelcome() {
 }
 
 func (a *ChatSession) checkExitWords(text string) bool {
-	exitWords := []string{"再见", "退下吧", "退出", "退出对话"}
+	exitWords := []string{"arrivederci", "addio", "esci dalla conversazione", "termina la conversazione", "chiudi la conversazione"}
+	text = strings.ToLower(text)
 	for _, word := range exitWords {
 		if strings.Contains(text, word) {
 			return true
@@ -906,7 +823,7 @@ func openClawLogSnippet(text string, maxRunes int) string {
 func (s *ChatSession) GetRandomGreeting() string {
 	greetingList := viper.GetStringSlice("greeting_list")
 	if len(greetingList) == 0 {
-		return "你好，有啥好玩的."
+		return "Ciao, di cosa parliamo?"
 	}
 	rand.Seed(time.Now().UnixNano())
 	return greetingList[rand.Intn(len(greetingList))]
@@ -1450,7 +1367,7 @@ func (s *ChatSession) ClearChatTextQueue() {
 // DoExitChat exits chat (sends goodbye and closes the session)
 func (s *ChatSession) DoExitChat() {
 	// Friendly goodbye text
-	goodbyeText := "好的，再见！期待下次与您聊天～"
+	goodbyeText := "Va bene, arrivederci! A presto."
 
 	// Save an assistant-role message
 	goodbyeMsg := schema.AssistantMessage(goodbyeText, nil)
@@ -1584,7 +1501,7 @@ func (s *ChatSession) actionDoChat(ctx context.Context, text string, speakerResu
 			if isExitKeyword {
 				s.finishOpenClawWarmup("", true)
 				exited := openclawManager.ExitMode(agentID, deviceID)
-				_ = s.AddTextToTTSQueue("已退出OpenClaw模式")
+				_ = s.AddTextToTTSQueue("Modalità OpenClaw chiusa.")
 				log.Infof("Device %s exit OpenClaw mode: agent=%s exited=%v", deviceID, agentID, exited)
 				return nil
 			}
@@ -1614,7 +1531,7 @@ func (s *ChatSession) actionDoChat(ctx context.Context, text string, speakerResu
 					err,
 				)
 				openclawManager.ExitMode(agentID, deviceID)
-				_ = s.AddTextToTTSQueue("OpenClaw当前不可用，已退出OpenClaw模式")
+				_ = s.AddTextToTTSQueue("OpenClaw non è disponibile, ho chiuso la modalità OpenClaw.")
 			} else {
 				s.startOpenClawWarmup(messageID, text)
 				log.Infof("OpenClaw send STT succeeded: agent=%s device=%s session=%s message_id=%s", agentID, deviceID, openclawSessionID, messageID)
@@ -1624,11 +1541,11 @@ func (s *ChatSession) actionDoChat(ctx context.Context, text string, speakerResu
 
 		if isEnterKeyword {
 			if !openclawManager.EnterMode(agentID, deviceID) {
-				_ = s.AddTextToTTSQueue("OpenClaw当前不可用，请稍后再试")
+				_ = s.AddTextToTTSQueue("OpenClaw non è disponibile, riprova più tardi.")
 				log.Warnf("Device %s enter OpenClaw mode failed: agent=%s agent session not ready", deviceID, agentID)
 				return nil
 			}
-			_ = s.AddTextToTTSQueue("已进入OpenClaw模式，请继续说")
+			_ = s.AddTextToTTSQueue("Modalità OpenClaw attiva, continua pure.")
 			log.Infof("Device %s enter OpenClaw mode: agent=%s trigger=%q", deviceID, agentID, openClawLogSnippet(trimmedText, 32))
 			return nil
 		}
@@ -1651,7 +1568,7 @@ func (s *ChatSession) actionDoChat(ctx context.Context, text string, speakerResu
 		// Publish exit-chat event
 		eventbus.Get().Publish(eventbus.TopicExitChat, &eventbus.ExitChatEvent{
 			ClientState: s.clientState,
-			Reason:      "用户主动退出",
+			Reason:      "user requested exit",
 			TriggerType: "exit_words",
 			UserText:    text,
 			Timestamp:   time.Now(),
@@ -1717,7 +1634,7 @@ func (s *ChatSession) actionDoChat(ctx context.Context, text string, speakerResu
 	err = s.llmManager.DoLLmRequest(ctx, userMessage, einoTools, true, speakerResult)
 	if err != nil {
 		log.Errorf("Failed to send LLM request with tools, seesionID: %s, error: %v", sessionID, err)
-		return fmt.Errorf("发送带工具的 LLM 请求失败: %v", err)
+		return fmt.Errorf("failed to send LLM request with tools: %v", err)
 	}
 	return nil
 }
@@ -1802,7 +1719,7 @@ func (s *ChatSession) switchTTSForSpeaker(speakerResult *speaker.IdentifyResult)
 	var targetTTSConfig *types.TtsConfigItem
 	ttsConfigsRaw := viper.Get("tts")
 	if ttsConfigsRaw == nil {
-		return fmt.Errorf("系统配置中未找到 tts")
+		return fmt.Errorf("tts not found in system config")
 	}
 
 	// Parse tts config (map keyed by config_id)
@@ -1836,7 +1753,7 @@ func (s *ChatSession) switchTTSForSpeaker(speakerResult *speaker.IdentifyResult)
 	}
 
 	if targetTTSConfig == nil {
-		return fmt.Errorf("未找到TTS配置 %s", *speakerGroupInfo.TTSConfigID)
+		return fmt.Errorf("TTS config %s not found", *speakerGroupInfo.TTSConfigID)
 	}
 
 	// 5. Copy TTS config to avoid mutating the original

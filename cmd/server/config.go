@@ -2,12 +2,10 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 	"xiaozhi-esp32-server-golang/internal/app/server/auth"
 	redisdb "xiaozhi-esp32-server-golang/internal/db/redis"
@@ -22,13 +20,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Globals controlling periodic updates
-var (
-	configUpdateTicker *time.Ticker
-	configUpdateStop   chan struct{}
-	configUpdateWg     sync.WaitGroup
-)
-
 func Init(configFile string) error {
 	//init config
 	err := initConfig(configFile)
@@ -41,20 +32,13 @@ func Init(configFile string) error {
 	//init log
 	initLog()
 
-	// Init config system (including WebSocket connection)
-	// Note: do not register ApplySystemConfigToViper here alone; it would run before main's callback so main would already see merged config. Merge in main's callback after reading and comparing current.
-	ctx := context.Background()
-	if err := user_config.InitConfigSystem(ctx); err != nil {
+	// Start the config provider. PocketBase settings are merged into viper before the servers
+	// start; if PocketBase is down, the server still starts and the merge happens when it answers.
+	if err := user_config.InitConfigSystem(context.Background(), applySystemConfig); err != nil {
 		fmt.Printf("config system init failed: %v\n", err)
+		os.Exit(1)
+		return err
 	}
-
-	// Fetch config from API and update
-	if err := updateConfigFromAPI(); err != nil {
-		fmt.Printf("fetching config from the API failed, using local config: %v\n", err)
-	}
-
-	// Start periodic config updates
-	startPeriodicConfigUpdate()
 
 	//init vad
 	initVad()
@@ -75,55 +59,6 @@ func Init(configFile string) error {
 	return nil
 }
 
-// startPeriodicConfigUpdate starts periodic config updates
-func startPeriodicConfigUpdate() {
-	// Update interval from config; default 5 minutes
-	updateInterval := viper.GetDuration("config_provider.update_interval")
-	if updateInterval <= 0 {
-		updateInterval = 30 * time.Second
-	}
-
-	// Check whether periodic updates are enabled
-	if !viper.GetBool("config_provider.enable_periodic_update") {
-		log.Info("Periodic config update disabled")
-		return
-	}
-
-	configUpdateStop = make(chan struct{})
-	configUpdateTicker = time.NewTicker(updateInterval)
-
-	configUpdateWg.Add(1)
-	go func() {
-		defer configUpdateWg.Done()
-		defer configUpdateTicker.Stop()
-
-		for {
-			select {
-			case <-configUpdateTicker.C:
-				if err := updateConfigFromAPI(); err != nil {
-					log.Warnf("Periodic config update failed: %v", err)
-				} else {
-					//log.Debug("Periodic config update succeeded")
-				}
-			case <-configUpdateStop:
-				log.Info("Periodic config update stopped")
-				return
-			}
-		}
-	}()
-
-	log.Infof("Periodic config update started, interval: %v", updateInterval)
-}
-
-// StopPeriodicConfigUpdate stops periodic config updates
-func StopPeriodicConfigUpdate() {
-	if configUpdateStop != nil {
-		close(configUpdateStop)
-		configUpdateWg.Wait()
-		logrus.Info("Periodic config update stopped")
-	}
-}
-
 func initConfig(configFile string) error {
 	viper.SetConfigFile(configFile)
 
@@ -135,13 +70,22 @@ func initConfig(configFile string) error {
 	return nil
 }
 
-// ApplySystemConfigToViper merges system config into viper for live WebSocket system_config updates (void callback)
-func ApplySystemConfigToViper(data map[string]interface{}) {
-	if err := viper.MergeConfigMap(data); err != nil {
-		log.Warnf("Failed to merge pushed config into viper: %v", err)
+// applySystemConfig takes system config from the provider. A handler registered by main merges it
+// and reloads the services whose settings changed; before main registers one, it is only merged.
+func applySystemConfig(data map[string]interface{}) {
+	if user_config.DispatchSystemConfig(data) {
 		return
 	}
-	log.Info("Merged system config from WebSocket push into viper")
+	ApplySystemConfigToViper(data)
+}
+
+// ApplySystemConfigToViper merges system config into viper
+func ApplySystemConfigToViper(data map[string]interface{}) {
+	if err := viper.MergeConfigMap(data); err != nil {
+		log.Warnf("Failed to merge system config into viper: %v", err)
+		return
+	}
+	log.Info("Merged system config into viper")
 }
 
 // SystemConfigEqual compares semantic equality via hashstructure fingerprint (map key order independent)
@@ -163,74 +107,6 @@ func SystemConfigEqual(a, b interface{}) bool {
 	equal := ha == hb
 	log.Debugf("[SystemConfigEqual] result: %t (ha=%d hb=%d), a: %+v, b: %+v", equal, ha, hb, a, b)
 	return equal
-}
-
-// updateConfigFromAPI fetches config from API and updates viper
-// Retries until success before returning
-func updateConfigFromAPI() error {
-	configProviderType := viper.GetString("config_provider.type")
-	retryInterval := 10 * time.Second // Retry interval
-	retryCount := 0
-
-	for {
-		// Backend management URL from config
-		configProvider, err := user_config.GetProvider(configProviderType)
-		if err != nil {
-			retryCount++
-			log.Warnf("Failed to get config provider (retry %d): %v, retry after %v", retryCount, err, retryInterval)
-			time.Sleep(retryInterval)
-			continue
-		}
-
-		// Create context
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-
-		// Get system config JSON string
-		configJSON, err := configProvider.GetSystemConfig(ctx)
-		cancel()
-
-		if err != nil {
-			retryCount++
-			log.Warnf("Failed to get system config (retry %d): %v, retry after %v", retryCount, err, retryInterval)
-			time.Sleep(retryInterval)
-			continue
-		}
-
-		if configJSON == "" {
-			// Empty config counts as success (service may return empty)
-			if retryCount > 0 {
-				log.Infof("Config fetch succeeded (empty config, after %d retries)", retryCount)
-			}
-			return nil
-		}
-
-		// Parse JSON into map
-		var configMap map[string]interface{}
-		if err := json.Unmarshal([]byte(configJSON), &configMap); err != nil {
-			retryCount++
-			log.Warnf("Failed to parse config JSON (retry %d): %v, retry after %v", retryCount, err, retryInterval)
-			time.Sleep(retryInterval)
-			continue
-		}
-
-		//log.Debugf("Load config from API: %+v", configMap)
-
-		// Merge into viper via MergeConfigMap
-		if err := viper.MergeConfigMap(configMap); err != nil {
-			retryCount++
-			log.Warnf("Failed to merge config into viper (retry %d): %v, retry after %v", retryCount, err, retryInterval)
-			time.Sleep(retryInterval)
-			continue
-		}
-
-		// Success
-		if retryCount > 0 {
-			log.Infof("Config fetch succeeded (after %d retries)", retryCount)
-		} else {
-			log.Debug("Config fetch succeeded")
-		}
-		return nil
-	}
 }
 
 func initLog() error {

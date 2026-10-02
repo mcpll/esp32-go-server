@@ -12,13 +12,10 @@ import (
 	"sync"
 	"time"
 
-	user_config "xiaozhi-esp32-server-golang/internal/domain/config"
 	config_types "xiaozhi-esp32-server-golang/internal/domain/config/types"
 	llm_memory "xiaozhi-esp32-server-golang/internal/domain/memory/llm_memory"
 	"xiaozhi-esp32-server-golang/internal/domain/rag"
 	log "xiaozhi-esp32-server-golang/logger"
-
-	"github.com/spf13/viper"
 )
 
 //This file handles local MCP tools bound to a session
@@ -82,12 +79,12 @@ func (c *ChatManager) LocalMcpClearHistory() error {
 }
 
 type PlayMusicParams struct {
-	Name string `json:"name,omitempty" description:"音乐的名称"`
+	Name string `json:"name,omitempty" description:"Name of the music"`
 	//Welcome string `json:"welcome" description:"Reassuring prompt while music search may take a while" required:"true"`
 }
 
 type MusicPlaybackControlParams struct {
-	Action string `json:"action" description:"控制动作：resume(继续播放/恢复播放/继续听/接着放)、pause、stop、prev、next、play_playlist(播放歌单/播放歌单里的歌曲/播放播放列表)、enqueue_current；play 和 continue 也会归一化为 resume" required:"true"`
+	Action string `json:"action" description:"Control action: resume (continue or restore playback), pause, stop, prev, next, play_playlist (play the playlist), enqueue_current (add the current song to the playlist); play and continue are normalized to resume" required:"true"`
 }
 
 type MusicPlaybackControlResult struct {
@@ -133,7 +130,7 @@ func (c *ChatManager) LocalMcpPlayMusic(ctx context.Context, musicParams *PlayMu
 
 	if musicURL == "" {
 		log.Errorf("Music not found: %s", musicName)
-		return fmt.Errorf("未找到音乐: %s", musicName)
+		return fmt.Errorf("music not found: %s", musicName)
 	}
 
 	log.Infof("Found music: %s, URL: %s", realMusicName, musicURL)
@@ -141,76 +138,32 @@ func (c *ChatManager) LocalMcpPlayMusic(ctx context.Context, musicParams *PlayMu
 	return nil
 }
 
-// LocalMcpSwitchDeviceRole switch device role by name (fuzzy match)
-func (c *ChatManager) LocalMcpSwitchDeviceRole(ctx context.Context, roleName string) (string, error) {
-	roleName = strings.TrimSpace(roleName)
-	if roleName == "" {
-		return "", fmt.Errorf("role_name 不能为空")
-	}
-
-	configProvider, err := user_config.GetProvider(viper.GetString("config_provider.type"))
-	if err != nil {
-		return "", fmt.Errorf("获取配置提供者失败: %w", err)
-	}
-
-	matchedRoleName, err := configProvider.SwitchDeviceRoleByName(ctx, c.DeviceID, roleName)
-	if err != nil {
-		return "", err
-	}
-
-	if err := c.ReloadDeviceConfig(ctx); err != nil {
-		return "", fmt.Errorf("角色已切换，但刷新会话配置失败: %w", err)
-	}
-
-	log.Infof("Device %s role switch succeeded, request=%s, matched=%s", c.DeviceID, roleName, matchedRoleName)
-	return matchedRoleName, nil
-}
-
-// LocalMcpRestoreDeviceDefaultRole restore the device default role
-func (c *ChatManager) LocalMcpRestoreDeviceDefaultRole(ctx context.Context) error {
-	configProvider, err := user_config.GetProvider(viper.GetString("config_provider.type"))
-	if err != nil {
-		return fmt.Errorf("获取配置提供者失败: %w", err)
-	}
-
-	if err := configProvider.RestoreDeviceDefaultRole(ctx, c.DeviceID); err != nil {
-		return err
-	}
-
-	if err := c.ReloadDeviceConfig(ctx); err != nil {
-		return fmt.Errorf("默认角色已恢复，但刷新会话配置失败: %w", err)
-	}
-
-	log.Infof("Device %s restore default role succeeded", c.DeviceID)
-	return nil
-}
-
 // LocalMcpSearchKnowledge search knowledge bases bound to the current agent
 func (c *ChatManager) LocalMcpSearchKnowledge(ctx context.Context, query string, topK int, knowledgeBaseIDs []uint) ([]config_types.KnowledgeSearchHit, error) {
 	if c == nil || c.clientState == nil {
-		return nil, fmt.Errorf("会话状态不可用")
+		return nil, fmt.Errorf("session state unavailable")
 	}
 	return rag.Search(ctx, query, topK, c.clientState.DeviceConfig.KnowledgeBases, knowledgeBaseIDs)
 }
 
 func (c *ChatManager) LocalMcpControlMusicPlayback(ctx context.Context, params *MusicPlaybackControlParams) (*MusicPlaybackControlResult, error) {
 	if c == nil {
-		return nil, fmt.Errorf("chat manager 不可用")
+		return nil, fmt.Errorf("chat manager unavailable")
 	}
 	return controlMusicPlayback(ctx, c.GetSession(), params)
 }
 
 func controlMusicPlayback(ctx context.Context, session *ChatSession, params *MusicPlaybackControlParams) (*MusicPlaybackControlResult, error) {
 	if session == nil || session.mediaPlayer == nil {
-		return nil, fmt.Errorf("媒体播放器不可用")
+		return nil, fmt.Errorf("media player unavailable")
 	}
 	if params == nil {
-		return nil, fmt.Errorf("控制参数不能为空")
+		return nil, fmt.Errorf("control params must not be empty")
 	}
 
 	action := normalizeMusicPlaybackAction(params.Action)
 	if action == "" {
-		return nil, fmt.Errorf("不支持的控制动作: %s", params.Action)
+		return nil, fmt.Errorf("unsupported control action: %s", params.Action)
 	}
 
 	result := &MusicPlaybackControlResult{
@@ -317,7 +270,7 @@ func getMusicURL(musicName string) (string, string, error) {
 	req, err := http.NewRequest("POST", "https://music.txqq.pro/",
 		strings.NewReader(data))
 	if err != nil {
-		return "", "", fmt.Errorf("创建请求失败: %v", err)
+		return "", "", fmt.Errorf("failed to create request: %v", err)
 	}
 
 	// Set headers to mimic a browser
@@ -345,26 +298,26 @@ func getMusicURL(musicName string) (string, string, error) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", "", fmt.Errorf("API请求失败: %v", err)
+		return "", "", fmt.Errorf("API request failed: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", "", fmt.Errorf("API请求失败，状态码: %d", resp.StatusCode)
+		return "", "", fmt.Errorf("API request failed, status code: %d", resp.StatusCode)
 	}
 
 	// Parse response
 	var searchResp MusicSearchResponse
 	if err := json.NewDecoder(resp.Body).Decode(&searchResp); err != nil {
-		return "", "", fmt.Errorf("解析响应失败: %v", err)
+		return "", "", fmt.Errorf("failed to parse response: %v", err)
 	}
 
 	if searchResp.Code != 200 {
-		return "", "", fmt.Errorf("API返回错误: %s", searchResp.Error)
+		return "", "", fmt.Errorf("API returned an error: %s", searchResp.Error)
 	}
 
 	if len(searchResp.Data) == 0 {
-		return "", "", fmt.Errorf("未找到音乐: %s", musicName)
+		return "", "", fmt.Errorf("music not found: %s", musicName)
 	}
 	musicItem := searchResp.Data[0]
 	// Return the first result URL

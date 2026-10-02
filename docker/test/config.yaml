@@ -1,13 +1,14 @@
 # Minimal server config for the local test stacks (docker/test/mac and docker/test/linux).
-# Derived from config/config.yaml. Providers are placeholders: this stack checks that the server
-# boots against Redis, not that ASR/LLM/TTS calls work.
+# Derived from config/config.yaml. The server reads agents, devices and settings from PocketBase;
+# the stack passes the PocketBase address and superuser through POCKETBASE_* env vars.
+# The ASR/LLM/TTS keys below are placeholders: a real voice turn needs real keys in this file.
 server:
   pprof:
     enable: false
     port: 6060
 
 auth:
-  enable: false
+  enable: true
 
 chat:
   max_idle_duration: 30000
@@ -16,8 +17,7 @@ chat:
   realtime_mode: 4
 
 config_provider:
-  type: "redis"
-  enable_periodic_update: false
+  type: "pocketbase"
 
 log:
   path: "/tmp/xiaozhi-logs/"
@@ -28,7 +28,9 @@ log:
   stdout: true
 
 # Host "redis" is the compose service name; the password matches docker-compose.yml.
+# Short memory is off by default, so the server runs without it.
 redis:
+  enable: false
   host: "redis"
   port: 6379
   password: "test"
@@ -86,7 +88,9 @@ vad:
     acquire_timeout_ms: 3000
 
 asr:
-  provider: "funasr"
+  provider: "aliyun_qwen3"
+  aliyun_qwen3:
+    api_key: "placeholder"
   funasr:
     host: "127.0.0.1"
     port: "10096"
@@ -99,7 +103,9 @@ asr:
     auto_end: true
 
 tts:
-  provider: "edge"
+  provider: "aliyun_qwen"
+  aliyun_qwen:
+    api_key: "placeholder"
   edge:
     voice: "it-IT-ElsaNeural"
     rate: "+0%"
@@ -109,7 +115,11 @@ tts:
     receive_timeout: 60
 
 llm:
-  provider: "placeholder"
+  provider: "aliyun"
+  aliyun:
+    type: "openai"
+    api_key: "placeholder"
+    base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
   placeholder:
     type: "openai"
     model_name: "placeholder"

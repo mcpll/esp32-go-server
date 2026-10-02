@@ -2,62 +2,58 @@ package user_config
 
 import (
 	"fmt"
+	"os"
+	"strings"
+	"sync"
 
-	"xiaozhi-esp32-server-golang/internal/domain/config/manager"
-	userconfig_redis "xiaozhi-esp32-server-golang/internal/domain/config/redis"
-	"xiaozhi-esp32-server-golang/internal/util"
+	"xiaozhi-esp32-server-golang/internal/domain/config/pocketbase"
+
+	"github.com/spf13/viper"
 )
 
-// Config user config provider settings
-type Config struct {
-	Type       string                 `json:"type"`       // storage type: "redis", "memory", "file"
-	Parameters map[string]interface{} `json:"parameters"` // storage-related config params
-}
+// ProviderPocketBase is the only config_provider.type there is.
+const ProviderPocketBase = "pocketbase"
 
+var (
+	pocketBaseOnce     sync.Once
+	pocketBaseProvider *pocketbase.Provider
+	pocketBaseErr      error
+)
+
+// GetProvider returns the config provider for config_provider.type. An empty type means pocketbase.
+// The provider is a process-wide singleton: it holds the PocketBase session and the event handlers.
 func GetProvider(sType string) (UserConfigProvider, error) {
-	config := make(map[string]interface{})
-	if sType == "manager" {
-		// prefer backend address from env; fall back to config
-		backendUrl := util.GetBackendURL()
-		config = map[string]interface{}{
-			"backend_url": backendUrl,
-			"auth_token":  util.GetManagerAuthToken(),
+	switch strings.TrimSpace(sType) {
+	case "", ProviderPocketBase:
+		p, err := sharedPocketBase()
+		if err != nil {
+			return nil, err
 		}
+		return p, nil
+	default:
+		return nil, fmt.Errorf("unsupported config provider: %s", sType)
 	}
-
-	provider, err := GetUserConfigProvider(sType, config)
-	if err != nil {
-		return nil, err
-	}
-	return provider, nil
 }
 
-// GetUserConfigProvider creates a user config provider
-// creates the provider for the given storage type and config
-// providerType: provider type; supports "redis", "memory", "file"
-// config: provider config params
-// returns a UserConfigProvider with full CRUD
-func GetUserConfigProvider(providerType string, config map[string]interface{}) (UserConfigProvider, error) {
-	if config == nil {
-		config = make(map[string]interface{})
-	}
+func sharedPocketBase() (*pocketbase.Provider, error) {
+	pocketBaseOnce.Do(func() {
+		url := firstSet(os.Getenv("POCKETBASE_URL"), viper.GetString("pocketbase.url"))
+		email := firstSet(os.Getenv("POCKETBASE_EMAIL"), viper.GetString("pocketbase.email"))
+		password := firstSet(os.Getenv("POCKETBASE_PASSWORD"), viper.GetString("pocketbase.password"))
+		if url == "" || email == "" || password == "" {
+			pocketBaseErr = fmt.Errorf("pocketbase.url, pocketbase.email and pocketbase.password are required (env: POCKETBASE_URL, POCKETBASE_EMAIL, POCKETBASE_PASSWORD)")
+			return
+		}
+		pocketBaseProvider = pocketbase.NewProvider(pocketbase.NewClient(url, email, password))
+	})
+	return pocketBaseProvider, pocketBaseErr
+}
 
-	switch providerType {
-	case "redis":
-		// create a Redis user config provider
-		provider, err := userconfig_redis.NewRedisUserConfigProvider(config)
-		if err != nil {
-			return nil, fmt.Errorf("创建Redis用户配置提供者失败: %v", err)
+func firstSet(values ...string) string {
+	for _, v := range values {
+		if strings.TrimSpace(v) != "" {
+			return strings.TrimSpace(v)
 		}
-		return provider, nil
-	case "manager":
-		// create a backend-manager user config provider
-		provider, err := manager.NewManagerUserConfigProvider(config)
-		if err != nil {
-			return nil, fmt.Errorf("创建后端管理系统用户配置提供者失败: %v", err)
-		}
-		return provider, nil
-	default:
-		return nil, fmt.Errorf("不支持的用户配置提供者: %s", providerType)
 	}
+	return ""
 }
