@@ -56,4 +56,3 @@ If this PR introduces a code change, how to test it?
 - Click on the unicorn button
 - `http://backend/api/unicorn/42` should get called
 
-**:warning: select _Squash and Merge_ when merging pull-requests to master.**
