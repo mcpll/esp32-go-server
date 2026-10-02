@@ -25,6 +25,16 @@ The voice loop is Italian, hold-to-talk, over the protocol the Eye firmware alre
 - Added: a PocketBase config provider, a `commands` channel, the React console, an Italian default stack and Italian prompts.
 - Fixed: WebSocket token check, no default secrets, no open inject route.
 
+## Build, vet and test
+
+The cgo dependencies (opus, onnxruntime) are in the builder stage of `docker/test/Dockerfile.server`. Build it once, then run Go from it with the source mounted (`.dockerignore` hides every `test/` directory from the image build, so do not rely on `COPY`):
+
+```sh
+docker build --target builder -t esp32-go-builder -f docker/test/Dockerfile.server .
+go() { docker run --rm -v "$PWD":/app -v esp32-gomod:/go/pkg/mod -w /app esp32-go-builder go "$@"; }
+go build ./... && go vet ./... && go test ./...
+```
+
 ## Local test stack (Docker)
 
 Each stack starts PocketBase (with `pb_migrations/` mounted), Redis and the server, and carries the migration check. Pick the one that matches your host:

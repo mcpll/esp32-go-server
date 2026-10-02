@@ -1,10 +1,8 @@
 package eino_llm
 
 import (
-	"fmt"
 	"testing"
 
-	"github.com/cloudwego/eino/schema"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -172,80 +170,6 @@ func TestEinoLLMProvider_GetProviderType(t *testing.T) {
 	assert.Equal(t, "ollama", providerType)
 }
 
-func TestEinoLLMProvider_ResponseWithEinoMessages(t *testing.T) {
-	config := map[string]interface{}{
-		"type":       "openai", // Use openai type
-		"model_name": "gpt-3.5-turbo",
-		"api_key":    "test-key",
-		"streamable": false, // Non-streaming for easier testing
-	}
-
-	provider, err := NewEinoLLMProvider(config)
-	require.NoError(t, err)
-
-	// Use Eino native message types
-	messages := []*schema.Message{
-		{
-			Role:    schema.System,
-			Content: "你是一个助手",
-		},
-		{
-			Role:    schema.User,
-			Content: "你好",
-		},
-	}
-
-	// Test Response — note: this may call a real API
-	// Without a real API key this fails; we mainly test structure
-	responseChan := provider.Response("test_session", messages)
-	var responses []string
-	for content := range responseChan {
-		responses = append(responses, content)
-		break // Take only the first response to avoid long waits
-	}
-
-	// For real API calls, mainly assert no panic
-	// assert.Len(t, responses, 1)
-}
-
-func TestEinoLLMProvider_ResponseWithFunctionsEinoTypes(t *testing.T) {
-	config := map[string]interface{}{
-		"type":       "openai", // Use openai type
-		"model_name": "gpt-3.5-turbo",
-		"api_key":    "test-key",
-		"streamable": false,
-	}
-
-	provider, err := NewEinoLLMProvider(config)
-	require.NoError(t, err)
-
-	// Use Eino native message types
-	messages := []*schema.Message{
-		{
-			Role:    schema.User,
-			Content: "今天北京的天气如何？",
-		},
-	}
-
-	// Use Eino native tool types
-	tools := []*schema.ToolInfo{
-		{
-			Name:        "get_weather",
-			ParamsOneOf: &schema.ParamsOneOf{
-				// Simplified tool parameter definition
-			},
-		},
-	}
-
-	// Test ResponseWithFunctions — structure only
-	responseChan := provider.ResponseWithFunctions("test_session", messages, tools)
-	go func() {
-		for range responseChan {
-			// Consume response without checking content
-		}
-	}()
-}
-
 func TestEinoConfig_Structure(t *testing.T) {
 	// Test config struct
 	config := EinoConfig{
@@ -265,34 +189,6 @@ func TestEinoConfig_Structure(t *testing.T) {
 	assert.Equal(t, "test-key", config.APIKey)
 	assert.Equal(t, true, config.Streamable)
 	assert.Contains(t, config.Parameters, "temperature")
-}
-
-// BenchmarkEinoLLMProvider_Response benchmark
-func BenchmarkEinoLLMProvider_Response(b *testing.B) {
-	config := map[string]interface{}{
-		"type":       "openai", // Use openai type
-		"model_name": "gpt-3.5-turbo",
-		"api_key":    "test-key",
-	}
-
-	provider, _ := NewEinoLLMProvider(config)
-	messages := []*schema.Message{
-		{
-			Role:    schema.User,
-			Content: "这是一个性能测试的内容",
-		},
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		responseChan := provider.Response("bench_session", messages)
-		// Consume response to finish the call
-		go func() {
-			for range responseChan {
-				// Consume response
-			}
-		}()
-	}
 }
 
 // BenchmarkEinoLLMProvider_WithMaxTokens method-chaining benchmark
@@ -352,22 +248,6 @@ func TestEinoLLMProvider_FullWorkflow(t *testing.T) {
 	// 5. Test provider type
 	providerType := enhancedProvider.GetProviderType()
 	assert.Equal(t, "openai", providerType)
-
-	// 6. Structure checks (no real API)
-	messages := []*schema.Message{
-		{
-			Role:    schema.User,
-			Content: "测试消息",
-		},
-	}
-
-	// Only assert no panic; ignore response content
-	responseChan := provider.Response("full_workflow_test", messages)
-	go func() {
-		for range responseChan {
-			// Consume response without checking content
-		}
-	}()
 }
 
 // TestMultipleProviderTypes test multiple provider types
@@ -406,22 +286,6 @@ func TestMultipleProviderTypes(t *testing.T) {
 			assert.NotNil(t, provider)
 			assert.Equal(t, tc.providerType, provider.GetProviderType())
 			assert.Equal(t, tc.modelName, provider.modelName)
-
-			// Test basic structure
-			messages := []*schema.Message{
-				{
-					Role:    schema.User,
-					Content: fmt.Sprintf("测试%s提供者", tc.providerType),
-				},
-			}
-
-			// Only assert no panic
-			responseChan := provider.Response("multi_provider_test", messages)
-			go func() {
-				for range responseChan {
-					// Consume response
-				}
-			}()
 		})
 	}
 }

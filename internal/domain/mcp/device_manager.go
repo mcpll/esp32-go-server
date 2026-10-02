@@ -179,6 +179,7 @@ func NewWsEndPointMcpClient(ctx context.Context, deviceID string, conn *websocke
 	wsTransport, err := NewWebsocketTransport(conn)
 	if err != nil {
 		logger.Errorf("failed to create MCP client: %v", err)
+		cancel()
 		return nil
 	}
 	mcpClient := client.NewClient(wsTransport)
@@ -209,6 +210,7 @@ func NewIotOverMcpClient(deviceID string, transportType string, conn ConnInterfa
 	iotTransport, err := NewIotOverMcpTransport(conn)
 	if err != nil {
 		logger.Errorf("failed to create MCP client: %v", err)
+		cancel()
 		return nil
 	}
 	mcpClient := client.NewClient(iotTransport)
@@ -257,7 +259,7 @@ func (dc *McpClientInstance) refreshToolsStrict() (map[string]tool.InvokableTool
 func (dc *McpClientInstance) refreshToolsWithPolicy(clearOnFailure bool) (map[string]tool.InvokableTool, error) {
 	emptyTools := make(map[string]tool.InvokableTool)
 	if dc == nil || dc.mcpClient == nil {
-		err := fmt.Errorf("mcp client未初始化")
+		err := fmt.Errorf("mcp client not initialized")
 		if clearOnFailure {
 			dc.clearToolsSnapshot()
 		}
@@ -738,10 +740,10 @@ func (dc *McpClientInstance) GetConnectionStatus() map[string]interface{} {
 
 func (dc *McpClientInstance) RawCallTool(ctx context.Context, toolName string, arguments map[string]interface{}) (string, error) {
 	if dc == nil || dc.mcpClient == nil {
-		return "", fmt.Errorf("MCP客户端未初始化")
+		return "", fmt.Errorf("MCP client not initialized")
 	}
 	if !dc.IsConnected() || !dc.IsInitialized() {
-		return "", fmt.Errorf("MCP客户端未就绪")
+		return "", fmt.Errorf("MCP client not ready")
 	}
 	if ctx == nil {
 		ctx = context.Background()
@@ -754,12 +756,12 @@ func (dc *McpClientInstance) RawCallTool(ctx context.Context, toolName string, a
 		},
 	})
 	if err != nil {
-		return "", fmt.Errorf("调用工具失败: %v", err)
+		return "", fmt.Errorf("tool call failed: %v", err)
 	}
 
 	resultBytes, err := result.MarshalJSON()
 	if err != nil {
-		return "", fmt.Errorf("工具调用返回内容转换失败: %v", err)
+		return "", fmt.Errorf("failed to convert tool call result: %v", err)
 	}
 	return string(resultBytes), nil
 }

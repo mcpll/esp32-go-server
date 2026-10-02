@@ -538,7 +538,7 @@ func (s *ClientState) getLLMProvider() (llm.LLMProvider, error) {
 	}
 	llmProvider, err := llm.GetLLMProvider(providerName, llmConfig.Config)
 	if err != nil {
-		return nil, fmt.Errorf("创建 LLM 提供者失败: %v", err)
+		return nil, fmt.Errorf("failed to create LLM provider: %v", err)
 	}
 	return llmProvider, nil
 }
@@ -549,6 +549,7 @@ func (s *ClientState) InitLlm() error {
 	llmProvider, err := s.getLLMProvider()
 	if err != nil {
 		log.Errorf("failed to create LLM provider: %v", err)
+		cancel()
 		return err
 	}
 
