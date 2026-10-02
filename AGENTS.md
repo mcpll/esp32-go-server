@@ -8,7 +8,7 @@ English. Log messages are English in every file in this repo. When you edit a fi
 
 ### Issue tracker
 
-GitHub issues on `mcpll/esp32-go-server` (always via the GitHub MCP server; `gh` only for issue dependencies). See `docs/agents/issue-tracker.md`.
+GitHub issues on `mcpll/esp32-go-server` (always via the GitHub MCP server; `gh` only for issue dependencies or for PR creation). See `docs/agents/issue-tracker.md`.
 
 ### Domain docs
 
