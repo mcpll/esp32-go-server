@@ -1,4 +1,4 @@
-//go:build cgo
+//go:build cgo && !(linux && arm64)
 
 package ten_vad
 
