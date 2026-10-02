@@ -82,8 +82,8 @@ func (s *ServerTransport) SendTtsStop() error {
 		s.clientState.SessionID,
 		s.clientState.GetStatus(),
 		s.clientState.GetListenPhase(),
-		s.clientState.IsWelcomeSpeaking,
-		s.clientState.IsWelcomePlaying,
+		s.clientState.GetWelcomeSpeaking(),
+		s.clientState.GetWelcomePlaying(),
 	)
 	msg := ServerMessage{
 		Type:      ServerMessageTypeTts,
@@ -98,7 +98,7 @@ func (s *ServerTransport) SendTtsStop() error {
 	if err != nil {
 		return err
 	}
-	s.clientState.IsWelcomePlaying = false
+	s.clientState.SetWelcomePlaying(false)
 	// After one dialogue round finishes playing, return to a state that can trigger the next round.
 	s.clientState.SetStatus(ClientStatusListenStop)
 	s.clientState.SetTtsStart(false)

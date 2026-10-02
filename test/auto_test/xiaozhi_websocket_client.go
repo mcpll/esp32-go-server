@@ -24,7 +24,7 @@ var detectStartTs int64
 var waitInput = make(chan struct{}, 1)
 var status = "idle"
 
-const defaultDetectText = "你好小智"
+const defaultDetectText = "你好小智" // Chinese kept: wake word sent on the wire
 
 // Message type constants
 const (
@@ -131,7 +131,7 @@ const (
 	LocalModeRealtime = "realtime"
 )
 
-var speectText = "你好测试"
+var speectText = "你好测试" // Chinese kept: text synthesized by the Chinese default voice
 var clientId = "e4b0c442-98fc-4e1b-8c3d-6a5b6a5b6a6d"
 var token = "test-token"
 var ttsProviderName = "edge_offline"
@@ -161,7 +161,7 @@ func parseAndSaveVisionURL(payload json.RawMessage) {
 		serverVisionURLMu.Lock()
 		serverVisionURL = mcpMsg.Params.Capabilities.Vision.URL
 		serverVisionURLMu.Unlock()
-		fmt.Printf("已保存服务器下发的 vision_url: %s\n", serverVisionURL)
+		fmt.Printf("saved vision_url sent by the server: %s\n", serverVisionURL)
 	}
 }
 
@@ -181,24 +181,24 @@ func resetSignals() {
 
 func main() {
 	// Parse command-line flags
-	serverAddr := flag.String("server", "ws://localhost:8989/xiaozhi/v1/", "服务器地址")
-	deviceID := flag.String("device", "test-device-001", "设备ID")
-	audioFile := flag.String("audio", "", "音频文件路径")
-	text := flag.String("text", "你好测试", "文本")
-	runnerFlag := flag.String("runner", "manual", "运行方式(manual|auto)")
-	modeFlag := flag.String("mode", LocalModeAuto1, "本地模式(auto1|auto2|manual|realtime，auto会映射到auto1)")
-	casesFlag := flag.String("cases", "all", "自动化测试用例(all|manual_roundtrip,auto1_roundtrip,auto2_roundtrip,realtime_roundtrip,hello_metadata,injected_message_skip_llm,iot_roundtrip,tts_sentence_boundaries,manual_multi_turn,mcp_initialize,hello_without_mcp_no_initialize,mcp_duplicate_hello_no_reinitialize,agent_ws_endpoint_mcp,agent_ws_endpoint_mcp_keepalive,invalid_hello_missing_audio_params,invalid_hello_unsupported_transport,duplicate_hello_rehandshake,listen_before_hello_ignored,abort_after_listen_start,abort_during_tts,realtime_interrupt,realtime_listen_stop,realtime_duplicate_start_ignored,goodbye_then_resume,ota_metadata,ota_activate_invalid_algorithm,ota_activate_invalid_challenge_if_required,mqtt_udp_hello,mqtt_udp_injected_message)")
-	caseTimeoutFlag := flag.Duration("case_timeout", 20*time.Second, "自动化单用例超时时间")
-	turnsFlag := flag.Int("turns", 1, "自动化测试每个用例发言轮次")
+	serverAddr := flag.String("server", "ws://localhost:8989/xiaozhi/v1/", "server address")
+	deviceID := flag.String("device", "test-device-001", "device ID")
+	audioFile := flag.String("audio", "", "audio file path")
+	text := flag.String("text", "你好测试", "text") // Chinese kept: default text for the Chinese default voice
+	runnerFlag := flag.String("runner", "manual", "runner (manual|auto)")
+	modeFlag := flag.String("mode", LocalModeAuto1, "local mode (auto1|auto2|manual|realtime; auto maps to auto1)")
+	casesFlag := flag.String("cases", "all", "automated test cases (all|manual_roundtrip,auto1_roundtrip,auto2_roundtrip,realtime_roundtrip,hello_metadata,injected_message_skip_llm,iot_roundtrip,tts_sentence_boundaries,manual_multi_turn,mcp_initialize,hello_without_mcp_no_initialize,mcp_duplicate_hello_no_reinitialize,agent_ws_endpoint_mcp,agent_ws_endpoint_mcp_keepalive,invalid_hello_missing_audio_params,invalid_hello_unsupported_transport,duplicate_hello_rehandshake,listen_before_hello_ignored,abort_after_listen_start,abort_during_tts,realtime_interrupt,realtime_listen_stop,realtime_duplicate_start_ignored,goodbye_then_resume,ota_metadata,ota_activate_invalid_algorithm,ota_activate_invalid_challenge_if_required,mqtt_udp_hello,mqtt_udp_injected_message)")
+	caseTimeoutFlag := flag.Duration("case_timeout", 20*time.Second, "timeout per automated case")
+	turnsFlag := flag.Int("turns", 1, "speech turns per automated case")
 	ttsProviderFlag := flag.String("tts_provider", "edge_offline", "TTS provider (edge_offline|edge|cosyvoice)")
 	sampleRate := flag.Int("sample_rate", 16000, "sampleRate")
 	frameDurationsMs := flag.Int("frame_ms", 20, "frame duration ms")
-	addMcpFlag := flag.Bool("mcp", false, "是否启用mcp")
-	endpointAuthTokenFlag := flag.String("endpoint_auth_token", defaultAgentEndpointAuthToken, "智能体 WebSocket MCP endpoint JWT 签名密钥")
+	addMcpFlag := flag.Bool("mcp", false, "enable mcp")
+	endpointAuthTokenFlag := flag.String("endpoint_auth_token", defaultAgentEndpointAuthToken, "JWT signing key for the agent WebSocket MCP endpoint")
 
 	flag.Parse()
 
-	fmt.Printf("运行小智客户端\n服务器: %s\n设备ID: %s\n音频文件: %s\n",
+	fmt.Printf("Running xiaozhi client\nserver: %s\ndevice ID: %s\naudio file: %s\n",
 		*serverAddr, *deviceID, *audioFile)
 
 	speectText = *text
@@ -218,9 +218,9 @@ func main() {
 	agentEndpointAuthToken = strings.TrimSpace(*endpointAuthTokenFlag)
 
 	if strings.TrimSpace(*modeFlag) != mode {
-		fmt.Printf("本地模式 %s 已映射为 %s\n", strings.TrimSpace(*modeFlag), mode)
+		fmt.Printf("local mode %s mapped to %s\n", strings.TrimSpace(*modeFlag), mode)
 	}
-	fmt.Printf("运行方式: %s\n本地策略模式: %s, 协议 listen.mode: %s\n", runnerMode, mode, protocolMode())
+	fmt.Printf("runner: %s\nlocal strategy mode: %s, protocol listen.mode: %s\n", runnerMode, mode, protocolMode())
 
 	if runnerMode == "auto" {
 		if err := runAutomationSuite(*serverAddr, *deviceID, *audioFile); err != nil {
@@ -246,7 +246,7 @@ func runClient(serverAddr, deviceID, audioFile string, testCase *protocolTestCas
 	OpusData = [][]byte{}
 	// Build WebSocket URL
 	wsURL := serverAddr
-	fmt.Printf("正在连接服务器: %s\n", wsURL)
+	fmt.Printf("connecting to server: %s\n", wsURL)
 
 	// Connect to WebSocket server
 	conn, _, err := dialServer(wsURL, deviceID)
@@ -256,17 +256,17 @@ func runClient(serverAddr, deviceID, audioFile string, testCase *protocolTestCas
 	defer conn.Close()
 	runtime := startSessionRuntime(conn, deviceID)
 
-	fmt.Println("已连接到服务器")
+	fmt.Println("connected to server")
 
 	// Send hello message
 	effectiveAddMcp := addMcp || (testCase != nil && testCase.EnableMCP)
 	if err := sendHello(runtime, deviceID, effectiveAddMcp, "websocket", defaultAudioFormat()); err != nil {
-		return fmt.Errorf("发送hello消息失败: %v", err)
+		return fmt.Errorf("failed to send hello message: %v", err)
 	}
 	if err := waitForHelloAck(runtime, defaultHelloTimeout); err != nil {
-		return fmt.Errorf("hello 握手失败: %v", err)
+		return fmt.Errorf("hello handshake failed: %v", err)
 	}
-	fmt.Println("hello 握手完成")
+	fmt.Println("hello handshake done")
 
 	if testCase != nil {
 		switch testCase.Kind {
@@ -278,19 +278,19 @@ func runClient(serverAddr, deviceID, audioFile string, testCase *protocolTestCas
 	// If audio file given, send it
 	if audioFile != "" {
 		if err := sendListenStart(runtime, protocolMode()); err != nil {
-			return fmt.Errorf("发送listen start消息失败: %v", err)
+			return fmt.Errorf("failed to send listen start message: %v", err)
 		}
-		fmt.Printf("已发送 listen start %s 信令\n", protocolMode())
+		fmt.Printf("sent listen start %s message\n", protocolMode())
 
 		// Short wait so server is ready for audio
 		time.Sleep(100 * time.Millisecond)
 
-		fmt.Println("开始发送音频数据...")
+		fmt.Println("sending audio data...")
 		// Read and send audio file (Opus-encoded)
 		if err := sendWavFileWithOpusEncoding(conn, audioFile); err != nil {
-			return fmt.Errorf("发送音频数据失败: %v\n", err)
+			return fmt.Errorf("failed to send audio data: %v\n", err)
 		}
-		fmt.Println("音频数据发送完成，等待服务器响应...")
+		fmt.Println("audio data sent, waiting for server response...")
 		// Wait 10 seconds then exit
 		time.Sleep(10 * time.Second)
 		return nil
@@ -298,7 +298,7 @@ func runClient(serverAddr, deviceID, audioFile string, testCase *protocolTestCas
 
 	// If no audio file, use TTS mode
 	if err := sendTextToSpeech(runtime, testCase); err != nil {
-		return fmt.Errorf("发送文本到语音失败: %v", err)
+		return fmt.Errorf("failed to send text to speech: %v", err)
 	}
 
 	return nil
@@ -327,10 +327,10 @@ func startSessionRuntime(conn *websocket.Conn, deviceID string) *sessionRuntime 
 
 	go func() {
 		for msg := range mcpSendMsgChan {
-			fmt.Printf("发送mcp消息: %s\n", string(msg))
+			fmt.Printf("sending mcp message: %s\n", string(msg))
 			runtime.recordOutgoingMCP(msg)
 			if err := runtime.writeText(msg); err != nil {
-				fmt.Printf("发送mcp消息失败: %v\n", err)
+				fmt.Printf("failed to send mcp message: %v\n", err)
 				return
 			}
 		}
@@ -341,15 +341,15 @@ func startSessionRuntime(conn *websocket.Conn, deviceID string) *sessionRuntime 
 		for {
 			messageType, message, err := conn.ReadMessage()
 			if err != nil {
-				fmt.Printf("读取消息失败: %v\n", err)
+				fmt.Printf("failed to read message: %v\n", err)
 				return
 			}
 
 			if messageType == websocket.TextMessage {
-				fmt.Printf("收到服务器消息: %+v\n", string(message))
+				fmt.Printf("received server message: %+v\n", string(message))
 				var serverMsg ServerMessage
 				if err := json.Unmarshal(message, &serverMsg); err != nil {
-					fmt.Printf("解析消息失败: %v\n", err)
+					fmt.Printf("failed to parse message: %v\n", err)
 					continue
 				}
 				runtime.recordIncomingMessage(serverMsg)
@@ -362,7 +362,7 @@ func startSessionRuntime(conn *websocket.Conn, deviceID string) *sessionRuntime 
 					select {
 					case mcpRecvMsgChan <- serverMsg.PayLoad:
 					default:
-						fmt.Printf("mcp消息队列已满, 丢弃消息: %s\n", string(serverMsg.PayLoad))
+						fmt.Printf("mcp message queue full, dropping message: %s\n", string(serverMsg.PayLoad))
 					}
 				}
 
@@ -389,13 +389,13 @@ func startSessionRuntime(conn *websocket.Conn, deviceID string) *sessionRuntime 
 						OpusData = [][]byte{}
 						firstRecvFrame = false
 						runtime.notifyTTSStart()
-						fmt.Println("收到 tts start，准备接收音频")
+						fmt.Println("received tts start, ready to receive audio")
 					case MessageStateStop:
 						ttsReceiving = false
 						runtime.notifyTTSStop()
-						fmt.Println("收到 tts stop")
+						fmt.Println("received tts stop")
 						if err := handleTTSStopForStrategy(runtime); err != nil {
-							fmt.Printf("处理 tts stop 失败: %v\n", err)
+							fmt.Printf("failed to handle tts stop: %v\n", err)
 						}
 					case MessageStateSentenceStart, MessageStateSentenceEnd:
 						if strings.TrimSpace(serverMsg.Text) != "" {
@@ -410,7 +410,7 @@ func startSessionRuntime(conn *websocket.Conn, deviceID string) *sessionRuntime 
 				}
 				if !firstRecvFrame {
 					firstRecvFrame = true
-					fmt.Printf("首帧到达时间: %d 毫秒\n", time.Now().UnixMilli()-detectStartTs)
+					fmt.Printf("first frame arrived after %d ms\n", time.Now().UnixMilli()-detectStartTs)
 				}
 				OpusData = append(OpusData, message)
 			}
@@ -462,7 +462,7 @@ func sendListenStart(runtime *sessionRuntime, mode string) error {
 	}
 
 	if err := sendJSONMessage(runtime, listenStartMsg); err != nil {
-		return fmt.Errorf("发送listen start消息失败: %v", err)
+		return fmt.Errorf("failed to send listen start message: %v", err)
 	}
 	return nil
 }
@@ -477,7 +477,7 @@ func sendListenStop(runtime *sessionRuntime) error {
 	}
 
 	if err := sendJSONMessage(runtime, listenStartMsg); err != nil {
-		return fmt.Errorf("发送listen stop消息失败: %v", err)
+		return fmt.Errorf("failed to send listen stop message: %v", err)
 	}
 
 	return nil
@@ -491,7 +491,7 @@ func sendAbort(runtime *sessionRuntime) error {
 	}
 
 	if err := sendJSONMessage(runtime, listenStartMsg); err != nil {
-		return fmt.Errorf("发送listen start消息失败: %v", err)
+		return fmt.Errorf("failed to send listen start message: %v", err)
 	}
 	return nil
 }
@@ -503,7 +503,7 @@ func sendIot(runtime *sessionRuntime, text string) error {
 		Text:     text,
 	}
 	if err := sendJSONMessage(runtime, msg); err != nil {
-		return fmt.Errorf("发送iot消息失败: %v", err)
+		return fmt.Errorf("failed to send iot message: %v", err)
 	}
 	return nil
 }
@@ -514,7 +514,7 @@ func sendGoodbye(runtime *sessionRuntime) error {
 		DeviceID: runtime.deviceID,
 	}
 	if err := sendJSONMessage(runtime, msg); err != nil {
-		return fmt.Errorf("发送goodbye消息失败: %v", err)
+		return fmt.Errorf("failed to send goodbye message: %v", err)
 	}
 	return nil
 }
@@ -529,7 +529,7 @@ func sendListenDetect(runtime *sessionRuntime, text string) error {
 	}
 
 	if err := sendJSONMessage(runtime, listenStartMsg); err != nil {
-		return fmt.Errorf("发送listen detect消息失败: %v", err)
+		return fmt.Errorf("failed to send listen detect message: %v", err)
 	}
 	return nil
 }
@@ -542,7 +542,7 @@ func normalizeLocalMode(raw string) (string, error) {
 	case LocalModeAuto1, LocalModeAuto2, LocalModeManual, LocalModeRealtime:
 		return localMode, nil
 	default:
-		return "", fmt.Errorf("不支持的模式: %s, 可选: auto1|auto2|manual|realtime", raw)
+		return "", fmt.Errorf("unsupported mode: %s, choose one of: auto1|auto2|manual|realtime", raw)
 	}
 }
 
@@ -565,7 +565,7 @@ func allowNextInput() {
 func sendInitialListenSequence(runtime *sessionRuntime) error {
 	switch mode {
 	case LocalModeAuto1:
-		fmt.Println("本地策略 auto1: 初始发送 listen detect，等待欢迎语结束后进入 listen start auto")
+		fmt.Println("local strategy auto1: send listen detect first, enter listen start auto after the welcome speech ends")
 		if err := sendListenDetect(runtime, defaultDetectText); err != nil {
 			return err
 		}
@@ -579,7 +579,7 @@ func sendInitialListenSequence(runtime *sessionRuntime) error {
 			}
 		}
 	case LocalModeAuto2:
-		fmt.Println("本地策略 auto2: 初始发送 listen start auto -> listen detect，等待欢迎语结束")
+		fmt.Println("local strategy auto2: send listen start auto -> listen detect first, wait for the welcome speech to end")
 		if err := sendListenStart(runtime, protocolMode()); err != nil {
 			return err
 		}
@@ -590,7 +590,7 @@ func sendInitialListenSequence(runtime *sessionRuntime) error {
 			return err
 		}
 	case LocalModeRealtime:
-		fmt.Println("本地策略 realtime: 初始发送 listen detect，等待欢迎语结束后 listen start realtime")
+		fmt.Println("local strategy realtime: send listen detect first, listen start realtime after the welcome speech ends")
 		if err := sendListenDetect(runtime, defaultDetectText); err != nil {
 			return err
 		}
@@ -610,10 +610,10 @@ func handleTTSStopForStrategy(runtime *sessionRuntime) error {
 		if err := sendListenStart(runtime, protocolMode()); err != nil {
 			return err
 		}
-		fmt.Printf("本地策略 %s: tts stop 后重新发送 listen start %s\n", mode, protocolMode())
+		fmt.Printf("local strategy %s: send listen start %s again after tts stop\n", mode, protocolMode())
 		allowNextInput()
 	case LocalModeRealtime:
-		fmt.Println("本地策略 realtime: tts stop 后不做额外处理")
+		fmt.Println("local strategy realtime: nothing extra after tts stop")
 	case LocalModeManual:
 		allowNextInput()
 	default:
@@ -628,7 +628,7 @@ func sendJSONMessage(runtime *sessionRuntime, msg interface{}) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("发送消息: %s\n", string(data))
+	fmt.Printf("sending message: %s\n", string(data))
 	if clientMsg, ok := msg.(ClientMessage); ok {
 		runtime.recordOutgoingMessage(clientMsg)
 	}
@@ -640,30 +640,30 @@ func sendWavFileWithOpusEncoding(conn *websocket.Conn, filePath string) error {
 	// Open WAV file
 	file, err := os.Open(filePath)
 	if err != nil {
-		return fmt.Errorf("打开WAV文件失败: %v", err)
+		return fmt.Errorf("failed to open WAV file: %v", err)
 	}
 	defer file.Close()
 
 	// Read file contents
 	fileContent, err := io.ReadAll(file)
 	if err != nil {
-		return fmt.Errorf("读取文件内容失败: %v", err)
+		return fmt.Errorf("failed to read file content: %v", err)
 	}
-	fmt.Printf("文件内容长度: %d\n", len(fileContent))
+	fmt.Printf("file content length: %d\n", len(fileContent))
 	file.Close()
 
 	opusFrames, err := util.WavToOpus(fileContent, SampleRate, Channels, 0)
 	if err != nil {
-		return fmt.Errorf("转换WAV文件失败: %v", err)
+		return fmt.Errorf("failed to convert WAV file: %v", err)
 	}
 
-	fmt.Printf("转换后的Opus帧数: %d\n", len(opusFrames))
+	fmt.Printf("Opus frames after conversion: %d\n", len(opusFrames))
 
 	for i, frame := range opusFrames {
-		fmt.Printf("Opus帧 %d 长度: %d\n", i, len(frame))
+		fmt.Printf("Opus frame %d length: %d\n", i, len(frame))
 		// Send Opus frame
 		if err := conn.WriteMessage(websocket.BinaryMessage, frame); err != nil {
-			return fmt.Errorf("发送Opus帧失败: %v", err)
+			return fmt.Errorf("failed to send Opus frame: %v", err)
 		}
 		// Pace sends to simulate realtime audio
 		time.Sleep(time.Duration(FrameDurationMs) * time.Millisecond)
@@ -672,23 +672,23 @@ func sendWavFileWithOpusEncoding(conn *websocket.Conn, filePath string) error {
 	// Send 200ms of silence
 	silenceDurationMs := 1000
 	silenceFrameCount := silenceDurationMs / FrameDurationMs
-	fmt.Printf("开始发送 %dms 静音音频数据，共 %d 帧\n", silenceDurationMs, silenceFrameCount)
+	fmt.Printf("sending %dms of silent audio, %d frames\n", silenceDurationMs, silenceFrameCount)
 
 	// Generate silent Opus data
 	emptyOpusData := genEmptyOpusData(SampleRate, Channels, FrameDurationMs, 1)
 	if emptyOpusData == nil {
-		return fmt.Errorf("生成静音Opus数据失败")
+		return fmt.Errorf("failed to generate silent Opus data")
 	}
 
 	// Loop sending silence frames
 	for i := 0; i < silenceFrameCount; i++ {
 		if err := conn.WriteMessage(websocket.BinaryMessage, emptyOpusData); err != nil {
-			return fmt.Errorf("发送静音Opus帧失败: %v", err)
+			return fmt.Errorf("failed to send silent Opus frame: %v", err)
 		}
 		// Pace sends to simulate realtime audio
 		time.Sleep(time.Duration(FrameDurationMs) * time.Millisecond)
 	}
-	fmt.Printf("静音音频数据发送完成\n")
+	fmt.Printf("silent audio data sent\n")
 
 	return nil
 }
@@ -697,7 +697,7 @@ func sendWavFileWithOpusEncoding(conn *websocket.Conn, filePath string) error {
 func sendAudioFile(conn *websocket.Conn, filePath string) error {
 	file, err := os.Open(filePath)
 	if err != nil {
-		return fmt.Errorf("打开音频文件失败: %v", err)
+		return fmt.Errorf("failed to open audio file: %v", err)
 	}
 	defer file.Close()
 
@@ -712,13 +712,13 @@ func sendAudioFile(conn *websocket.Conn, filePath string) error {
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("读取音频数据失败: %v", err)
+			return fmt.Errorf("failed to read audio data: %v", err)
 		}
 
 		if n > 0 {
 			// Send binary audio data
 			if err := conn.WriteMessage(websocket.BinaryMessage, buffer[:n]); err != nil {
-				return fmt.Errorf("发送音频数据失败: %v", err)
+				return fmt.Errorf("failed to send audio data: %v", err)
 			}
 
 			// Pace sends to simulate realtime audio
@@ -758,7 +758,7 @@ func sendTextToSpeech(runtime *sessionRuntime, testCase *protocolTestCase) error
 		"frame_duration": FrameDurationMs,
 		"target_sr":      SampleRate,
 		"audio_format":   "mp3",
-		"instruct_text":  "你好",
+		"instruct_text":  "你好", // Chinese kept: cosyvoice instruction text
 	}
 	edgeConfig := map[string]interface{}{
 		"voice":           "zh-CN-XiaoxiaoNeural",
@@ -783,12 +783,12 @@ func sendTextToSpeech(runtime *sessionRuntime, testCase *protocolTestCase) error
 	case "cosyvoice":
 		providerConfig = cosyVoiceConfig
 	default:
-		return fmt.Errorf("不支持的tts provider: %s, 可选: edge_offline|edge|cosyvoice", providerName)
+		return fmt.Errorf("unsupported tts provider: %s, choose one of: edge_offline|edge|cosyvoice", providerName)
 	}
-	fmt.Printf("使用 TTS provider: %s\n", providerName)
+	fmt.Printf("using TTS provider: %s\n", providerName)
 	ttsProvider, err := tts.GetTTSProvider(providerName, providerConfig)
 	if err != nil {
-		return fmt.Errorf("获取tts服务失败(provider=%s): %v", providerName, err)
+		return fmt.Errorf("failed to get tts service (provider=%s): %v", providerName, err)
 	}
 
 	/*
@@ -804,14 +804,14 @@ func sendTextToSpeech(runtime *sessionRuntime, testCase *protocolTestCase) error
 	genAndSendAudio := func(msg string, count int) error {
 		audioChan, err := ttsProvider.TextToSpeechStream(context.Background(), msg, SampleRate, 1, FrameDurationMs)
 		if err != nil {
-			fmt.Printf("生成语音失败: %v\n", err)
-			return fmt.Errorf("生成语音失败: %v", err)
+			fmt.Printf("failed to generate speech: %v\n", err)
+			return fmt.Errorf("failed to generate speech: %v", err)
 		}
 
 		for audioData := range audioChan {
 			//fmt.Printf("sent audio data length: %d\n", len(audioData))
 			if err := runtime.writeBinary(audioData); err != nil {
-				return fmt.Errorf("发送语音帧失败: %v", err)
+				return fmt.Errorf("failed to send speech frame: %v", err)
 			}
 			time.Sleep(time.Duration(FrameDurationMs) * time.Millisecond)
 		}
@@ -820,7 +820,7 @@ func sendTextToSpeech(runtime *sessionRuntime, testCase *protocolTestCase) error
 
 		for i := 0; i <= count; i++ {
 			if err := runtime.writeBinary(emptyOpusData); err != nil {
-				return fmt.Errorf("发送静音帧失败: %v", err)
+				return fmt.Errorf("failed to send silent frame: %v", err)
 			}
 			time.Sleep(time.Duration(FrameDurationMs) * time.Millisecond)
 		}
@@ -829,7 +829,7 @@ func sendTextToSpeech(runtime *sessionRuntime, testCase *protocolTestCase) error
 	}
 
 	if err := sendInitialListenSequence(runtime); err != nil {
-		return fmt.Errorf("发送初始 listen 序列失败: %v", err)
+		return fmt.Errorf("failed to send initial listen sequence: %v", err)
 	}
 	if mode != LocalModeRealtime {
 		allowNextInput()
@@ -850,7 +850,7 @@ func sendTextToSpeech(runtime *sessionRuntime, testCase *protocolTestCase) error
 					<-resumeChan
 				default:
 					if err := runtime.writeBinary(emptyOpusData); err != nil {
-						fmt.Printf("发送 realtime 静音帧失败: %v\n", err)
+						fmt.Printf("failed to send realtime silent frame: %v\n", err)
 						return
 					}
 					time.Sleep(time.Duration(FrameDurationMs) * time.Millisecond)
@@ -867,7 +867,7 @@ func sendTextToSpeech(runtime *sessionRuntime, testCase *protocolTestCase) error
 		if mode == LocalModeManual {
 			if err := sendListenStart(runtime, protocolMode()); err != nil {
 				allowNextInput()
-				return fmt.Errorf("发送 listen start 失败: %v", err)
+				return fmt.Errorf("failed to send listen start: %v", err)
 			}
 		}
 		if err := genAndSendAudio(input, 100); err != nil {
@@ -878,7 +878,7 @@ func sendTextToSpeech(runtime *sessionRuntime, testCase *protocolTestCase) error
 		}
 		if mode == LocalModeManual {
 			if err := sendListenStop(runtime); err != nil {
-				return fmt.Errorf("发送 listen stop 失败: %v", err)
+				return fmt.Errorf("failed to send listen stop: %v", err)
 			}
 		}
 		if mode == LocalModeRealtime {
@@ -893,10 +893,10 @@ func sendTextToSpeech(runtime *sessionRuntime, testCase *protocolTestCase) error
 
 	for {
 
-		fmt.Print("请输入要合成的文本（回车发送，直接回车退出）：")
+		fmt.Print("Enter the text to synthesize (Enter to send, empty line to quit): ")
 		input, err := reader.ReadString('\n')
 		if err != nil {
-			fmt.Printf("读取输入失败: %v\n", err)
+			fmt.Printf("failed to read input: %v\n", err)
 			continue
 		}
 		input = strings.TrimSpace(input)
@@ -909,7 +909,7 @@ func sendTextToSpeech(runtime *sessionRuntime, testCase *protocolTestCase) error
 		}
 		f := func() {
 			if err := runTurn(input); err != nil {
-				fmt.Printf("发送音频失败: %v\n", err)
+				fmt.Printf("failed to send audio: %v\n", err)
 			}
 		}
 		if mode == LocalModeRealtime {
@@ -921,6 +921,4 @@ func sendTextToSpeech(runtime *sessionRuntime, testCase *protocolTestCase) error
 			go f()
 		}
 	}
-
-	return nil
 }

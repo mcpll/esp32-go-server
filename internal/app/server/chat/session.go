@@ -668,7 +668,7 @@ func (s *ChatSession) HandleListenDetect(msg *ClientMessage) error {
 		// 1. First wake with welcome allowed: play welcome;
 		// 2. Welcome already played and already in auto listen: ignore repeat wake;
 		// 3. Otherwise: buffer as normal detect -> LLM text.
-		action := resolveDetectAction(text, enableGreeting, s.clientState.IsWelcomeSpeaking, autoListenActive)
+		action := resolveDetectAction(text, enableGreeting, s.clientState.GetWelcomeSpeaking(), autoListenActive)
 
 		log.Debugf(
 			"Detect recv: device=%s text=%q action=%s autoListenActive=%v history={%s} welcomeSpeaking=%v welcomePlaying=%v",
@@ -677,8 +677,8 @@ func (s *ChatSession) HandleListenDetect(msg *ClientMessage) error {
 			action,
 			autoListenActive,
 			prevHistory.DebugString(now),
-			s.clientState.IsWelcomeSpeaking,
-			s.clientState.IsWelcomePlaying,
+			s.clientState.GetWelcomeSpeaking(),
+			s.clientState.GetWelcomePlaying(),
 		)
 
 		if action == detectActionSilent {
@@ -748,8 +748,8 @@ func (s *ChatSession) HandleWelcome() {
 		return
 	}
 
-	s.clientState.IsWelcomeSpeaking = true
-	s.clientState.IsWelcomePlaying = true
+	s.clientState.SetWelcomeSpeaking(true)
+	s.clientState.SetWelcomePlaying(true)
 	s.beginWelcomePlaybackWait()
 
 	go func(ctx context.Context, greetingText string) {
@@ -1081,7 +1081,7 @@ func (s *ChatSession) HandleListenStart(msg *ClientMessage) error {
 
 	// In auto/manual, the device may auto-send listen start during welcome playback;
 	// those packets must not preempt welcome, so ignore them while welcome is playing.
-	if shouldIgnoreListenStartDuringWelcome(msg.Mode, s.clientState.IsWelcomePlaying) {
+	if shouldIgnoreListenStartDuringWelcome(msg.Mode, s.clientState.GetWelcomePlaying()) {
 		log.Infof("Device %s welcome playing, ignore listen start: history={%s}", msg.DeviceID, prevHistory.DebugString(now))
 		return nil
 	}
@@ -1091,8 +1091,8 @@ func (s *ChatSession) HandleListenStart(msg *ClientMessage) error {
 		msg.DeviceID,
 		msg.Mode,
 		prevHistory.DebugString(now),
-		s.clientState.IsWelcomeSpeaking,
-		s.clientState.IsWelcomePlaying,
+		s.clientState.GetWelcomeSpeaking(),
+		s.clientState.GetWelcomePlaying(),
 		s.clientState.GetListenPhase(),
 	)
 
@@ -1108,14 +1108,14 @@ func (s *ChatSession) HandleListenStart(msg *ClientMessage) error {
 
 		// On first realtime entry, if welcome is still playing, wait for it to finish;
 		// enter realtime listen only after welcome finishes fully.
-		if shouldWaitRealtimeListenStartDuringWelcome(msg.Mode, s.clientState.IsWelcomePlaying) {
+		if shouldWaitRealtimeListenStartDuringWelcome(msg.Mode, s.clientState.GetWelcomePlaying()) {
 			if !s.waitForWelcomePlaybackCompletion() {
 				return nil
 			}
 		}
 
 		s.clientState.RecordCommandArrival(CommandTypeListenStart, now)
-		if shouldInterruptOutputOnListenStart(msg.Mode, s.clientState.IsWelcomePlaying) {
+		if shouldInterruptOutputOnListenStart(msg.Mode, s.clientState.GetWelcomePlaying()) {
 			// Outside welcome protection, listen start means a new listen takeover,
 			// so stop current TTS/LLM to avoid talking and listening at once.
 			s.StopSpeakingWithReason(true, fmt.Sprintf("HandleListenStart mode=%s", msg.Mode))

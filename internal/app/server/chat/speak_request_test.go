@@ -695,8 +695,8 @@ func TestTTSManagerFinishTtsStopDispatchesTurnEndPolicy(t *testing.T) {
 
 	manager.lastSpeakPathWarmAt.Store(time.Now().UnixMilli())
 	manager.clientState.Abort = true
-	manager.clientState.IsWelcomeSpeaking = true
-	manager.clientState.IsWelcomePlaying = true
+	manager.clientState.SetWelcomeSpeaking(true)
+	manager.clientState.SetWelcomePlaying(true)
 	manager.clientState.SetStatus(data_client.ClientStatusTTSStart)
 	manager.clientState.SetListenPhase(data_client.ListenPhaseListening)
 	manager.clientState.SessionCtx.Get(manager.clientState.Ctx)
@@ -772,8 +772,8 @@ func TestHandleMqttTransportReadyResetsConversationState(t *testing.T) {
 
 	manager.lastSpeakPathWarmAt.Store(time.Now().UnixMilli())
 	manager.clientState.Abort = true
-	manager.clientState.IsWelcomeSpeaking = true
-	manager.clientState.IsWelcomePlaying = true
+	manager.clientState.SetWelcomeSpeaking(true)
+	manager.clientState.SetWelcomePlaying(true)
 	manager.clientState.SetStatus(data_client.ClientStatusTTSStart)
 	manager.clientState.SetListenPhase(data_client.ListenPhaseListening)
 	manager.clientState.SessionCtx.Get(manager.clientState.Ctx)
@@ -802,7 +802,7 @@ func TestHandleMqttTransportReadyResetsConversationState(t *testing.T) {
 	if manager.clientState.Abort {
 		t.Fatal("expected mqtt transport ready to clear abort flag")
 	}
-	if manager.clientState.IsWelcomeSpeaking || manager.clientState.IsWelcomePlaying {
+	if manager.clientState.GetWelcomeSpeaking() || manager.clientState.GetWelcomePlaying() {
 		t.Fatal("expected mqtt transport ready to clear welcome flags")
 	}
 	if conn.sentCmdCount() != 0 {
@@ -855,8 +855,8 @@ func TestHandleMqttTransportReadyResetsMcpRuntimeBeforeWarmup(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("expected mqtt transport ready to close existing IoT MCP runtime")
 	}
-	if manager.mcpInitState != chatMcpInitStateIdle {
-		t.Fatalf("expected MCP init state to reset to idle, got %v", manager.mcpInitState)
+	if readMcpInitState(manager) != chatMcpInitStateIdle {
+		t.Fatalf("expected MCP init state to reset to idle, got %v", readMcpInitState(manager))
 	}
 
 	manager.WarmupMcp()

@@ -8,6 +8,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// newInitializedVAD returns a ready-to-use VAD; NewWebRTCVAD alone leaves it uninitialized.
+func newInitializedVAD(t *testing.T) *WebRTCVAD {
+	t.Helper()
+	vad, err := NewWebRTCVADWithConfig(DefaultSampleRate, DefaultMode)
+	require.NoError(t, err)
+	return vad.(*WebRTCVAD)
+}
+
 // TestNewWebRTCVAD tests creating a WebRTC VAD instance
 func TestNewWebRTCVAD(t *testing.T) {
 	vad := NewWebRTCVAD()
@@ -52,8 +60,7 @@ func TestNewWebRTCVADWithConfig(t *testing.T) {
 
 // TestWebRTCVAD_IsVAD tests voice activity detection
 func TestWebRTCVAD_IsVAD(t *testing.T) {
-	vad := NewWebRTCVAD()
-	require.NotNil(t, vad)
+	vad := newInitializedVAD(t)
 	defer vad.Close()
 
 	// test empty data
@@ -82,17 +89,11 @@ func TestWebRTCVAD_IsVAD(t *testing.T) {
 
 // TestWebRTCVAD_Reset tests reset
 func TestWebRTCVAD_Reset(t *testing.T) {
-	vad := NewWebRTCVAD()
-	require.NotNil(t, vad)
+	vad := newInitializedVAD(t)
 	defer vad.Close()
 
-	// reset before initialization
-	err := vad.Reset()
-	assert.NoError(t, err)
-
-	// use VAD once to initialize
 	testData := make([]float32, 1600) // 100ms at 16kHz
-	_, err = vad.IsVAD(testData)
+	_, err := vad.IsVAD(testData)
 	assert.NoError(t, err)
 
 	// reset after initialization
@@ -102,24 +103,15 @@ func TestWebRTCVAD_Reset(t *testing.T) {
 
 // TestWebRTCVAD_Close tests close
 func TestWebRTCVAD_Close(t *testing.T) {
-	vad := NewWebRTCVAD()
-	require.NotNil(t, vad)
-
 	// close when not initialized
-	err := vad.Close()
-	assert.NoError(t, err)
+	assert.NoError(t, NewWebRTCVAD().Close())
 
-	// close after initialization
-	testData := make([]float32, 1600)
-	_, err = vad.IsVAD(testData)
+	// close after initialization, twice
+	vad := newInitializedVAD(t)
+	_, err := vad.IsVAD(make([]float32, 1600))
 	assert.NoError(t, err)
-
-	err = vad.Close()
-	assert.NoError(t, err)
-
-	// close again
-	err = vad.Close()
-	assert.NoError(t, err)
+	assert.NoError(t, vad.Close())
+	assert.NoError(t, vad.Close())
 }
 
 // TestWebRTCVAD_SetMode tests SetMode
@@ -220,4 +212,51 @@ func generateSineWave(sampleRate int, frequency float64, duration float64, ampli
 	}
 
 	return samples
+}
+
+func TestWebRTCVADFactory(t *testing.T) {
+	config := WebRTCVADConfig{
+		SampleRate: 16000,
+		Mode:       2,
+	}
+
+	factory := NewWebRTCVADFactory(config)
+
+	// test resource creation
+	resource, err := factory.Create()
+	if err != nil {
+		t.Fatalf("Failed to create resource: %v", err)
+	}
+	defer resource.Close()
+
+	// validate resource type
+	vad, ok := resource.(*WebRTCVAD)
+	if !ok {
+		t.Fatalf("Created resource is not WebRTCVAD type")
+	}
+
+	// validate config
+	if vad.GetSampleRate() != config.SampleRate {
+		t.Errorf("Expected sample rate %d, got %d", config.SampleRate, vad.GetSampleRate())
+	}
+
+	if vad.GetMode() != config.Mode {
+		t.Errorf("Expected mode %d, got %d", config.Mode, vad.GetMode())
+	}
+
+	// test validation
+	if !factory.Validate(resource) {
+		t.Error("Factory validation failed for valid resource")
+	}
+
+	// test reset
+	err = factory.Reset(resource)
+	if err != nil {
+		t.Errorf("Factory reset failed: %v", err)
+	}
+
+	// test resource validity
+	if !resource.IsValid() {
+		t.Error("Resource should be valid after reset")
+	}
 }

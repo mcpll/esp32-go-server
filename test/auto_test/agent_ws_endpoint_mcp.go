@@ -41,7 +41,7 @@ func runAgentWsEndpointMCPCase(serverAddr, deviceID string, testCase *protocolTe
 	if err != nil {
 		return err
 	}
-	fmt.Printf("智能体 MCP endpoint: %s\n", endpoint)
+	fmt.Printf("agent MCP endpoint: %s\n", endpoint)
 
 	runtime, err := startAgentWsEndpointRuntime(endpoint)
 	if err != nil {
@@ -89,7 +89,7 @@ func runAgentWsEndpointMCPCase(serverAddr, deviceID string, testCase *protocolTe
 func startAgentWsEndpointRuntime(endpoint string) (*agentWsEndpointRuntime, error) {
 	conn, _, err := websocket.DefaultDialer.Dial(endpoint, http.Header{})
 	if err != nil {
-		return nil, fmt.Errorf("连接智能体 MCP endpoint 失败: %w", err)
+		return nil, fmt.Errorf("failed to connect to agent MCP endpoint: %w", err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -116,7 +116,7 @@ func newAgentWsEndpointMCPServer() *server.MCPServer {
 		),
 	)
 	weatherTool := mcp.NewTool("query_weather",
-		mcp.WithDescription("查询天气"),
+		mcp.WithDescription("query the weather"),
 	)
 
 	mcpServer.AddTool(helloTool, agentWsEndpointHelloHandler)
@@ -142,7 +142,7 @@ func (r *agentWsEndpointRuntime) readLoop() {
 		_, message, err := r.conn.ReadMessage()
 		if err != nil {
 			if r.ctx.Err() == nil {
-				r.setErr(fmt.Errorf("读取智能体 MCP endpoint 消息失败: %w", err))
+				r.setErr(fmt.Errorf("failed to read agent MCP endpoint message: %w", err))
 				r.cancel()
 			}
 			return
@@ -156,12 +156,12 @@ func (r *agentWsEndpointRuntime) readLoop() {
 
 		responseBytes, err := json.Marshal(response)
 		if err != nil {
-			r.setErr(fmt.Errorf("序列化 MCP 响应失败: %w", err))
+			r.setErr(fmt.Errorf("failed to marshal MCP response: %w", err))
 			r.cancel()
 			return
 		}
 		if err := r.writeMessage(websocket.TextMessage, responseBytes); err != nil {
-			r.setErr(fmt.Errorf("发送 MCP 响应失败: %w", err))
+			r.setErr(fmt.Errorf("failed to send MCP response: %w", err))
 			r.cancel()
 			return
 		}
@@ -179,7 +179,7 @@ func (r *agentWsEndpointRuntime) websocketPingLoop() {
 			return
 		case <-ticker.C:
 			if err := r.writeMessage(websocket.PingMessage, []byte{}); err != nil {
-				r.setErr(fmt.Errorf("发送 websocket ping 失败: %w", err))
+				r.setErr(fmt.Errorf("failed to send websocket ping: %w", err))
 				r.cancel()
 				return
 			}
@@ -219,7 +219,7 @@ func (r *agentWsEndpointRuntime) recordResult(method string) {
 }
 
 func (r *agentWsEndpointRuntime) waitForMethodCount(method string, expected int, timeout time.Duration) error {
-	return r.waitForCount("MCP endpoint 方法", method, expected, timeout, r.methodCount)
+	return r.waitForCount("MCP endpoint method", method, expected, timeout, r.methodCount)
 }
 
 func (r *agentWsEndpointRuntime) waitForResultCount(method string, expected int, timeout time.Duration) error {
@@ -239,7 +239,7 @@ func (r *agentWsEndpointRuntime) waitForCount(label string, method string, expec
 			return err
 		}
 		if time.Now().After(deadline) {
-			return fmt.Errorf("等待 %s %s 数量达到 %d 超时，当前=%d", label, method, expected, countFunc(method))
+			return fmt.Errorf("timed out waiting for %s %s count to reach %d, current=%d", label, method, expected, countFunc(method))
 		}
 
 		<-ticker.C
@@ -299,10 +299,10 @@ func (r *agentWsEndpointRuntime) Close() {
 func buildAgentWsEndpointURL(serverAddr, agentID string) (string, error) {
 	parsed, err := neturl.Parse(strings.TrimSpace(serverAddr))
 	if err != nil {
-		return "", fmt.Errorf("解析 server 地址失败: %w", err)
+		return "", fmt.Errorf("failed to parse server address: %w", err)
 	}
 	if parsed.Scheme == "" || parsed.Host == "" {
-		return "", fmt.Errorf("server 地址必须包含 scheme 和 host: %s", serverAddr)
+		return "", fmt.Errorf("server address must include scheme and host: %s", serverAddr)
 	}
 
 	switch parsed.Scheme {
@@ -312,7 +312,7 @@ func buildAgentWsEndpointURL(serverAddr, agentID string) (string, error) {
 		parsed.Scheme = "wss"
 	case "ws", "wss":
 	default:
-		return "", fmt.Errorf("不支持的 server scheme: %s", parsed.Scheme)
+		return "", fmt.Errorf("unsupported server scheme: %s", parsed.Scheme)
 	}
 
 	token, err := signAgentWsEndpointToken(agentID)
@@ -350,6 +350,15 @@ func buildAgentWsEndpointAgentID(deviceID, caseName string) string {
 	return sanitizeCaseDeviceID(base+"-"+caseName, 72)
 }
 
+// sanitizeCaseDeviceID reduces input to [a-z0-9-] and cuts it to maxLen.
+func sanitizeCaseDeviceID(input string, maxLen int) string {
+	id := sanitizeDeviceIDSuffix(input)
+	if len(id) > maxLen {
+		id = strings.Trim(id[:maxLen], "-")
+	}
+	return id
+}
+
 func agentWsEndpointHelloHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	name, err := request.RequireString("name")
 	if err != nil {
@@ -359,5 +368,5 @@ func agentWsEndpointHelloHandler(ctx context.Context, request mcp.CallToolReques
 }
 
 func agentWsEndpointWeatherHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return mcp.NewToolResultText("天气晴朗 20度 北风3级"), nil
+	return mcp.NewToolResultText("Sunny, 20 degrees, north wind force 3"), nil
 }

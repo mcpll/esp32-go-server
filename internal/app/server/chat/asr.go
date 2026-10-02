@@ -964,7 +964,7 @@ func (a *ASRManager) StartAsrRecognitionLoop(
 					return
 				}
 				if result.EmptyReason != "" {
-					log.Debugf("ASR empty result classified: reason=%s, status=%s", result.EmptyReason, state.Status)
+					log.Debugf("ASR empty result classified: reason=%s, status=%s", result.EmptyReason, state.GetStatus())
 					emptyResultWindowStart = time.Now()
 					emptyResultCount = 0
 
@@ -1009,7 +1009,7 @@ func (a *ASRManager) StartAsrRecognitionLoop(
 				default:
 				}
 
-				log.Debugf("ready Restart Asr, state.Status: %s", state.Status)
+				log.Debugf("ready Restart Asr, state.Status: %s", state.GetStatus())
 				// Realtime: keep listening even in LLMStart/TTSStart (allow ASR restart)
 				// Non-realtime: only Listening or ListenStop may restart ASR
 				if isAllowedToRestart() {

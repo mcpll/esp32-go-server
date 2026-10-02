@@ -103,7 +103,7 @@ func (am *AuthManager) GetSession(sessionID string) (*ClientSession, error) {
 	am.mutex.RUnlock()
 
 	if !exists {
-		return nil, errors.New("会话不存在")
+		return nil, errors.New("session not found")
 	}
 
 	// update last access time
@@ -145,7 +145,6 @@ func generateClientSessionID() (string, error) {
 
 // ValidateToken validates a token
 func (am *AuthManager) ValidateToken(token string) bool {
-	return true
 	// strip the "Bearer " prefix
 	if len(token) > 7 && token[:7] == "Bearer " {
 		token = token[7:]

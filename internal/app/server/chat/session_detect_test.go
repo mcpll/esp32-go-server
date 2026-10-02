@@ -69,7 +69,7 @@ func TestHandleListenStartCancelsPendingDetectLLM(t *testing.T) {
 
 func TestHandleListenStartIgnoresRecentDetectWhileWelcomePlaying(t *testing.T) {
 	session := newDetectDebounceTestSession(t)
-	session.clientState.IsWelcomePlaying = true
+	session.clientState.SetWelcomePlaying(true)
 	session.clientState.RecordCommandArrival(data_client.CommandTypeDetect, time.Now())
 
 	if err := session.HandleListenStart(&data_client.ClientMessage{
@@ -169,7 +169,7 @@ func TestHandleListenStartIgnoresAutoStartDuringWelcome(t *testing.T) {
 	session, conn, cleanup := newStartedTTSControlTestSession(t)
 	defer cleanup()
 
-	session.clientState.IsWelcomePlaying = true
+	session.clientState.SetWelcomePlaying(true)
 	initialHistory := session.clientState.GetCommandHistorySnapshot()
 
 	session.ttsManager.EnqueueTtsStart(context.Background())
@@ -190,7 +190,7 @@ func TestHandleListenStartIgnoresAutoStartDuringWelcome(t *testing.T) {
 	if got := conn.sentCmdCount(); got != 1 {
 		t.Fatalf("expected auto listen start during welcome to avoid interrupting TTS, got %d commands", got)
 	}
-	if !session.clientState.IsWelcomePlaying {
+	if !session.clientState.GetWelcomePlaying() {
 		t.Fatal("expected auto listen start during welcome to keep welcome playback active")
 	}
 	if got := session.clientState.ListenMode; got != "" {
@@ -205,7 +205,7 @@ func TestHandleListenStartIgnoresAutoStartDuringWelcome(t *testing.T) {
 
 func TestHandleListenStartRealtimeDoesNotWaitForWelcomeCompletion(t *testing.T) {
 	session := newDetectDebounceTestSession(t)
-	session.clientState.IsWelcomePlaying = true
+	session.clientState.SetWelcomePlaying(true)
 	session.beginWelcomePlaybackWait()
 	initialHistory := session.clientState.GetCommandHistorySnapshot()
 
@@ -228,7 +228,7 @@ func TestHandleListenStartRealtimeDoesNotWaitForWelcomeCompletion(t *testing.T) 
 	if history.LastCmdType != data_client.CommandTypeListenStart || !history.LastCmdAt.After(initialHistory.LastCmdAt) {
 		t.Fatalf("expected realtime listen start to update command history, got %+v want %+v", history, initialHistory)
 	}
-	if !session.clientState.IsWelcomePlaying {
+	if !session.clientState.GetWelcomePlaying() {
 		t.Fatal("expected realtime listen start not to interrupt welcome playback")
 	}
 }
@@ -261,7 +261,7 @@ func TestHandleListenDetectSilentlySkipsWakeupWhenAutoListenActiveAfterWelcome(t
 	session := newDetectDebounceTestSession(t)
 	setViperValueForTest(t, "enable_greeting", true)
 	setViperValueForTest(t, "wakeup_words", []string{"你好小智"})
-	session.clientState.IsWelcomeSpeaking = true
+	session.clientState.SetWelcomeSpeaking(true)
 	session.clientState.ListenMode = "auto"
 	session.clientState.SetListenPhase(data_client.ListenPhaseListening)
 
@@ -285,7 +285,7 @@ func TestHandleListenDetectWelcomedWakeupSchedulesLLMWhenAutoListenIdle(t *testi
 	session := newDetectDebounceTestSession(t)
 	setViperValueForTest(t, "enable_greeting", true)
 	setViperValueForTest(t, "wakeup_words", []string{"你好小智"})
-	session.clientState.IsWelcomeSpeaking = true
+	session.clientState.SetWelcomeSpeaking(true)
 	session.clientState.ListenMode = "auto"
 	session.clientState.SetListenPhase(data_client.ListenPhaseIdle)
 
@@ -323,8 +323,8 @@ func TestOnListenStartStaleAfterInvalidateDoesNotClearWelcomePlaybackOrContexts(
 	session.invalidateListenStart()
 	sessionCtx := session.clientState.SessionCtx.Get(session.clientState.Ctx)
 	afterAsrCtx := session.clientState.AfterAsrSessionCtx.Get(sessionCtx)
-	session.clientState.IsWelcomeSpeaking = true
-	session.clientState.IsWelcomePlaying = true
+	session.clientState.SetWelcomeSpeaking(true)
+	session.clientState.SetWelcomePlaying(true)
 
 	session.stopSpeakingMu.Unlock()
 
@@ -337,7 +337,7 @@ func TestOnListenStartStaleAfterInvalidateDoesNotClearWelcomePlaybackOrContexts(
 		t.Fatal("OnListenStart did not return after invalidation")
 	}
 
-	if !session.clientState.IsWelcomePlaying {
+	if !session.clientState.GetWelcomePlaying() {
 		t.Fatal("expected stale listen start not to clear welcome playing state")
 	}
 	if sessionCtx.Err() != nil {
@@ -351,21 +351,21 @@ func TestOnListenStartStaleAfterInvalidateDoesNotClearWelcomePlaybackOrContexts(
 func TestStopSpeakingClearsRealtimeListenSessionActive(t *testing.T) {
 	session := newDetectDebounceTestSession(t)
 	session.realtimeListenSessionActive.Store(true)
-	session.clientState.IsWelcomePlaying = true
+	session.clientState.SetWelcomePlaying(true)
 
 	session.StopSpeaking(true)
 
 	if session.isRealtimeListenSessionActive() {
 		t.Fatal("expected session cancel path to clear realtime listen session active")
 	}
-	if session.clientState.IsWelcomePlaying {
+	if session.clientState.GetWelcomePlaying() {
 		t.Fatal("expected StopSpeaking to clear welcome playing state")
 	}
 }
 
 func TestStopSpeakingSignalsInterruptedWelcomePlaybackWait(t *testing.T) {
 	session := newDetectDebounceTestSession(t)
-	session.clientState.IsWelcomePlaying = true
+	session.clientState.SetWelcomePlaying(true)
 	session.beginWelcomePlaybackWait()
 
 	done := make(chan bool, 1)
