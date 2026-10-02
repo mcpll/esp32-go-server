@@ -25,6 +25,24 @@ The voice loop is Italian, hold-to-talk, over the protocol the Eye firmware alre
 - Added: a PocketBase config provider, a `commands` channel, the React console, an Italian default stack and Italian prompts.
 - Fixed: WebSocket token check, no default secrets, no open inject route.
 
+## Local test stack (Docker)
+
+Each stack starts PocketBase (with `pb_migrations/` mounted), Redis and the server, and carries the migration check. Pick the one that matches your host:
+
+| Host | Compose file | Images | VAD |
+|------|--------------|--------|-----|
+| Mac (Apple Silicon) | `docker/test/mac/docker-compose.yml` | native `linux/arm64` | `silero_vad` (upstream ships no ten-vad for Linux arm64) |
+| Linux x86-64 | `docker/test/linux/docker-compose.yml` | native `linux/amd64` | `silero_vad`, or `ten_vad` by editing `docker/test/config.yaml` |
+
+```sh
+F=docker/test/mac/docker-compose.yml   # or docker/test/linux/docker-compose.yml
+docker compose -f $F --profile check run --rm check   # runs pb_migrations/check.sh, prints OK
+docker compose -f $F up --build                       # PocketBase admin UI at http://localhost:8090/_/
+docker compose -f $F down -v                          # reset all data
+```
+
+The first boot creates the console user (a record in the `users` collection, for the future console, not for the PocketBase admin UI) from `ADMIN_EMAIL` and `ADMIN_PASSWORD` (defaults `owner@example.com` / `console-pass-123`; override them in your shell). The admin UI at `/_/` only accepts a superuser, so every start also upserts a superuser with the same `ADMIN_EMAIL` and `ADMIN_PASSWORD` (password of at least 8 characters); it survives `down -v`. The server does not talk to PocketBase yet and the ASR/LLM/TTS providers in `docker/test/config.yaml` are placeholders, so the stack checks that it boots, not that a voice turn works.
+
 ## Roadmap
 
 - Spec: [#8](https://github.com/mcpll/esp32-go-server/issues/8)

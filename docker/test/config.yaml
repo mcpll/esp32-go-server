@@ -1,0 +1,134 @@
+# Minimal server config for the local test stacks (docker/test/mac and docker/test/linux).
+# Derived from config/config.yaml. Providers are placeholders: this stack checks that the server
+# boots against Redis, not that ASR/LLM/TTS calls work.
+server:
+  pprof:
+    enable: false
+    port: 6060
+
+auth:
+  enable: false
+
+chat:
+  max_idle_duration: 30000
+  chat_max_silence_duration: 400
+  speak_request_reuse_window_ms: 60000
+  realtime_mode: 4
+
+config_provider:
+  type: "redis"
+  enable_periodic_update: false
+
+log:
+  path: "/tmp/xiaozhi-logs/"
+  file: "server.log"
+  level: "info"
+  max_age: 3
+  rotation_time: 10
+  stdout: true
+
+# Host "redis" is the compose service name; the password matches docker-compose.yml.
+redis:
+  host: "redis"
+  port: 6379
+  password: "test"
+  db: 0
+  key_prefix: "xiaozhi"
+
+websocket:
+  host: "0.0.0.0"
+  port: 8989
+
+mqtt:
+  enable: false
+
+mqtt_server:
+  enable: true
+  listen_host: "0.0.0.0"
+  listen_port: 2883
+  client_id: "xiaozhi_server"
+  username: "admin"
+  password: "test"
+  enable_auth: false
+  tls:
+    enable: false
+
+udp:
+  external_host: "127.0.0.1"
+  external_port: 8990
+  listen_host: "0.0.0.0"
+  listen_port: 8990
+
+resource_pools:
+  max_size: 1000
+  min_size: 1
+  max_idle: 50
+  acquire_timeout: 5s
+  idle_timeout: 10m
+  validate_on_borrow: true
+  validate_on_return: true
+
+# silero_vad works on both stacks. On linux/amd64 you can switch to "ten_vad";
+# linux/arm64 (Mac) has no ten-vad library, so keep silero_vad there.
+vad:
+  provider: "silero_vad"
+  silero_vad:
+    model_path: "config/models/vad/silero_vad.onnx"
+    threshold: 0.5
+    min_silence_duration_ms: 100
+    sample_rate: 16000
+    channels: 1
+    acquire_timeout_ms: 3000
+  ten_vad:
+    hop_size: 512
+    threshold: 0.4
+    pool_size: 10
+    acquire_timeout_ms: 3000
+
+asr:
+  provider: "funasr"
+  funasr:
+    host: "127.0.0.1"
+    port: "10096"
+    mode: "offline"
+    sample_rate: 16000
+    chunk_size: [5, 10, 5]
+    chunk_interval: 10
+    max_connections: 5
+    timeout: 30
+    auto_end: true
+
+tts:
+  provider: "edge"
+  edge:
+    voice: "it-IT-ElsaNeural"
+    rate: "+0%"
+    volume: "+0%"
+    pitch: "+0Hz"
+    connect_timeout: 10
+    receive_timeout: 60
+
+llm:
+  provider: "placeholder"
+  placeholder:
+    type: "openai"
+    model_name: "placeholder"
+    api_key: "placeholder"
+    base_url: "http://127.0.0.1:1/v1"
+    max_tokens: 100
+
+memory:
+  provider: "nomemo"
+
+mcp:
+  global:
+    enabled: false
+
+local_mcp:
+  exit_conversation: true
+  clear_conversation_history: true
+
+enable_greeting: false
+
+ota:
+  signature_key: "test-signature-key"

@@ -1,0 +1,81 @@
+# Self-contained test stack for Apple Silicon: every image is native linux/arm64, no emulation.
+# Same services as ../linux/docker-compose.yml; only the platform differs.
+# ten-vad has no arm64 library, so the server runs with silero_vad (see ../config.yaml).
+#
+#   up:     docker compose -f docker/test/mac/docker-compose.yml up --build
+#   check:  docker compose -f docker/test/mac/docker-compose.yml --profile check run --rm check
+#   reset:  docker compose -f docker/test/mac/docker-compose.yml down -v
+name: esp32-test-mac
+
+x-platform: &platform linux/arm64
+
+services:
+  pocketbase:
+    platform: *platform
+    build:
+      context: ../../..
+      dockerfile: docker/test/Dockerfile.pocketbase
+    # Upsert the superuser on every start so the admin UI login (/_/) always works, then serve.
+    # It reuses ADMIN_EMAIL/ADMIN_PASSWORD (password: 8 characters minimum).
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        pocketbase superuser upsert "$$ADMIN_EMAIL" "$$ADMIN_PASSWORD" --dir /pb_data --migrationsDir /pb_migrations
+        && exec pocketbase serve --http 0.0.0.0:8090 --dir /pb_data --migrationsDir /pb_migrations
+    environment:
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-owner@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-console-pass-123}
+    volumes:
+      - ../../../pb_migrations:/pb_migrations:ro
+      - pb_data:/pb_data
+    ports:
+      - "8090:8090"
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://127.0.0.1:8090/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    platform: *platform
+    image: redis:7-alpine
+    command: ["redis-server", "--requirepass", "test"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "test", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  server:
+    platform: *platform
+    build:
+      context: ../../..
+      dockerfile: docker/test/Dockerfile.server
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ../config.yaml:/workspace/config/config.yaml:ro
+      - ../../../config/models:/workspace/config/models:ro
+    ports:
+      - "8989:8989"
+      - "2883:2883"
+      - "8990:8990/udp"
+
+  # Runs pb_migrations/check.sh against throwaway data folders; does not touch pb_data.
+  check:
+    platform: *platform
+    profiles: ["check"]
+    build:
+      context: ../../..
+      dockerfile: docker/test/Dockerfile.pocketbase
+    entrypoint: ["bash", "/pb_migrations/check.sh"]
+    environment:
+      PB_BIN: /usr/local/bin/pocketbase
+    volumes:
+      - ../../../pb_migrations:/pb_migrations:ro
+
+volumes:
+  pb_data:

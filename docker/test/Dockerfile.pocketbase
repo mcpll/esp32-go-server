@@ -1,0 +1,16 @@
+# PocketBase for local testing of pb_migrations. Native on both linux/amd64 and linux/arm64.
+# The migrations are mounted at run time, not copied, so edits show up without a rebuild.
+FROM alpine:3.20
+
+# ponytail: pinned by hand; align with the production PocketBase version when there is one.
+ARG PB_VERSION=0.40.4
+ARG TARGETARCH
+
+RUN apk add --no-cache bash curl jq unzip ca-certificates \
+    && curl -fsSL "https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_${TARGETARCH}.zip" -o /tmp/pb.zip \
+    && unzip /tmp/pb.zip pocketbase -d /usr/local/bin \
+    && rm /tmp/pb.zip \
+    && chmod +x /usr/local/bin/pocketbase
+
+EXPOSE 8090
+ENTRYPOINT ["pocketbase"]

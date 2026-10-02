@@ -1,0 +1,52 @@
+# Server image for local testing, one file for linux/amd64 and linux/arm64 (picked by TARGETARCH).
+#   - onnxruntime: official release for the target arch (x64 or aarch64).
+#   - opus/opusfile: from apt, so the right arch comes for free.
+#   - ten-vad: upstream ships only Linux/x64. On linux/arm64 the Go stub is compiled in
+#     (internal/domain/vad/ten_vad/ten_vad_stub.go), so set vad.provider to silero_vad or webrtc_vad there.
+#   - Built without the asr_server tag, so no sherpa-onnx libraries are needed.
+FROM golang:1.26.4-bookworm AS builder
+
+ARG TARGETARCH
+ARG ORT_VERSION=1.21.0
+ENV DEBIAN_FRONTEND=noninteractive CGO_ENABLED=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libopus-dev libopusfile-dev pkg-config g++ libc++-dev libc++abi-dev curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN case "${TARGETARCH}" in amd64) ORT_ARCH=x64 ;; arm64) ORT_ARCH=aarch64 ;; *) echo "unsupported arch ${TARGETARCH}" >&2; exit 1 ;; esac \
+    && ORT_DIR="onnxruntime-linux-${ORT_ARCH}-${ORT_VERSION}" \
+    && curl -fsSL "https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/${ORT_DIR}.tgz" -o /tmp/ort.tgz \
+    && tar -xzf /tmp/ort.tgz -C /tmp \
+    && mkdir -p /usr/local/include/onnxruntime \
+    && cp -r "/tmp/${ORT_DIR}/include/." /usr/local/include/onnxruntime/ \
+    && cp -a "/tmp/${ORT_DIR}/lib/." /usr/local/lib/ \
+    && rm -rf /tmp/ort.tgz "/tmp/${ORT_DIR}" \
+    && ldconfig
+
+ENV CGO_CFLAGS="-I/usr/local/include/onnxruntime" \
+    CGO_LDFLAGS="-L/usr/local/lib -lonnxruntime"
+
+WORKDIR /app
+COPY . .
+RUN go build -o /app/xiaozhi_server ./cmd/server/
+
+FROM debian:bookworm-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libopus0 libopusfile0 libc++1 libc++abi1 ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /usr/local/lib/libonnxruntime* /usr/local/lib/
+# ten-vad runtime library; only linux/x64 exists upstream, unused on arm64
+COPY --from=builder /app/lib/ten-vad/lib/Linux /workspace/lib/ten-vad/lib/Linux
+RUN ldconfig
+
+WORKDIR /workspace
+COPY --from=builder /app/xiaozhi_server /workspace/bin/xiaozhi_server
+RUN mkdir -p /workspace/logs /workspace/config
+ENV LD_LIBRARY_PATH=/workspace/lib/ten-vad/lib/Linux/x64
+
+EXPOSE 8989 8990 2883
+CMD ["bin/xiaozhi_server", "-c", "config/config.yaml"]
