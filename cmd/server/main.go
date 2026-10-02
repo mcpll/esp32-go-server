@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"xiaozhi-esp32-server-golang/internal/app/server"
 	user_config "xiaozhi-esp32-server-golang/internal/domain/config"
+	"xiaozhi-esp32-server-golang/internal/domain/config/store"
 	log "xiaozhi-esp32-server-golang/logger"
 
 	"github.com/spf13/viper"
@@ -59,7 +60,7 @@ func main() {
 	user_config.RegisterSystemConfigHandler(func(data map[string]interface{}) {
 		lock.Lock()
 		defer lock.Unlock()
-		current := viper.AllSettings()
+		current := store.AllSettings()
 		oldMqttServer := current["mqtt_server"]
 		oldMqtt := current["mqtt"]
 		oldUdp := current["udp"]

@@ -12,11 +12,11 @@ import (
 	"sync"
 	"time"
 
+	"xiaozhi-esp32-server-golang/internal/domain/config/store"
 	"xiaozhi-esp32-server-golang/internal/domain/config/types"
 	log "xiaozhi-esp32-server-golang/logger"
 
 	"github.com/google/uuid"
-	"github.com/spf13/viper"
 )
 
 const (
@@ -226,11 +226,11 @@ func (p *Provider) GetUserConfig(ctx context.Context, deviceID string) (types.UC
 func mergeSection(stage, agentProvider string, overrides map[string]any) (string, map[string]any) {
 	provider := strings.TrimSpace(agentProvider)
 	if provider == "" {
-		provider = viper.GetString(stage + ".provider")
+		provider = store.GetString(stage + ".provider")
 	}
 	merged := map[string]any{}
 	if provider != "" {
-		for k, v := range viper.GetStringMap(stage + "." + provider) {
+		for k, v := range store.GetStringMap(stage + "." + provider) {
 			merged[k] = cloneValue(v)
 		}
 	}

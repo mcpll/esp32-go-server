@@ -7,11 +7,10 @@ import (
 	"time"
 	"xiaozhi-esp32-server-golang/internal/data/client"
 	user_config "xiaozhi-esp32-server-golang/internal/domain/config"
+	"xiaozhi-esp32-server-golang/internal/domain/config/store"
 	ctypes "xiaozhi-esp32-server-golang/internal/domain/config/types"
 	"xiaozhi-esp32-server-golang/internal/util"
 	log "xiaozhi-esp32-server-golang/logger"
-
-	"github.com/spf13/viper"
 )
 
 type ActivationRequest struct {
@@ -50,10 +49,10 @@ func (s *WebSocketServer) handleOta(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var activationInfo *ActivationInfo
-	authEnable := viper.GetBool("auth.enable")
+	authEnable := store.GetBool("auth.enable")
 	log.Debugf("authEnable: %v", authEnable)
 	if authEnable {
-		configProvider, err := user_config.GetProvider(viper.GetString("config_provider.type"))
+		configProvider, err := user_config.GetProvider(store.GetString("config_provider.type"))
 		if err != nil {
 			log.Errorf("failed to get config provider: %v", err)
 			http.Error(w, "internal server error", http.StatusInternalServerError)
@@ -95,8 +94,8 @@ func (s *WebSocketServer) handleOta(w http.ResponseWriter, r *http.Request) {
 	// Password
 	respData := &OtaResponse{
 		Websocket: WebsocketInfo{
-			Url:   viper.GetString(otaConfigPrefix + "websocket.url"),
-			Token: viper.GetString(otaConfigPrefix + "websocket.token"),
+			Url:   store.GetString(otaConfigPrefix + "websocket.url"),
+			Token: store.GetString(otaConfigPrefix + "websocket.token"),
 		},
 		Mqtt: mqttInfo,
 		ServerTime: ServerTimeInfo{
@@ -120,12 +119,12 @@ func (s *WebSocketServer) handleOta(w http.ResponseWriter, r *http.Request) {
 }
 
 func getMqttInfo(deviceId, clientId, otaConfigPrefix, ip string) *MqttInfo {
-	if !viper.GetBool(otaConfigPrefix + "mqtt.enable") {
+	if !store.GetBool(otaConfigPrefix + "mqtt.enable") {
 		return nil
 	}
 
 	// Generate MQTT credentials
-	signatureKey := viper.GetString("ota.signature_key")
+	signatureKey := store.GetString("ota.signature_key")
 	credentials, err := util.GenerateMqttCredentials(deviceId, clientId, ip, signatureKey)
 	if err != nil {
 		log.Errorf("failed to generate MQTT credentials: %v", err)
@@ -133,7 +132,7 @@ func getMqttInfo(deviceId, clientId, otaConfigPrefix, ip string) *MqttInfo {
 	}
 
 	return &MqttInfo{
-		Endpoint:       viper.GetString(otaConfigPrefix + "mqtt.endpoint"),
+		Endpoint:       store.GetString(otaConfigPrefix + "mqtt.endpoint"),
 		ClientId:       credentials.ClientId,
 		Username:       credentials.Username,
 		Password:       credentials.Password,
@@ -164,7 +163,7 @@ func (s *WebSocketServer) handleOtaActivate(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Call config Provider for binding verification
-	configProvider, err := user_config.GetProvider(viper.GetString("config_provider.type"))
+	configProvider, err := user_config.GetProvider(store.GetString("config_provider.type"))
 	if err != nil {
 		log.Errorf("failed to get config Provider: %v", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
