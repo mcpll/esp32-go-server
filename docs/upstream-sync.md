@@ -1,6 +1,17 @@
 # Syncing with upstream
 
-This repository is a fork of [hackers365/xiaozhi-esp32-server-golang](https://github.com/hackers365/xiaozhi-esp32-server-golang). It was imported by merging upstream commit `21f1a2e` with `--allow-unrelated-histories`, so upstream history and authorship are kept.
+This repository is a fork of [hackers365/xiaozhi-esp32-server-golang](https://github.com/hackers365/xiaozhi-esp32-server-golang). Upstream was first brought in at commit `21f1a2e`. That import landed on `main` as a squash (`2604b07`), which dropped the merge base. The base was restored afterwards by merging branch `import-upstream` with `-s ours` (`Record upstream 21f1a2e as merge base`), so the tree of `main` stayed unchanged and `21f1a2e` became an ancestor again.
+
+## First-sync check
+
+Before every merge from upstream:
+
+```sh
+git fetch upstream
+git merge-base main upstream/main
+```
+
+That must print `21f1a2e71ff383723f1464ea9b137016e6feab8d`, or a later upstream commit once a real sync has landed. If it prints nothing, stop: the histories are unrelated again and a merge would conflict on every shared path (add/add). Do not merge until the base is restored.
 
 ## Pull later upstream fixes
 
