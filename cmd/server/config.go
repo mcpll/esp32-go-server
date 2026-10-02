@@ -10,6 +10,7 @@ import (
 	"xiaozhi-esp32-server-golang/internal/app/server/auth"
 	redisdb "xiaozhi-esp32-server-golang/internal/db/redis"
 	user_config "xiaozhi-esp32-server-golang/internal/domain/config"
+	"xiaozhi-esp32-server-golang/internal/domain/config/store"
 
 	log "xiaozhi-esp32-server-golang/logger"
 
@@ -81,7 +82,7 @@ func applySystemConfig(data map[string]interface{}) {
 
 // ApplySystemConfigToViper merges system config into viper
 func ApplySystemConfigToViper(data map[string]interface{}) {
-	if err := viper.MergeConfigMap(data); err != nil {
+	if err := store.Merge(data); err != nil {
 		log.Warnf("Failed to merge system config into viper: %v", err)
 		return
 	}
