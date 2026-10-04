@@ -1,3 +1,4 @@
+import { controlClass } from '@/components/classes'
 import type { Field } from '@/lib/providerForm'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -29,6 +30,7 @@ export function FieldControl({
       <Label htmlFor={id}>{field.label}</Label>
       <Input
         id={id}
+        className={controlClass}
         inputMode={field.kind === 'number' ? 'numeric' : 'text'}
         value={text}
         onChange={(event) => onChange(event.target.value)}

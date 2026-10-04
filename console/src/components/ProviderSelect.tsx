@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { controlClass } from '@/components/classes'
 import {
   Select,
   SelectContent,
@@ -43,7 +44,7 @@ export function ProviderSelect({
     <div className="grid gap-2">
       <Label htmlFor={`${stage}-provider`}>Provider</Label>
       <Select items={items} value={selected} onValueChange={onValueChange}>
-        <SelectTrigger id={`${stage}-provider`} className="w-full">
+        <SelectTrigger id={`${stage}-provider`} className={`w-full ${controlClass}`}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -54,7 +55,11 @@ export function ProviderSelect({
           ))}
         </SelectContent>
       </Select>
-      {error !== null ? <p role="alert">{error}</p> : null}
+      {error !== null ? (
+        <p className="text-sm text-destructive" role="alert">
+          {error}
+        </p>
+      ) : null}
     </div>
   )
 }

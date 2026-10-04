@@ -1,4 +1,6 @@
 import { useState, type FormEvent } from 'react'
+import { AudioLines } from 'lucide-react'
+import { actionClass, controlClass, panelClass } from '@/components/classes'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -18,10 +20,13 @@ export function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-svh max-w-sm items-center p-6">
-      <Card className="w-full">
+    <main className="flex min-h-svh items-center justify-center bg-background p-6">
+      <Card className={`w-full max-w-sm ${panelClass}`}>
         <CardHeader>
-          <CardTitle>Log in</CardTitle>
+          <div className="mb-2 flex size-12 items-center justify-center rounded-2xl bg-accent text-primary">
+            <AudioLines className="size-6" />
+          </div>
+          <CardTitle className="text-xl font-semibold tracking-tight">Log in</CardTitle>
         </CardHeader>
         <CardContent>
           <form className="grid gap-4" onSubmit={onSubmit}>
@@ -29,6 +34,7 @@ export function LoginPage() {
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
+                className={controlClass}
                 type="email"
                 autoComplete="username"
                 value={email}
@@ -39,6 +45,7 @@ export function LoginPage() {
               <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
+                className={controlClass}
                 type="password"
                 autoComplete="current-password"
                 value={password}
@@ -46,11 +53,11 @@ export function LoginPage() {
               />
             </div>
             {message !== null ? (
-              <p className="text-destructive" role="alert">
+              <p className="text-sm text-destructive" role="alert">
                 {message}
               </p>
             ) : null}
-            <Button type="submit" disabled={login.isPending}>
+            <Button className={`w-full ${actionClass}`} type="submit" disabled={login.isPending}>
               {login.isPending ? 'Logging in…' : 'Log in'}
             </Button>
           </form>

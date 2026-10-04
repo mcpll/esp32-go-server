@@ -1,4 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
+import { actionClass, controlClass, panelClass } from '@/components/classes'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -37,7 +38,7 @@ export function AddDeviceForm({ agents }: { agents: Agent[] }) {
   }
 
   return (
-    <Card>
+    <Card className={panelClass}>
       <CardHeader>
         <CardTitle>Add device</CardTitle>
       </CardHeader>
@@ -50,6 +51,7 @@ export function AddDeviceForm({ agents }: { agents: Agent[] }) {
               <Label htmlFor="device-code">Six-digit code</Label>
               <Input
                 id="device-code"
+                className={controlClass}
                 inputMode="numeric"
                 autoComplete="off"
                 value={code}
@@ -59,7 +61,7 @@ export function AddDeviceForm({ agents }: { agents: Agent[] }) {
             <div className="grid gap-2">
               <Label htmlFor="device-agent">Agent</Label>
               <Select items={items} value={agentId} onValueChange={(value) => setAgentId(value ?? '')}>
-                <SelectTrigger id="device-agent" className="w-full">
+                <SelectTrigger id="device-agent" className={`w-full ${controlClass}`}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -73,7 +75,12 @@ export function AddDeviceForm({ agents }: { agents: Agent[] }) {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="device-note">Note</Label>
-              <Input id="device-note" value={note} onChange={(event) => setNote(event.target.value)} />
+              <Input
+                id="device-note"
+                className={controlClass}
+                value={note}
+                onChange={(event) => setNote(event.target.value)}
+              />
             </div>
             <p className="text-sm text-muted-foreground">
               The device leaves the activation screen on its next check-in.
@@ -83,7 +90,7 @@ export function AddDeviceForm({ agents }: { agents: Agent[] }) {
                 {message}
               </p>
             ) : null}
-            <Button type="submit" disabled={bind.isPending}>
+            <Button className={actionClass} type="submit" disabled={bind.isPending}>
               {bind.isPending ? 'Adding…' : 'Add device'}
             </Button>
           </form>

@@ -1,3 +1,4 @@
+import { areaClass } from '@/components/classes'
 import { FieldControl } from '@/components/FieldControl'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -30,7 +31,7 @@ export function KnownProviderFields({
         <Label htmlFor={`${stage}-json`}>Other JSON</Label>
         <Textarea
           id={`${stage}-json`}
-          className="font-mono"
+          className={`${areaClass} font-mono`}
           rows={6}
           spellCheck={false}
           value={draft.restText}
