@@ -16,13 +16,13 @@ import (
 func TestOpenAITTS(t *testing.T) {
 	// Skip live network tests unless the env var is set
 	if os.Getenv("RUN_OPENAI_TEST") != "1" {
-		t.Skip("跳过OpenAI API测试，设置环境变量RUN_OPENAI_TEST=1以启用")
+		t.Skip("skip OpenAI API test; set RUN_OPENAI_TEST=1 to enable")
 	}
 
 	// Get API key from environment
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
-		t.Skip("跳过OpenAI API测试，需要设置环境变量OPENAI_API_KEY")
+		t.Skip("skip OpenAI API test; set OPENAI_API_KEY")
 	}
 
 	config := map[string]interface{}{
@@ -44,14 +44,14 @@ func TestOpenAITTS(t *testing.T) {
 
 		frames, err := provider.TextToSpeech(ctx, "Hello, this is a test of OpenAI text to speech.", 16000, 1, 60)
 		if err != nil {
-			t.Fatalf("TextToSpeech失败: %v", err)
+			t.Fatalf("TextToSpeech failed: %v", err)
 		}
 
 		if len(frames) == 0 {
-			t.Error("未返回任何音频帧")
+			t.Error("no audio frames returned")
 		}
 
-		t.Logf("成功生成 %d 个音频帧", len(frames))
+		t.Logf("generated %d audio frames", len(frames))
 	})
 
 	// Test streaming text-to-speech
@@ -61,7 +61,7 @@ func TestOpenAITTS(t *testing.T) {
 
 		outputChan, err := provider.TextToSpeechStream(ctx, "Hello, this is a test of OpenAI streaming text to speech.", 16000, 1, 60)
 		if err != nil {
-			t.Fatalf("TextToSpeechStream失败: %v", err)
+			t.Fatalf("TextToSpeechStream failed: %v", err)
 		}
 
 		// Receive all frames
@@ -77,16 +77,16 @@ func TestOpenAITTS(t *testing.T) {
 				}
 				receivedFrames = append(receivedFrames, frame)
 			case <-timeout:
-				t.Error("接收音频帧超时")
+				t.Error("timed out waiting for audio frames")
 				break receiveLoop
 			}
 		}
 
 		if len(receivedFrames) == 0 {
-			t.Error("未接收到任何音频帧")
+			t.Error("received no audio frames")
 		}
 
-		t.Logf("成功接收 %d 个音频帧", len(receivedFrames))
+		t.Logf("received %d audio frames", len(receivedFrames))
 	})
 
 	// Test different voices
@@ -109,15 +109,15 @@ func TestOpenAITTS(t *testing.T) {
 
 				frames, err := provider.TextToSpeech(ctx, "Testing voice: "+voice, 16000, 1, 60)
 				if err != nil {
-					t.Errorf("使用语音 %s 失败: %v", voice, err)
+					t.Errorf("voice %s failed: %v", voice, err)
 					return
 				}
 
 				if len(frames) == 0 {
-					t.Errorf("语音 %s 未返回任何音频帧", voice)
+					t.Errorf("voice %s returned no audio frames", voice)
 				}
 
-				t.Logf("语音 %s 成功生成 %d 个音频帧", voice, len(frames))
+				t.Logf("voice %s generated %d audio frames", voice, len(frames))
 			})
 		}
 	})
@@ -142,15 +142,15 @@ func TestOpenAITTS(t *testing.T) {
 
 				frames, err := provider.TextToSpeech(ctx, "Testing speed", 16000, 1, 60)
 				if err != nil {
-					t.Errorf("使用速度 %.1f 失败: %v", speed, err)
+					t.Errorf("speed %.1f failed: %v", speed, err)
 					return
 				}
 
 				if len(frames) == 0 {
-					t.Errorf("速度 %.1f 未返回任何音频帧", speed)
+					t.Errorf("speed %.1f returned no audio frames", speed)
 				}
 
-				t.Logf("速度 %.1f 成功生成 %d 个音频帧", speed, len(frames))
+				t.Logf("speed %.1f generated %d audio frames", speed, len(frames))
 			})
 		}
 	})
@@ -165,23 +165,23 @@ func TestOpenAITTSProviderDefaults(t *testing.T) {
 	provider := NewOpenAITTSProvider(config)
 
 	if provider.APIURL != "https://api.openai.com/v1/audio/speech" {
-		t.Errorf("期望默认API URL为 https://api.openai.com/v1/audio/speech，实际为 %s", provider.APIURL)
+		t.Errorf("default API URL = %s, want https://api.openai.com/v1/audio/speech", provider.APIURL)
 	}
 
 	if provider.Model != "tts-1" {
-		t.Errorf("期望默认模型为 tts-1，实际为 %s", provider.Model)
+		t.Errorf("default model = %s, want tts-1", provider.Model)
 	}
 
 	if provider.Voice != "alloy" {
-		t.Errorf("期望默认语音为 alloy，实际为 %s", provider.Voice)
+		t.Errorf("default voice = %s, want alloy", provider.Voice)
 	}
 
 	if provider.ResponseFormat != "mp3" {
-		t.Errorf("期望默认响应格式为 mp3，实际为 %s", provider.ResponseFormat)
+		t.Errorf("default response format = %s, want mp3", provider.ResponseFormat)
 	}
 
 	if provider.Speed != 1.0 {
-		t.Errorf("期望默认速度为 1.0，实际为 %.1f", provider.Speed)
+		t.Errorf("default speed = %.1f, want 1.0", provider.Speed)
 	}
 }
 
@@ -198,7 +198,7 @@ func TestOpenAITTSProviderSupportsOpusResponse(t *testing.T) {
 
 	opusBytes, err := util.PCM16ToOggOpus(pcm, sampleRate, 1, 20)
 	if err != nil {
-		t.Fatalf("生成测试 Ogg Opus 失败: %v", err)
+		t.Fatalf("failed to build test Ogg Opus: %v", err)
 	}
 
 	requestErrCh := make(chan error, 1)
@@ -212,7 +212,7 @@ func TestOpenAITTSProviderSupportsOpusResponse(t *testing.T) {
 			return
 		}
 		if req.ResponseFormat != "opus" {
-			requestErrCh <- fmt.Errorf("期望 response_format=opus，实际为 %s", req.ResponseFormat)
+			requestErrCh <- fmt.Errorf("response_format = %s, want opus", req.ResponseFormat)
 			http.Error(w, "unexpected response_format", http.StatusBadRequest)
 			return
 		}
@@ -234,26 +234,53 @@ func TestOpenAITTSProviderSupportsOpusResponse(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	outputChan, err := provider.TextToSpeechStream(ctx, "测试 opus 输出", sampleRate, 1, 60)
+	outputChan, err := provider.TextToSpeechStream(ctx, "opus output test", sampleRate, 1, 60)
 	if err != nil {
-		t.Fatalf("TextToSpeechStream 返回错误: %v", err)
+		t.Fatalf("TextToSpeechStream returned an error: %v", err)
 	}
 
 	frameCount := 0
 	for frame := range outputChan {
 		if len(frame) == 0 {
-			t.Fatal("收到空 Opus 帧")
+			t.Fatal("empty Opus frame")
 		}
 		frameCount++
 	}
 
 	if frameCount == 0 {
-		t.Fatal("未收到任何 Opus 帧")
+		t.Fatal("no Opus frames")
 	}
 
 	select {
 	case err := <-requestErrCh:
-		t.Fatalf("mock server 校验失败: %v", err)
+		t.Fatalf("mock server check failed: %v", err)
 	default:
+	}
+}
+
+func TestRequestBodySendsStyleAndOmitsDefaultSpeed(t *testing.T) {
+	provider := NewOpenAITTSProvider(map[string]interface{}{
+		"model": "google/gemini-3.8-flash-tts",
+		"voice": "Algenib",
+		"style": "very slow, gravelly",
+		"speed": 1.0,
+	})
+
+	raw, err := json.Marshal(provider.requestBody("ciao"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(raw, &body); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := body["speed"]; ok {
+		t.Fatalf("default speed was sent: %s", raw)
+	}
+	options := body["provider"].(map[string]any)["options"].(map[string]any)
+	studio := options["google-ai-studio"].(map[string]any)
+	meta := studio["speech_metadata"].(map[string]any)
+	if meta["style"] != "very slow, gravelly" {
+		t.Fatalf("style = %#v", meta["style"])
 	}
 }

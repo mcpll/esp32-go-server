@@ -56,18 +56,20 @@ type OpenAITTSProvider struct {
 	Voice          string
 	ResponseFormat string
 	Speed          float64
+	Style          string
 	Stream         bool
 	FrameDuration  int
 }
 
 // request struct
 type openAIRequest struct {
-	Model          string  `json:"model"`
-	Input          string  `json:"input"`
-	Voice          string  `json:"voice"`
-	ResponseFormat string  `json:"response_format,omitempty"`
-	Speed          float64 `json:"speed,omitempty"`
-	Stream         bool    `json:"stream,omitempty"`
+	Model          string         `json:"model"`
+	Input          string         `json:"input"`
+	Voice          string         `json:"voice"`
+	ResponseFormat string         `json:"response_format,omitempty"`
+	Speed          float64        `json:"speed,omitempty"`
+	Stream         bool           `json:"stream,omitempty"`
+	Provider       map[string]any `json:"provider,omitempty"`
 }
 
 // NewOpenAITTSProvider creates a new OpenAI TTS provider
@@ -78,6 +80,7 @@ func NewOpenAITTSProvider(config map[string]interface{}) *OpenAITTSProvider {
 	voice, _ := config["voice"].(string)
 	responseFormat, _ := config["response_format"].(string)
 	speed, _ := config["speed"].(float64)
+	style, _ := config["style"].(string)
 	stream, _ := config["stream"].(bool)
 	frameDuration, _ := config["frame_duration"].(float64)
 
@@ -109,8 +112,34 @@ func NewOpenAITTSProvider(config map[string]interface{}) *OpenAITTSProvider {
 		ResponseFormat: responseFormat,
 		Stream:         stream,
 		Speed:          speed,
+		Style:          strings.TrimSpace(style),
 		FrameDuration:  int(frameDuration),
 	}
+}
+
+// requestBody builds the speech request. Speed 1 is the provider default and is omitted:
+// Gemini TTS rejects a speed field it does not implement.
+func (p *OpenAITTSProvider) requestBody(text string) openAIRequest {
+	body := openAIRequest{
+		Model:          p.Model,
+		Input:          text,
+		Voice:          p.Voice,
+		ResponseFormat: p.ResponseFormat,
+		Stream:         p.Stream,
+	}
+	if p.Speed != 0 && p.Speed != 1 {
+		body.Speed = p.Speed
+	}
+	if p.Style != "" {
+		body.Provider = map[string]any{
+			"options": map[string]any{
+				"google-ai-studio": map[string]any{
+					"speech_metadata": map[string]any{"style": p.Style},
+				},
+			},
+		}
+	}
+	return body
 }
 
 // TextToSpeech converts text to speech; returns audio frames and error
@@ -125,7 +154,7 @@ func (p *OpenAITTSProvider) TextToSpeech(ctx context.Context, text string, sampl
 		audioFrames = append(audioFrames, frame)
 	}
 	if len(audioFrames) == 0 {
-		return nil, fmt.Errorf("OpenAI TTS 返回音频为空")
+		return nil, fmt.Errorf("OpenAI TTS returned empty audio")
 	}
 	return audioFrames, nil
 }
@@ -134,19 +163,9 @@ func (p *OpenAITTSProvider) TextToSpeech(ctx context.Context, text string, sampl
 func (p *OpenAITTSProvider) TextToSpeechStream(ctx context.Context, text string, sampleRate int, channels int, frameDuration int) (outputChan chan []byte, err error) {
 	startTs := time.Now().UnixMilli()
 
-	// create the request body
-	reqBody := openAIRequest{
-		Model:          p.Model,
-		Input:          text,
-		Voice:          p.Voice,
-		ResponseFormat: p.ResponseFormat,
-		Speed:          p.Speed,
-		Stream:         p.Stream,
-	}
-
-	jsonData, err := json.Marshal(reqBody)
+	jsonData, err := json.Marshal(p.requestBody(text))
 	if err != nil {
-		return nil, fmt.Errorf("序列化请求失败: %v", err)
+		return nil, fmt.Errorf("failed to serialize request: %v", err)
 	}
 
 	//log.Debugf("OpenAI TTS request: %s", string(jsonData))
@@ -154,7 +173,7 @@ func (p *OpenAITTSProvider) TextToSpeechStream(ctx context.Context, text string,
 	// create the HTTP request
 	req, err := http.NewRequestWithContext(ctx, "POST", p.APIURL, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return nil, fmt.Errorf("创建请求失败: %v", err)
+		return nil, fmt.Errorf("failed to create request: %v", err)
 	}
 
 	// set request headers
@@ -255,7 +274,7 @@ func (p *OpenAITTSProvider) SetVoice(voiceConfig map[string]interface{}) error {
 		p.Voice = voice
 		return nil
 	}
-	return fmt.Errorf("无效的音色配置: 缺少 voice")
+	return fmt.Errorf("invalid voice config: missing voice")
 }
 
 // Close closes resources (stateless provider; nothing to close)
