@@ -1,0 +1,38 @@
+import type { Field } from '@/lib/providerForm'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
+
+export function FieldControl({
+  id,
+  field,
+  value,
+  onChange,
+}: {
+  id: string
+  field: Field
+  value: string | boolean | undefined
+  onChange: (value: string | boolean) => void
+}) {
+  if (field.kind === 'bool') {
+    return (
+      <div className="flex items-center justify-between gap-4">
+        <Label htmlFor={id}>{field.label}</Label>
+        <Switch id={id} checked={value === true} onCheckedChange={onChange} />
+      </div>
+    )
+  }
+
+  const text = typeof value === 'string' ? value : ''
+  return (
+    <div className="grid gap-2">
+      <Label htmlFor={id}>{field.label}</Label>
+      <Input
+        id={id}
+        inputMode={field.kind === 'number' ? 'numeric' : 'text'}
+        value={text}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </div>
+  )
+}

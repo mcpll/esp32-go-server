@@ -21,12 +21,13 @@ services:
     command:
       - >-
         pocketbase superuser upsert "$$ADMIN_EMAIL" "$$ADMIN_PASSWORD" --dir /pb_data --migrationsDir /pb_migrations
-        && exec pocketbase serve --http 0.0.0.0:8090 --dir /pb_data --migrationsDir /pb_migrations
+        && exec pocketbase serve --http 0.0.0.0:8090 --dir /pb_data --migrationsDir /pb_migrations --publicDir /pb_public
     environment:
       ADMIN_EMAIL: ${ADMIN_EMAIL:-owner@example.com}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-console-pass-123}
     volumes:
       - ../../../pb_migrations:/pb_migrations:ro
+      - ../../../pb_public:/pb_public:ro
       - pb_data:/pb_data
     ports:
       - "8090:8090"
