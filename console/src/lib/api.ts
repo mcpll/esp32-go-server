@@ -3,6 +3,8 @@ import { activationUpdate, bindDeviceUpdate, parseDeviceCode } from '@/lib/devic
 import { pb } from '@/lib/client'
 import { agentUpdate, type AgentDraft } from '@/lib/providerForm'
 import { readAgent, readDevice, type Agent, type Device } from '@/lib/records'
+import { readSetting, type Setting } from '@/lib/settingsForm'
+import type { JsonObject } from '@/lib/json'
 
 export async function fetchAgents(): Promise<Agent[]> {
   const records: unknown = await pb.collection('agents').getFullList({
@@ -53,6 +55,16 @@ export async function bindDevice(input: {
     throw error
   }
   await pb.collection('devices').update(id, patch)
+}
+
+export async function fetchSettings(): Promise<Setting[]> {
+  const records: unknown = await pb.collection('settings').getFullList({ sort: 'key' })
+  if (!Array.isArray(records)) throw new Error('Settings list is not an array')
+  return records.map(readSetting)
+}
+
+export async function saveSetting(input: { id: string; value: JsonObject }): Promise<void> {
+  await pb.collection('settings').update(input.id, { value: input.value })
 }
 
 export async function setDeviceActivated(input: {

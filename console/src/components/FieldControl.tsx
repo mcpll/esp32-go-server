@@ -9,16 +9,24 @@ export function FieldControl({
   field,
   value,
   onChange,
+  hint,
 }: {
   id: string
   field: Field
   value: string | boolean | undefined
   onChange: (value: string | boolean) => void
+  hint?: string
 }) {
+  const label = (
+    <Label htmlFor={id}>
+      {field.label}
+      {hint ? <span className="ml-2 font-normal text-muted-foreground">{hint}</span> : null}
+    </Label>
+  )
   if (field.kind === 'bool') {
     return (
       <div className="flex items-center justify-between gap-4">
-        <Label htmlFor={id}>{field.label}</Label>
+        {label}
         <Switch id={id} checked={value === true} onCheckedChange={onChange} />
       </div>
     )
@@ -27,7 +35,7 @@ export function FieldControl({
   const text = typeof value === 'string' ? value : ''
   return (
     <div className="grid gap-2">
-      <Label htmlFor={id}>{field.label}</Label>
+      {label}
       <Input
         id={id}
         className={controlClass}

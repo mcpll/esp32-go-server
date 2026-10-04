@@ -48,6 +48,10 @@ type Provider struct {
 	retryBase time.Duration
 	retryMax  time.Duration
 
+	// watchBase and watchMax bound the realtime reconnect backoff.
+	watchBase time.Duration
+	watchMax  time.Duration
+
 	createMu sync.Mutex // one device record is created at a time, so concurrent OTA polls do not race
 
 	handlersMu sync.RWMutex
@@ -61,6 +65,8 @@ func NewProvider(client *Client) *Provider {
 		newCode:   randomSixDigits,
 		retryBase: defaultRetryBase,
 		retryMax:  defaultRetryMax,
+		watchBase: time.Second,
+		watchMax:  30 * time.Second,
 		handlers:  map[string]types.EventHandler{},
 	}
 }
@@ -360,6 +366,8 @@ func (p *Provider) RegisterMessageEventHandler(ctx context.Context, eventType st
 // start. If PocketBase does not answer, Start returns anyway and keeps retrying in the background
 // until the work is done or ctx ends. onSystemConfig receives the settings object on each load.
 func (p *Provider) Start(ctx context.Context, onSystemConfig func(map[string]interface{})) {
+	go p.watchSettings(ctx, onSystemConfig)
+
 	first, cancel := context.WithTimeout(ctx, startupAttemptTimeout)
 	err := p.startup(first, onSystemConfig)
 	cancel()
@@ -368,6 +376,65 @@ func (p *Provider) Start(ctx context.Context, onSystemConfig func(map[string]int
 	}
 	log.Warnf("pocketbase: not reachable at startup, retrying in the background: %v", err)
 	go p.retryStartup(ctx, onSystemConfig)
+}
+
+// watchSettings subscribes to settings and reloads them on every event and
+// after every reconnect. Events are lost while the stream is down, so a
+// reconnect always reloads the whole collection.
+func (p *Provider) watchSettings(ctx context.Context, onSystemConfig func(map[string]interface{})) {
+	base, max := p.watchBase, p.watchMax
+	if base <= 0 {
+		base = time.Second
+	}
+	if max <= 0 {
+		max = 30 * time.Second
+	}
+	delay := base
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+		subscribed, err := p.client.Watch(ctx, []string{settingsCollection + "/*"}, func() {
+			p.reloadSettings(ctx, onSystemConfig)
+		}, func(event string) {
+			if strings.HasPrefix(event, settingsCollection) {
+				p.reloadSettings(ctx, onSystemConfig)
+			}
+		})
+		if ctx.Err() != nil {
+			return
+		}
+		if err != nil {
+			log.Warnf("pocketbase: settings realtime dropped: %v", err)
+		}
+		if subscribed {
+			delay = base
+		} else {
+			delay *= 2
+			if delay > max {
+				delay = max
+			}
+		}
+		timer := time.NewTimer(delay)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		case <-timer.C:
+		}
+	}
+}
+
+func (p *Provider) reloadSettings(ctx context.Context, onSystemConfig func(map[string]interface{})) {
+	if onSystemConfig == nil {
+		return
+	}
+	cfg, err := p.LoadSystemConfig(ctx)
+	if err != nil {
+		log.Warnf("pocketbase: reload settings: %v", err)
+		return
+	}
+	onSystemConfig(cfg)
 }
 
 func (p *Provider) retryStartup(ctx context.Context, onSystemConfig func(map[string]interface{})) {

@@ -94,6 +94,7 @@ type Client struct {
 	email    string
 	password string
 	http     *http.Client
+	stream   *http.Client // no timeout: the SSE body stays open until the context ends
 	perPage  int
 
 	mu        sync.Mutex // guards the token fields; held across the auth request
@@ -108,6 +109,7 @@ func NewClient(baseURL, email, password string) *Client {
 		email:    email,
 		password: password,
 		http:     &http.Client{Timeout: 10 * time.Second},
+		stream:   &http.Client{},
 		perPage:  defaultPerPage,
 	}
 }

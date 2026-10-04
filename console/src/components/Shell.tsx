@@ -1,14 +1,15 @@
 import { Suspense, type ComponentType } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { AudioLines, Bot, LogOut, Radio } from 'lucide-react'
+import { AudioLines, Bot, LogOut, Radio, Settings } from 'lucide-react'
 import { PageErrorBoundary } from '@/components/PageErrorBoundary'
 import { useSession } from '@/hooks/useSession'
-import { AGENTS_PATH, DEVICES_PATH } from '@/lib/gate'
+import { AGENTS_PATH, DEVICES_PATH, SETTINGS_PATH } from '@/lib/gate'
 import { cn } from '@/lib/utils'
 
 const LINKS: { to: string; label: string; icon: ComponentType<{ className?: string; strokeWidth?: number }> }[] = [
   { to: AGENTS_PATH, label: 'Agents', icon: Bot },
   { to: DEVICES_PATH, label: 'Devices', icon: Radio },
+  { to: SETTINGS_PATH, label: 'Settings', icon: Settings },
 ]
 
 const railItem =

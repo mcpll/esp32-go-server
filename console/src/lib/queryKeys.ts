@@ -7,3 +7,7 @@ export const deviceKeys = {
   all: ['devices'] as const,
   screen: ['device-screen'] as const,
 }
+
+export const settingKeys = {
+  all: ['settings'] as const,
+}

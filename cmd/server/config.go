@@ -85,9 +85,10 @@ func applySystemConfig(data map[string]interface{}) {
 	ApplySystemConfigToViper(data)
 }
 
-// ApplySystemConfigToViper merges system config into viper
+// ApplySystemConfigToViper merges system config into viper, then puts env secrets
+// back so a settings record cannot override them.
 func ApplySystemConfigToViper(data map[string]interface{}) {
-	if err := store.Merge(data); err != nil {
+	if err := store.MergeThen(data, secrets.ApplyEnv); err != nil {
 		log.Warnf("Failed to merge system config into viper: %v", err)
 		return
 	}

@@ -7,6 +7,7 @@ describe('logged-out gate', () => {
     expect(isReachable(false, '/agents')).toBe(false)
     expect(isReachable(false, '/agents/abc')).toBe(false)
     expect(isReachable(false, '/devices')).toBe(false)
+    expect(isReachable(false, '/settings')).toBe(false)
   })
 
   it('hides login once the owner is in', () => {
@@ -14,5 +15,6 @@ describe('logged-out gate', () => {
     expect(isReachable(true, '/agents')).toBe(true)
     expect(isReachable(true, '/agents/abc')).toBe(true)
     expect(isReachable(true, '/devices')).toBe(true)
+    expect(isReachable(true, '/settings')).toBe(true)
   })
 })

@@ -35,6 +35,23 @@ type fakePB struct {
 	refreshes   int
 	issued      int
 	requests    []string
+
+	sseIDs  map[string]bool
+	conns   []*sseConn
+	subs    [][]string
+	sseHeld bool
+	nextSSE int
+}
+
+type sseConn struct {
+	id     string
+	events chan string
+	drop   chan struct{}
+	once   sync.Once
+}
+
+func (c *sseConn) close() {
+	c.once.Do(func() { close(c.drop) })
 }
 
 func newFakePB(t *testing.T) *fakePB {
@@ -44,6 +61,7 @@ func newFakePB(t *testing.T) *fakePB {
 		collections: map[string][]map[string]any{},
 		tokenTTL:    time.Hour,
 		validTokens: map[string]bool{},
+		sseIDs:      map[string]bool{},
 	}
 	f.server = httptest.NewServer(http.HandlerFunc(f.handle))
 	t.Cleanup(f.server.Close)
@@ -133,6 +151,10 @@ var uniqueFields = map[string][]string{
 var recordsRoute = regexp.MustCompile(`^/api/collections/([a-z_]+)/records(?:/([A-Za-z0-9]+))?$`)
 
 func (f *fakePB) handle(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/api/realtime" && r.Method == http.MethodGet {
+		f.serveSSE(w, r)
+		return
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.requests = append(f.requests, r.Method+" "+r.URL.Path)
@@ -157,6 +179,10 @@ func (f *fakePB) handle(w http.ResponseWriter, r *http.Request) {
 
 	if !f.validTokens[r.Header.Get("Authorization")] {
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"message": "The request requires valid record authorization token."})
+		return
+	}
+	if r.URL.Path == "/api/realtime" && r.Method == http.MethodPost {
+		f.subscribeLocked(w, r)
 		return
 	}
 	m := recordsRoute.FindStringSubmatch(r.URL.Path)
@@ -333,6 +359,130 @@ func (f *fakePB) uniqueViolationLocked(collection, selfID string, body map[strin
 		}
 	}
 	return ""
+}
+
+func (f *fakePB) serveSSE(w http.ResponseWriter, r *http.Request) {
+	f.mu.Lock()
+	down, hold := f.down, f.sseHeld
+	tokenOK := f.validTokens[r.Header.Get("Authorization")]
+	f.mu.Unlock()
+	if down || hold {
+		http.Error(w, `{"message":"unavailable"}`, http.StatusServiceUnavailable)
+		return
+	}
+	if !tokenOK {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"message": "The request requires valid record authorization token."})
+		return
+	}
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+
+	f.mu.Lock()
+	f.nextSSE++
+	conn := &sseConn{
+		id:     fmt.Sprintf("sse%d", f.nextSSE),
+		events: make(chan string, 8),
+		drop:   make(chan struct{}),
+	}
+	f.sseIDs[conn.id] = true
+	f.conns = append(f.conns, conn)
+	f.mu.Unlock()
+	defer func() {
+		conn.close()
+		f.mu.Lock()
+		delete(f.sseIDs, conn.id)
+		f.conns = removeConn(f.conns, conn)
+		f.mu.Unlock()
+	}()
+
+	fmt.Fprintf(w, "event: PB_CONNECT\ndata: {\"clientId\":%q}\n\n", conn.id)
+	flusher.Flush()
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case <-conn.drop:
+			return
+		case chunk := <-conn.events:
+			fmt.Fprint(w, chunk)
+			flusher.Flush()
+		}
+	}
+}
+
+func (f *fakePB) subscribeLocked(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		ClientID      string   `json:"clientId"`
+		Subscriptions []string `json:"subscriptions"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || !f.sseIDs[body.ClientID] {
+		writeJSON(w, http.StatusNotFound, map[string]any{"message": "Missing or invalid client id."})
+		return
+	}
+	f.subs = append(f.subs, append([]string(nil), body.Subscriptions...))
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (f *fakePB) subscriptionCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.subs)
+}
+
+func (f *fakePB) lastSubscriptions() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.subs) == 0 {
+		return nil
+	}
+	return append([]string(nil), f.subs[len(f.subs)-1]...)
+}
+
+func (f *fakePB) streamCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.conns)
+}
+
+func (f *fakePB) holdSSE(hold bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.sseHeld = hold
+}
+
+func (f *fakePB) dropStreams() {
+	f.mu.Lock()
+	conns := append([]*sseConn(nil), f.conns...)
+	f.mu.Unlock()
+	for _, conn := range conns {
+		conn.close()
+	}
+}
+
+func (f *fakePB) publish(event, data string) {
+	chunk := fmt.Sprintf("event: %s\ndata: %s\n\n", event, data)
+	f.mu.Lock()
+	conns := append([]*sseConn(nil), f.conns...)
+	f.mu.Unlock()
+	for _, conn := range conns {
+		select {
+		case conn.events <- chunk:
+		case <-conn.drop:
+		}
+	}
+}
+
+func removeConn(conns []*sseConn, target *sseConn) []*sseConn {
+	out := make([]*sseConn, 0, len(conns))
+	for _, conn := range conns {
+		if conn != target {
+			out = append(out, conn)
+		}
+	}
+	return out
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
