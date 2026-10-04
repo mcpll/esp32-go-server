@@ -55,12 +55,40 @@ describe('provider drafts', () => {
     )
   })
 
-  it('requires the voice when the TTS provider is known', () => {
+  it('omits a cleared voice so the server default applies', () => {
     const draft = draftFromConfig('tts', 'aliyun_qwen', tts)
     if (draft.kind !== 'known') throw new Error('expected known draft')
-    expect(() =>
-      configFromDraft('tts', { ...draft, values: { ...draft.values, voice: '' } }),
-    ).toThrow(/Voice is required/)
+    expect(configFromDraft('tts', { ...draft, values: { ...draft.values, voice: '' } })).toEqual({
+      model: 'qwen3-tts-flash',
+      language_type: 'Italian',
+      stream: true,
+    })
+  })
+
+  it('leaves auto_end out when the agent JSON omits it', () => {
+    const input = { language: 'it' }
+    expect(configFromDraft('asr', draftFromConfig('asr', 'aliyun_qwen3', input))).toEqual(input)
+  })
+
+  it('keeps auto_end false when the agent stored false', () => {
+    const input = { language: 'it', auto_end: false }
+    expect(configFromDraft('asr', draftFromConfig('asr', 'aliyun_qwen3', input))).toEqual(input)
+  })
+
+  it('drops api_key and keeps other credentials', () => {
+    const draft = draftFromConfig('asr', 'funasr', {
+      host: '127.0.0.1',
+      api_key: 'k',
+      access_token: 't',
+      password: 'p',
+      secret: 's',
+    })
+    expect(configFromDraft('asr', draft)).toEqual({
+      host: '127.0.0.1',
+      access_token: 't',
+      password: 'p',
+      secret: 's',
+    })
   })
 
   it('keeps the config when switching a known provider to other', () => {

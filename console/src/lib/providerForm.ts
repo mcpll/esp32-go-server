@@ -1,13 +1,6 @@
 import { asJsonObject, isJsonObject, type JsonObject, type JsonValue } from '@/lib/json'
 
-const SECRET_KEYS = new Set([
-  'api_key',
-  'apikey',
-  'api_secret',
-  'access_token',
-  'secret',
-  'password',
-])
+const SECRET_KEYS = new Set(['api_key', 'apikey', 'api_secret'])
 
 export type Stage = 'asr' | 'llm' | 'tts'
 
@@ -85,7 +78,7 @@ function collectSecrets(value: JsonObject, found: string[]): void {
   }
 }
 
-export type FieldValues = { [path: string]: string | boolean }
+export type FieldValues = { [path: string]: string | boolean | undefined }
 
 export type KnownDraft = {
   kind: 'known'
@@ -188,10 +181,14 @@ function parseConfigJson(text: string): JsonObject {
   return object
 }
 
-function takeField(rest: JsonObject, field: Field): string | boolean {
+function takeField(rest: JsonObject, field: Field): string | boolean | undefined {
   const current = readPath(rest, field.path)
+  const present = pathExists(rest, field.path)
   deletePath(rest, field.path)
-  if (field.kind === 'bool') return current === true
+  if (field.kind === 'bool') {
+    if (!present) return undefined
+    return current === true
+  }
   if (typeof current === 'number') return String(current)
   if (typeof current === 'string') return current
   return ''
@@ -199,11 +196,16 @@ function takeField(rest: JsonObject, field: Field): string | boolean {
 
 function writeField(object: JsonObject, field: Field, value: string | boolean | undefined): void {
   if (field.kind === 'bool') {
-    writePath(object, field.path, value === true)
+    if (typeof value !== 'boolean') {
+      deletePath(object, field.path)
+      return
+    }
+    writePath(object, field.path, value)
     return
   }
   if (typeof value !== 'string' || value.trim() === '') {
-    throw new Error(`${field.label} is required`)
+    deletePath(object, field.path)
+    return
   }
   if (field.kind === 'number') {
     if (!/^\d+$/.test(value.trim())) throw new Error(`${field.label} must be a whole number`)
@@ -219,6 +221,14 @@ function splitPath(path: string): [string, string | null] {
   const tail = path.slice(dot + 1)
   if (tail.includes('.')) throw new Error(`Unsupported field path ${path}`)
   return [path.slice(0, dot), tail]
+}
+
+function pathExists(object: JsonObject, path: string): boolean {
+  const [head, tail] = splitPath(path)
+  if (!Object.hasOwn(object, head)) return false
+  if (tail === null) return true
+  const value = object[head]
+  return isJsonObject(value) && Object.hasOwn(value, tail)
 }
 
 function readPath(object: JsonObject, path: string): JsonValue | undefined {

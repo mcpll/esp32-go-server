@@ -61,7 +61,7 @@ cd console
 npm install
 npm run dev    # http://localhost:5173, proxies /api to PocketBase on :8090
 npm test
-npm run build  # writes ../pb_public, which PocketBase serves
+npm run build  # writes ../pb_public; the test stack serves that directory
 ```
 
 Log in with `ADMIN_EMAIL` and `ADMIN_PASSWORD`. While logged out, only the login screen is reachable. The console edits agents and devices in PocketBase. It does not store API keys and it does not call a vendor.
