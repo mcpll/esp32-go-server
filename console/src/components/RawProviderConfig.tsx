@@ -1,3 +1,4 @@
+import { areaClass, controlClass } from '@/components/classes'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -20,6 +21,7 @@ export function RawProviderConfig({
         <Label htmlFor={providerId}>Provider name</Label>
         <Input
           id={providerId}
+          className={controlClass}
           value={draft.provider}
           onChange={(event) => onChange({ ...draft, provider: event.target.value })}
         />
@@ -28,7 +30,7 @@ export function RawProviderConfig({
         <Label htmlFor={jsonId}>Config JSON</Label>
         <Textarea
           id={jsonId}
-          className="font-mono"
+          className={`${areaClass} font-mono`}
           rows={8}
           spellCheck={false}
           value={draft.restText}

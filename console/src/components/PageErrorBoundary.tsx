@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react'
+import { actionClass } from '@/components/classes'
 import { Button } from '@/components/ui/button'
 import { errorMessage } from '@/lib/errors'
 
@@ -15,9 +16,11 @@ export class PageErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.message === null) return this.props.children
     return (
-      <div className="grid gap-3">
-        <p role="alert">{this.state.message}</p>
-        <Button type="button" onClick={() => this.setState({ message: null })}>
+      <div className="flex flex-1 flex-col items-start gap-3 p-6">
+        <p className="text-sm" role="alert">
+          {this.state.message}
+        </p>
+        <Button className={actionClass} type="button" onClick={() => this.setState({ message: null })}>
           Try again
         </Button>
       </div>
