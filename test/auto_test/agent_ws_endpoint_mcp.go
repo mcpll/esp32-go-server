@@ -16,7 +16,7 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-const defaultAgentEndpointAuthToken = "xiaozhi_mcp_openclaw_secret_key"
+const defaultAgentEndpointAuthToken = "test-endpoint-auth-token"
 
 var agentEndpointAuthToken = defaultAgentEndpointAuthToken
 

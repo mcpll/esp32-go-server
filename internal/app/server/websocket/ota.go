@@ -95,7 +95,7 @@ func (s *WebSocketServer) handleOta(w http.ResponseWriter, r *http.Request) {
 	respData := &OtaResponse{
 		Websocket: WebsocketInfo{
 			Url:   store.GetString(otaConfigPrefix + "websocket.url"),
-			Token: store.GetString(otaConfigPrefix + "websocket.token"),
+			Token: store.GetString("websocket.token"),
 		},
 		Mqtt: mqttInfo,
 		ServerTime: ServerTimeInfo{

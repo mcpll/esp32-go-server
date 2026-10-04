@@ -172,13 +172,6 @@ func (app *App) newWebSocketServer() *websocket.WebSocketServer {
 		port,
 		websocket.WithOnNewConnection(app.OnNewConnection),
 		websocket.WithOnOpenClawResponse(app.OnOpenClawResponse),
-		websocket.WithOnInjectMessage(func(deviceID, message string, skipLlm bool, autoListen bool) error {
-			chatManager, exists := app.GetChatManager(deviceID)
-			if !exists || chatManager == nil {
-				return fmt.Errorf("device %s not found or offline", deviceID)
-			}
-			return chatManager.InjectMessage(message, skipLlm, autoListen)
-		}),
 	)
 }
 

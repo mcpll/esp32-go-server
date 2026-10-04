@@ -40,6 +40,10 @@ redis:
 websocket:
   host: "0.0.0.0"
   port: 8989
+  token: "test-ws-token"
+
+manager:
+  endpoint_auth_token: "test-endpoint-token"
 
 mqtt:
   enable: false
@@ -139,6 +143,9 @@ local_mcp:
   clear_conversation_history: true
 
 enable_greeting: false
+
+vision:
+  token: "test-vision-token"
 
 ota:
   signature_key: "test-signature-key"

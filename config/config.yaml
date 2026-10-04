@@ -44,10 +44,9 @@ pocketbase:
   email: ""
   password: ""
 
-# Signing token of the MCP/OpenClaw endpoint JWTs.
-# ponytail: moves to an env-backed key and loses its default in the security-fixes ticket.
+# Signing token of the MCP/OpenClaw endpoint JWTs. Required. Env: ENDPOINT_AUTH_TOKEN
 manager:
-  endpoint_auth_token: "xiaozhi_mcp_openclaw_secret_key"
+  endpoint_auth_token: ""
 
 # Fallback system prompt, used only when a session has no agent prompt
 system_prompt: "Sei un assistente vocale gentile. Rispondi in italiano con frasi brevi, senza emoji, codice o tag xml."
@@ -70,10 +69,11 @@ redis:
   db: 0                  # database number
   key_prefix: "xiaozhi"  # key prefix
 
-# WebSocket server
+# WebSocket server. token is required (env WEBSOCKET_TOKEN) and is sent to the device in the OTA response.
 websocket:
   host: "0.0.0.0"  # listen address, 0.0.0.0 listens on all interfaces
   port: 8989       # WebSocket listen port
+  token: ""
 
 # MQTT client (connects to an external MQTT broker)
 mqtt:
@@ -83,7 +83,7 @@ mqtt:
   port: 2883                  # MQTT port
   client_id: "xiaozhi_server" # client id
   username: "admin"           # MQTT user name
-  password: "test!@#"         # MQTT password
+  password: ""                # MQTT password
 
 # MQTT server (runs the embedded broker)
 mqtt_server:
@@ -92,8 +92,8 @@ mqtt_server:
   listen_port: 2883                     # listen port
   client_id: "xiaozhi_server"           # server client id
   username: "admin"                     # default user name
-  password: "test!@#"                   # default password
-  signature_key: "your_ota_signature_key_here"  # OTA signature key
+  password: ""                          # super-admin password; required (env MQTT_SERVER_PASSWORD)
+  signature_key: ""                     # required when enable_auth is true (env MQTT_SERVER_SIGNATURE_KEY)
   enable_auth: false                    # enable authentication
   # TLS
   tls:
@@ -354,6 +354,7 @@ llm:
 vision:
   enable_auth: false  # enable authentication
   vision_url: "http://192.168.208.214:8989/xiaozhi/api/vision"  # vision API URL sent to the device
+  token: ""  # required; env VISION_TOKEN
   # Vision language model
   vllm:
     provider: "aliyun_vision"  # vision model provider
@@ -374,7 +375,7 @@ vision:
 
 # OTA (over-the-air) config
 ota:
-  signature_key: "your_ota_signature_key_here"  # OTA signature key
+  signature_key: ""
   # Test environment, for the local network
   test:
     websocket:

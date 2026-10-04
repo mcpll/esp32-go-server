@@ -8,7 +8,6 @@ import (
 
 const (
 	defaultAdminUsername = "admin"
-	defaultAdminPassword = "test!@#"
 )
 
 func configuredAdminUsername() string {
@@ -19,8 +18,5 @@ func configuredAdminUsername() string {
 }
 
 func configuredAdminPassword() string {
-	if password := strings.TrimSpace(viper.GetString("mqtt_server.password")); password != "" {
-		return password
-	}
-	return defaultAdminPassword
+	return strings.TrimSpace(viper.GetString("mqtt_server.password"))
 }

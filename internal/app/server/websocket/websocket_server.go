@@ -1,10 +1,10 @@
 package websocket
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -12,6 +12,7 @@ import (
 
 	"xiaozhi-esp32-server-golang/internal/app/server/auth"
 	"xiaozhi-esp32-server-golang/internal/app/server/types"
+	"xiaozhi-esp32-server-golang/internal/domain/config/store"
 	"xiaozhi-esp32-server-golang/internal/domain/mcp"
 	"xiaozhi-esp32-server-golang/internal/domain/openclaw"
 	log "xiaozhi-esp32-server-golang/logger"
@@ -32,7 +33,6 @@ type WebSocketServer struct {
 
 	onNewConnection    types.OnNewConnection
 	onOpenClawResponse func(event openclaw.ResponseDelivery) bool
-	onInjectMessage    func(deviceID, message string, skipLlm bool, autoListen bool) error
 }
 
 // Option type definition
@@ -62,12 +62,6 @@ func WithOnNewConnection(onNewConnection types.OnNewConnection) WebSocketServerO
 func WithOnOpenClawResponse(handler func(event openclaw.ResponseDelivery) bool) WebSocketServerOption {
 	return func(s *WebSocketServer) {
 		s.onOpenClawResponse = handler
-	}
-}
-
-func WithOnInjectMessage(handler func(deviceID, message string, skipLlm bool, autoListen bool) error) WebSocketServerOption {
-	return func(s *WebSocketServer) {
-		s.onInjectMessage = handler
 	}
 }
 
@@ -103,29 +97,30 @@ func (s *WebSocketServer) Start() error {
 	// Start session cleanup
 	go s.cleanupSessions()
 
-	// Register route handlers
-	http.HandleFunc("/xiaozhi/mqtt_udp/v1/", s.handleMqttUdpChat)
-	http.HandleFunc("/xiaozhi/v1/", s.handleChat)
-	http.HandleFunc("/xiaozhi/ota/", s.handleOta)
-	http.HandleFunc("/xiaozhi/ota/activate", s.handleOtaActivate)
-	http.HandleFunc("/mcp", s.handleMCPWebSocket)
-	http.HandleFunc("/ws/openclaw", s.handleOpenClawWebSocket)
-	http.HandleFunc("/xiaozhi/api/mcp/tools/", s.handleMCPAPI)
-	http.HandleFunc("/xiaozhi/api/vision", s.handleVisionAPI) // Image recognition API
-
-	http.HandleFunc("/admin/inject_msg", s.handleInjectMsg)
-
 	listenAddr := fmt.Sprintf("0.0.0.0:%d", s.port)
 	log.Infof("WebSocket server started at ws://%s/xiaozhi/v1/", listenAddr)
 	log.Infof("MCP WebSocket endpoint: ws://%s/mcp?token=xxx", listenAddr)
 	log.Infof("OpenClaw WebSocket endpoint: ws://%s/ws/openclaw?token=xxx", listenAddr)
 	log.Infof("MCP API endpoint: http://%s/xiaozhi/api/mcp/tools/{deviceId}", listenAddr)
 
-	if err := http.ListenAndServe(listenAddr, nil); err != nil {
+	if err := http.ListenAndServe(listenAddr, s.Handler()); err != nil {
 		log.Log().Fatalf("WebSocket server failed to start: %v", err)
 		return err
 	}
 	return nil
+}
+
+func (s *WebSocketServer) Handler() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/xiaozhi/mqtt_udp/v1/", s.handleMqttUdpChat)
+	mux.HandleFunc("/xiaozhi/v1/", s.handleChat)
+	mux.HandleFunc("/xiaozhi/ota/", s.handleOta)
+	mux.HandleFunc("/xiaozhi/ota/activate", s.handleOtaActivate)
+	mux.HandleFunc("/mcp", s.handleMCPWebSocket)
+	mux.HandleFunc("/ws/openclaw", s.handleOpenClawWebSocket)
+	mux.HandleFunc("/xiaozhi/api/mcp/tools/", s.handleMCPAPI)
+	mux.HandleFunc("/xiaozhi/api/vision", s.handleVisionAPI)
+	return mux
 }
 
 // handleGetDeviceTools returns the device tool list
@@ -156,29 +151,26 @@ func (s *WebSocketServer) internalHandleChat(w http.ResponseWriter, r *http.Requ
 	deviceID, clientID := extractDeviceAndClientID(r)
 	if deviceID == "" {
 		log.Warn("missing device-id, provide via Header or URL query")
-		http.Error(w, "缺少 device-id（支持 Header 或 URL 参数）", http.StatusBadRequest)
+		http.Error(w, "missing device-id (Header or URL query)", http.StatusBadRequest)
 		return
 	}
 	if clientID == "" {
 		log.Debugf("connection missing client-id, device_id: %s", deviceID)
 	}
 
-	/*isAuth := viper.GetBool("auth.enable")
-	if isAuth {
-		token := r.Header.Get("Authorization")
-		if token == "" {
-			log.Warn("missing Authorization header")
-			http.Error(w, "missing Authorization header", http.StatusUnauthorized)
-			return
-		}
-
-		// Validate token
-		if !s.authManager.ValidateToken(token) {
-			log.Warnf("invalid token: %s", token)
-			http.Error(w, "invalid token", http.StatusUnauthorized)
-			return
-		}
-	}*/
+	got := strings.TrimSpace(r.Header.Get("Authorization"))
+	if got == "" {
+		log.Warn("missing Authorization header")
+		http.Error(w, "missing Authorization header", http.StatusUnauthorized)
+		return
+	}
+	got = strings.TrimSpace(strings.TrimPrefix(got, "Bearer "))
+	want := strings.TrimSpace(store.GetString("websocket.token"))
+	if want == "" || got != want {
+		log.Warn("invalid Authorization token")
+		http.Error(w, "invalid token", http.StatusUnauthorized)
+		return
+	}
 
 	// Upgrade HTTP connection to WebSocket
 	conn, err := s.upgrader.Upgrade(w, r, nil)
@@ -237,51 +229,4 @@ func findQueryValue(values url.Values, keys []string) (string, string) {
 		}
 	}
 	return "", ""
-}
-
-func (s *WebSocketServer) handleInjectMsg(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	if s.onInjectMessage == nil {
-		http.Error(w, "inject message handler unavailable", http.StatusServiceUnavailable)
-		return
-	}
-
-	var req struct {
-		DeviceID   string `json:"device_id"`
-		Message    string `json:"message"`
-		SkipLlm    bool   `json:"skip_llm"`
-		AutoListen *bool  `json:"auto_listen"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
-		return
-	}
-	if req.DeviceID == "" {
-		http.Error(w, "device_id is required", http.StatusBadRequest)
-		return
-	}
-	if req.Message == "" {
-		http.Error(w, "message is required", http.StatusBadRequest)
-		return
-	}
-	autoListen := true
-	if req.AutoListen != nil {
-		autoListen = *req.AutoListen
-	}
-	if err := s.onInjectMessage(req.DeviceID, req.Message, req.SkipLlm, autoListen); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"success":     true,
-		"device_id":   req.DeviceID,
-		"message":     req.Message,
-		"skip_llm":    req.SkipLlm,
-		"auto_listen": autoListen,
-	})
 }

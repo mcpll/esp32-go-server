@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"time"
 	"xiaozhi-esp32-server-golang/internal/app/server/auth"
+	"xiaozhi-esp32-server-golang/internal/app/server/secrets"
 	redisdb "xiaozhi-esp32-server-golang/internal/db/redis"
 	user_config "xiaozhi-esp32-server-golang/internal/domain/config"
 	"xiaozhi-esp32-server-golang/internal/domain/config/store"
@@ -65,6 +66,10 @@ func initConfig(configFile string) error {
 
 	// Read config file
 	if err := viper.ReadInConfig(); err != nil {
+		return err
+	}
+	secrets.ApplyEnv()
+	if err := secrets.Check(); err != nil {
 		return err
 	}
 
