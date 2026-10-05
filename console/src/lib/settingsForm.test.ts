@@ -42,7 +42,31 @@ describe('settings form', () => {
       broker: '127.0.0.1',
       port: '2883',
     })
-    expect(next).toEqual({ broker: '127.0.0.1', port: 2883, extra: true })
+    expect(next).toEqual({ broker: '127.0.0.1', port: 2883, password: 'secret', extra: true })
+  })
+
+  it('drops the embedded broker password and keeps tls paths', () => {
+    const broker: SettingsBlock = {
+      key: 'mqtt_server',
+      title: 'MQTT broker',
+      fields: [
+        { path: 'listen_port', label: 'Listen port', kind: 'number' },
+        { path: 'password', label: 'Password', kind: 'text' },
+        { path: 'tls.port', label: 'TLS port', kind: 'number' },
+        { path: 'tls.pem', label: 'TLS certificate', kind: 'text' },
+        { path: 'tls.key', label: 'TLS private key', kind: 'text' },
+      ],
+    }
+    const original = { password: 'nope', listen_port: 1, tls: { enable: false } }
+    const values = fieldValues(original, broker)
+    values.listen_port = '9'
+    values['tls.port'] = '8883'
+    values['tls.pem'] = 'config/server.pem'
+    values['tls.key'] = 'config/server.key'
+    expect(settingsValue(broker, original, values)).toEqual({
+      listen_port: 9,
+      tls: { enable: false, port: 8883, pem: 'config/server.pem', key: 'config/server.key' },
+    })
   })
 
   it('round-trips a nested OTA url', () => {

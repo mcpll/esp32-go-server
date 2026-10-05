@@ -1,4 +1,5 @@
 import { controlClass } from '@/components/classes'
+import { FieldInfo } from '@/components/FieldInfo'
 import type { Field } from '@/lib/providerForm'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,24 +11,33 @@ export function FieldControl({
   value,
   onChange,
   hint,
+  info,
+  masked = false,
 }: {
   id: string
   field: Field
   value: string | boolean | undefined
   onChange: (value: string | boolean) => void
   hint?: string
+  info?: string
+  masked?: boolean
 }) {
   const label = (
-    <Label htmlFor={id}>
-      {field.label}
-      {hint ? <span className="ml-2 font-normal text-muted-foreground">{hint}</span> : null}
-    </Label>
+    <span className="flex items-center gap-1.5">
+      <Label htmlFor={id}>
+        {field.label}
+        {hint ? <span className="ml-2 font-normal text-muted-foreground">{hint}</span> : null}
+      </Label>
+      {info !== undefined && info !== '' ? <FieldInfo text={info} /> : null}
+    </span>
   )
   if (field.kind === 'bool') {
     return (
-      <div className="flex items-center justify-between gap-4">
+      <div className="grid gap-2">
         {label}
-        <Switch id={id} checked={value === true} onCheckedChange={onChange} />
+        <div className="flex h-11 items-center">
+          <Switch id={id} checked={value === true} onCheckedChange={onChange} />
+        </div>
       </div>
     )
   }
@@ -39,6 +49,8 @@ export function FieldControl({
       <Input
         id={id}
         className={controlClass}
+        type={masked ? 'password' : 'text'}
+        autoComplete={masked ? 'off' : undefined}
         inputMode={field.kind === 'number' ? 'numeric' : 'text'}
         value={text}
         onChange={(event) => onChange(event.target.value)}

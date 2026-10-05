@@ -69,15 +69,11 @@ websocket:
   port: 8989       # WebSocket listen port
   token: ""
 
-# Embedded broker secrets. Host, port and enable live in the settings record.
+# Embedded broker secrets. Host, port, enable and TLS paths live in the settings record.
 # password: env MQTT_SERVER_PASSWORD. signature_key: env MQTT_SERVER_SIGNATURE_KEY when auth is on.
 mqtt_server:
   password: ""
   signature_key: ""
-  tls:
-    port: 8883
-    pem: "config/server.pem"
-    key: "config/server.key"
 
 # Resource pools (shared defaults for every resource type)
 resource_pools:

@@ -4,11 +4,13 @@ export type SettingsField = {
   path: string
   label: string
   kind: 'text' | 'number' | 'bool' | 'json'
+  help?: string
 }
 
 export type SettingsBlock = {
   key: string
   title: string
+  hint?: string
   fields: readonly SettingsField[]
 }
 
@@ -36,98 +38,112 @@ export const SETTINGS_BLOCKS: readonly SettingsBlock[] = [
   {
     key: 'mqtt',
     title: 'MQTT',
+    hint: 'How this server connects to a broker.',
     fields: [
-      { path: 'enable', label: 'Enabled', kind: 'bool' },
-      { path: 'broker', label: 'Broker', kind: 'text' },
-      { path: 'type', label: 'Type', kind: 'text' },
-      { path: 'port', label: 'Port', kind: 'number' },
-      { path: 'client_id', label: 'Client id', kind: 'text' },
-      { path: 'username', label: 'Username', kind: 'text' },
-      { path: 'transport_offline_grace_period', label: 'Offline grace', kind: 'text' },
-      { path: 'transport_offline_grace_period_seconds', label: 'Offline grace (seconds)', kind: 'number' },
+      { path: 'enable', label: 'Enabled', kind: 'bool', help: 'Connects this server to a broker. Saving reconnects, or stops the client when this is off.' },
+      { path: 'broker', label: 'Broker', kind: 'text', help: 'Host of the broker this server connects to. Saving reconnects.' },
+      { path: 'type', label: 'Type', kind: 'text', help: 'Connection type, usually tcp. Saving reconnects.' },
+      { path: 'port', label: 'Port', kind: 'number', help: 'Broker port. Saving reconnects.' },
+      { path: 'client_id', label: 'Client id', kind: 'text', help: 'Id this server uses on the broker. Saving reconnects.' },
+      { path: 'username', label: 'Username', kind: 'text', help: 'Username for the broker. Saving reconnects.' },
+      { path: 'password', label: 'Password', kind: 'text', help: 'Password for that broker. This is not the embedded broker secret. Saving reconnects.' },
+      { path: 'transport_offline_grace_period', label: 'Offline grace', kind: 'text', help: 'How long a device stays online after the broker drops. A Go duration such as 2m. The running server reads this once, so restart it after a change.' },
+      { path: 'transport_offline_grace_period_seconds', label: 'Offline grace (seconds)', kind: 'number', help: 'Same wait, in seconds, used when the duration above is empty. Restart the server after a change.' },
     ],
   },
   {
     key: 'mqtt_server',
     title: 'MQTT broker',
+    hint: 'The broker embedded in this server.',
     fields: [
-      { path: 'enable', label: 'Enabled', kind: 'bool' },
-      { path: 'listen_host', label: 'Listen host', kind: 'text' },
-      { path: 'listen_port', label: 'Listen port', kind: 'number' },
-      { path: 'client_id', label: 'Client id', kind: 'text' },
-      { path: 'username', label: 'Username', kind: 'text' },
-      { path: 'enable_auth', label: 'Authentication', kind: 'bool' },
-      { path: 'tls.enable', label: 'TLS', kind: 'bool' },
+      { path: 'enable', label: 'Enabled', kind: 'bool', help: 'Starts the broker built into this server. Saving restarts it.' },
+      { path: 'listen_host', label: 'Listen host', kind: 'text', help: 'Address the broker binds. Saving restarts it.' },
+      { path: 'listen_port', label: 'Listen port', kind: 'number', help: 'Port the broker binds. Saving restarts it.' },
+      { path: 'client_id', label: 'Client id', kind: 'text', help: 'Id of the broker process. Saving restarts it.' },
+      { path: 'username', label: 'Username', kind: 'text', help: 'Username the broker expects. Its password stays in the server environment. Saving restarts the broker.' },
+      { path: 'enable_auth', label: 'Authentication', kind: 'bool', help: 'Devices must present a signed password. The signature key stays in the environment. Saving restarts the broker.' },
+      { path: 'tls.enable', label: 'TLS', kind: 'bool', help: 'Also listens with TLS. Saving restarts the broker.' },
+      { path: 'tls.port', label: 'TLS port', kind: 'number', help: 'Port of the TLS listener. Saving restarts the broker.' },
+      { path: 'tls.pem', label: 'TLS certificate', kind: 'text', help: 'Path of the certificate file on this machine. Saving restarts the broker.' },
+      { path: 'tls.key', label: 'TLS private key', kind: 'text', help: 'Path of the private key on this machine. Saving restarts the broker.' },
     ],
   },
   {
     key: 'udp',
     title: 'UDP',
+    hint: 'Audio address given to the device.',
     fields: [
-      { path: 'external_host', label: 'External host', kind: 'text' },
-      { path: 'external_port', label: 'External port', kind: 'number' },
-      { path: 'listen_host', label: 'Listen host', kind: 'text' },
-      { path: 'listen_port', label: 'Listen port', kind: 'number' },
+      { path: 'external_host', label: 'External host', kind: 'text', help: 'Host the device is told to send audio to. The next hello uses it.' },
+      { path: 'external_port', label: 'External port', kind: 'number', help: 'Port the device is told to send audio to. The next hello uses it.' },
+      { path: 'listen_host', label: 'Listen host', kind: 'text', help: 'Stored with the block. The audio socket always binds 0.0.0.0.' },
+      { path: 'listen_port', label: 'Listen port', kind: 'number', help: 'Port the audio socket binds. Saving rebinds it.' },
     ],
   },
   {
     key: 'ota',
     title: 'OTA',
+    hint: 'Addresses the device receives when it checks in.',
     fields: [
-      { path: 'test.websocket.url', label: 'Test WebSocket URL', kind: 'text' },
-      { path: 'test.mqtt.enable', label: 'Test MQTT', kind: 'bool' },
-      { path: 'test.mqtt.endpoint', label: 'Test MQTT endpoint', kind: 'text' },
-      { path: 'external.websocket.url', label: 'External WebSocket URL', kind: 'text' },
-      { path: 'external.mqtt.enable', label: 'External MQTT', kind: 'bool' },
-      { path: 'external.mqtt.endpoint', label: 'External MQTT endpoint', kind: 'text' },
+      { path: 'test.websocket.url', label: 'Test WebSocket URL', kind: 'text', help: 'WebSocket address for a device on the local network (192.168, 10, or 127). The next check-in returns it. No restart.' },
+      { path: 'test.mqtt.enable', label: 'Test MQTT', kind: 'bool', help: 'Include MQTT details in the local check-in response. The next check-in uses it.' },
+      { path: 'test.mqtt.endpoint', label: 'Test MQTT endpoint', kind: 'text', help: 'Broker address given to a local device. The next check-in returns it.' },
+      { path: 'external.websocket.url', label: 'External WebSocket URL', kind: 'text', help: 'WebSocket address for a device outside the local network. The next check-in returns it. No restart.' },
+      { path: 'external.mqtt.enable', label: 'External MQTT', kind: 'bool', help: 'Include MQTT details for a device outside the local network. The next check-in uses it.' },
+      { path: 'external.mqtt.endpoint', label: 'External MQTT endpoint', kind: 'text', help: 'Broker address given to an external device. The next check-in returns it.' },
     ],
   },
   {
     key: 'mcp',
     title: 'MCP',
+    hint: 'Global MCP servers.',
     fields: [
-      { path: 'global.enabled', label: 'Global MCP', kind: 'bool' },
-      { path: 'global.reconnect_interval', label: 'Reconnect interval (seconds)', kind: 'number' },
-      { path: 'global.max_reconnect_attempts', label: 'Max reconnect attempts', kind: 'number' },
-      { path: 'global.servers', label: 'Servers', kind: 'json' },
+      { path: 'global.enabled', label: 'Global MCP', kind: 'bool', help: 'Connects the shared MCP servers. Saving reloads those connections.' },
+      { path: 'global.reconnect_interval', label: 'Reconnect interval (seconds)', kind: 'number', help: 'Seconds between tries after a server drops. Saving reloads the connections.' },
+      { path: 'global.max_reconnect_attempts', label: 'Max reconnect attempts', kind: 'number', help: 'How many times to retry a dropped server. Saving reloads the connections.' },
+      { path: 'global.servers', label: 'Servers', kind: 'json', help: 'JSON list of MCP servers. Saving reloads the connections. API keys in this JSON are ignored.' },
     ],
   },
   {
     key: 'voice_identify',
     title: 'Voiceprint',
+    hint: 'Voice server that tells speakers apart.',
     fields: [
-      { path: 'enable', label: 'Enabled', kind: 'bool' },
-      { path: 'base_url', label: 'Base URL', kind: 'text' },
-      { path: 'threshold', label: 'Threshold', kind: 'number' },
+      { path: 'enable', label: 'Enabled', kind: 'bool', help: 'Asks the voice server who is speaking. The next session uses it. The agent still needs voiceprint turned on.' },
+      { path: 'base_url', label: 'Base URL', kind: 'text', help: 'Address of the voice server. The next session uses it.' },
+      { path: 'threshold', label: 'Threshold', kind: 'number', help: 'How close a voice must match to count. The next session uses it.' },
     ],
   },
   {
     key: 'knowledge',
     title: 'Knowledge',
-    fields: [{ path: 'providers', label: 'Providers', kind: 'json' }],
+    hint: 'Knowledge providers.',
+    fields: [{ path: 'providers', label: 'Providers', kind: 'json', help: 'JSON of knowledge providers, such as RAGFlow. The next session uses it. API keys in this JSON are ignored.' }],
   },
   {
     key: 'vision',
     title: 'Vision',
+    hint: 'Where camera frames are sent.',
     fields: [
-      { path: 'enable_auth', label: 'Authentication', kind: 'bool' },
-      { path: 'vision_url', label: 'Vision URL', kind: 'text' },
+      { path: 'enable_auth', label: 'Authentication', kind: 'bool', help: 'Requires the vision token on requests. The token stays in the server environment. The next request uses this switch.' },
+      { path: 'vision_url', label: 'Vision URL', kind: 'text', help: 'Where camera frames are sent. The next request uses it.' },
     ],
   },
   {
     key: 'chat',
     title: 'Chat',
+    hint: 'How long a conversation waits.',
     fields: [
-      { path: 'max_idle_duration', label: 'Max idle (ms)', kind: 'number' },
-      { path: 'chat_max_silence_duration', label: 'Silence to end a sentence (ms)', kind: 'number' },
-      { path: 'speak_request_reuse_window_ms', label: 'Speak reuse window (ms)', kind: 'number' },
-      { path: 'realtime_mode', label: 'Realtime mode', kind: 'number' },
+      { path: 'max_idle_duration', label: 'Max idle (ms)', kind: 'number', help: 'How long a quiet session stays open, in milliseconds. Zero means it never closes for idle. The running session reads this as it goes.' },
+      { path: 'chat_max_silence_duration', label: 'Silence to end a sentence (ms)', kind: 'number', help: 'Silence that ends an utterance, in milliseconds. The next session uses it.' },
+      { path: 'speak_request_reuse_window_ms', label: 'Speak reuse window (ms)', kind: 'number', help: 'How long a warmed speak path can be reused, in milliseconds. The next speak uses it.' },
+      { path: 'realtime_mode', label: 'Realtime mode', kind: 'number', help: 'Barge-in rule while realtime is on. 1 interrupts on voice, 2 on a recognized phrase, 3 on a known speaker, 4 stops the reply at the first text. The running session reads this as it goes.' },
     ],
   },
   {
     key: 'vad',
     title: 'VAD',
-    fields: [{ path: 'provider', label: 'Provider', kind: 'text' }],
+    hint: 'Voice-activity detector. The model file stays in the server config.',
+    fields: [{ path: 'provider', label: 'Provider', kind: 'text', help: 'Which detector to use: webrtc_vad, silero_vad, or ten_vad. The next session uses it. The model file stays in the server config.' }],
   },
 ]
 
@@ -146,7 +162,7 @@ export function readSetting(input: unknown): Setting {
   return {
     id,
     key,
-    value: stripSettingsSecrets(asJsonObject(input.value, 'Setting value')),
+    value: stripSettingsSecrets(asJsonObject(input.value, 'Setting value'), key),
   }
 }
 
@@ -169,15 +185,16 @@ export function fieldValues(value: JsonObject, block: SettingsBlock): FieldValue
 }
 
 export function settingsValue(block: SettingsBlock, original: JsonObject, values: FieldValues): JsonObject {
-  const out = stripSettingsSecrets(structuredClone(original))
+  const out = stripSettingsSecrets(structuredClone(original), block.key)
   for (const field of block.fields) {
-    if (isSecretPath(field.path)) continue
+    if (isSecretKey(`${block.key}.${field.path}`)) continue
     writeField(out, field, values[field.path])
   }
-  return stripSettingsSecrets(out)
+  return stripSettingsSecrets(out, block.key)
 }
 
-function isSecretPath(path: string): boolean {
+function isSecretKey(path: string): boolean {
+  if (path === 'mqtt.password') return false
   const leaf = path.split('.').pop() ?? path
   return SECRET_KEYS.has(leaf)
 }
@@ -252,20 +269,21 @@ function isJsonValue(value: unknown): value is JsonValue {
   return false
 }
 
-export function stripSettingsSecrets(value: JsonObject): JsonObject {
+export function stripSettingsSecrets(value: JsonObject, prefix = ''): JsonObject {
   const out: JsonObject = {}
   for (const [key, child] of Object.entries(value)) {
-    if (SECRET_KEYS.has(key)) continue
-    out[key] = stripChild(child)
+    const path = prefix ? `${prefix}.${key}` : key
+    if (isSecretKey(path)) continue
+    out[key] = stripChild(child, path)
   }
   return out
 }
 
-function stripChild(value: JsonValue): JsonValue {
+function stripChild(value: JsonValue, path: string): JsonValue {
   if (Array.isArray(value)) {
-    return value.map((item) => (isJsonObject(item) ? stripSettingsSecrets(item) : item))
+    return value.map((item) => (isJsonObject(item) ? stripSettingsSecrets(item, path) : item))
   }
-  if (isJsonObject(value)) return stripSettingsSecrets(value)
+  if (isJsonObject(value)) return stripSettingsSecrets(value, path)
   return value
 }
 
