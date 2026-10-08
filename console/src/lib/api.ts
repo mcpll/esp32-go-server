@@ -2,6 +2,7 @@ import { ClientResponseError } from 'pocketbase'
 import { activationUpdate, bindDeviceUpdate, parseDeviceCode } from '@/lib/deviceBind'
 import { pb } from '@/lib/client'
 import { agentUpdate, type AgentDraft } from '@/lib/providerForm'
+import { readCommand, type Command } from '@/lib/commands'
 import { readAgent, readDevice, type Agent, type Device } from '@/lib/records'
 import { readSetting, type Setting } from '@/lib/settingsForm'
 import type { JsonObject } from '@/lib/json'
@@ -29,7 +30,7 @@ export async function fetchDevices(): Promise<Device[]> {
   const records: unknown = await pb.collection('devices').getFullList({
     sort: 'code',
     expand: 'agent',
-    fields: 'id,code,note,activated,online,agent,expand.agent.name',
+    fields: 'id,code,note,activated,online,device_id,agent,expand.agent.name',
   })
   if (!Array.isArray(records)) throw new Error('Device list is not an array')
   return records.map(readDevice)
@@ -65,6 +66,16 @@ export async function fetchSettings(): Promise<Setting[]> {
 
 export async function saveSetting(input: { id: string; value: JsonObject }): Promise<void> {
   await pb.collection('settings').update(input.id, { value: input.value })
+}
+
+export async function createCommand(body: JsonObject): Promise<Command> {
+  const created: unknown = await pb.collection('commands').create(body)
+  return readCommand(created)
+}
+
+export async function fetchCommand(id: string): Promise<Command> {
+  const record: unknown = await pb.collection('commands').getOne(id)
+  return readCommand(record)
 }
 
 export async function setDeviceActivated(input: {
