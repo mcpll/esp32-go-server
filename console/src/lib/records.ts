@@ -1,4 +1,5 @@
 import { asJsonObject, isJsonObject, type JsonObject } from '@/lib/json'
+import { readOpenClaw, type OpenClawConfig } from '@/lib/openclawForm'
 import { stripSecrets } from '@/lib/providerForm'
 
 export type Agent = {
@@ -11,6 +12,7 @@ export type Agent = {
   llmConfig: JsonObject
   ttsProvider: string
   ttsConfig: JsonObject
+  openclaw: OpenClawConfig
 }
 
 export type Device = {
@@ -35,6 +37,7 @@ export function readAgent(input: unknown): Agent {
     llmConfig: stripSecrets(asJsonObject(record.llm_config, 'llm_config')),
     ttsProvider: requiredString(record, 'tts_provider', 'Agent'),
     ttsConfig: stripSecrets(asJsonObject(record.tts_config, 'tts_config')),
+    openclaw: readOpenClaw(record.openclaw),
   }
 }
 
