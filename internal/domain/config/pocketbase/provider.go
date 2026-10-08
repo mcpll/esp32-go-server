@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"math/big"
 	"strings"
 	"sync"
@@ -20,9 +21,11 @@ import (
 )
 
 const (
-	devicesCollection  = "devices"
-	settingsCollection = "settings"
-	commandsCollection = "commands"
+	devicesCollection            = "devices"
+	settingsCollection           = "settings"
+	commandsCollection           = "commands"
+	knowledgeBasesCollection     = "knowledge_bases"
+	knowledgeDocumentsCollection = "knowledge_documents"
 
 	// activationTimeoutMs is how long the device keeps showing its code (five minutes).
 	activationTimeoutMs = 300000
@@ -234,7 +237,55 @@ func (p *Provider) GetUserConfig(ctx context.Context, deviceID string) (types.UC
 			ExitKeywords:  openclaw.Strings("exit_keywords"),
 		},
 	}
+	bases, err := p.knowledgeBases(ctx, agent)
+	if err != nil {
+		return types.UConfig{}, err
+	}
+	cfg.KnowledgeBases = bases
 	return cfg, nil
+}
+
+// knowledgeBases is filled only when the agent switch is on. The search tool and the
+// routing prompt both ignore a base whose id is 0, so the PocketBase id is folded into
+// a stable non-zero uint the unchanged tool can pass back as knowledge_base_ids.
+func (p *Provider) knowledgeBases(ctx context.Context, agent Record) ([]types.KnowledgeBaseRef, error) {
+	if !agent.Bool("knowledge_enabled") {
+		return nil, nil
+	}
+	var refs []types.KnowledgeBaseRef
+	for _, id := range agent.Strings("knowledge_bases") {
+		rec, err := p.client.First(ctx, knowledgeBasesCollection, textEquals("id", id), "")
+		if err != nil {
+			return nil, fmt.Errorf("knowledge base %s: %w", id, err)
+		}
+		ref := types.KnowledgeBaseRef{
+			ID:           knowledgeRefID(rec.String("id")),
+			Name:         rec.String("name"),
+			Description:  rec.String("description"),
+			Provider:     rec.String("provider"),
+			ExternalKBID: rec.String("external_kb_id"),
+			Status:       rec.String("status"),
+		}
+		if threshold, ok := rec.Float("retrieval_threshold"); ok {
+			ref.RetrievalThreshold = &threshold
+		}
+		refs = append(refs, ref)
+	}
+	return refs, nil
+}
+
+func knowledgeRefID(recordID string) uint {
+	sum := fnv.New64a()
+	_, _ = sum.Write([]byte(recordID))
+	n := sum.Sum64()
+	id := uint(n)
+	if id == 0 {
+		id = uint(n >> 32)
+	}
+	if id == 0 {
+		id = 1
+	}
+	return id
 }
 
 // MergeStage lays a command's provider config over the viper section for that provider.

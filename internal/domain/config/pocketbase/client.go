@@ -60,6 +60,22 @@ func (r Record) Bool(key string) bool {
 	return b
 }
 
+// Float returns a number field. PocketBase JSON numbers arrive as float64.
+func (r Record) Float(key string) (float64, bool) {
+	switch v := r[key].(type) {
+	case float64:
+		return v, true
+	case float32:
+		return float64(v), true
+	case int:
+		return float64(v), true
+	case int64:
+		return float64(v), true
+	default:
+		return 0, false
+	}
+}
+
 // Object returns a json field holding an object, or nil.
 func (r Record) Object(key string) map[string]any {
 	m, _ := r[key].(map[string]any)
@@ -312,6 +328,29 @@ func (c *Client) Create(ctx context.Context, collection string, fields map[strin
 // Update changes fields of a record.
 func (c *Client) Update(ctx context.Context, collection, id string, fields map[string]any) error {
 	return c.do(ctx, http.MethodPatch, recordsPath(collection, id), nil, fields, nil)
+}
+
+// File downloads one file field. name is the filename PocketBase stored on the record.
+func (c *Client) File(ctx context.Context, collection, recordID, name string) ([]byte, error) {
+	path := "/api/files/" + url.PathEscape(collection) + "/" + url.PathEscape(recordID) + "/" + url.PathEscape(name)
+	for attempt := 0; ; attempt++ {
+		token, err := c.authorize(ctx)
+		if err != nil {
+			return nil, err
+		}
+		status, raw, err := c.send(ctx, http.MethodGet, path, nil, nil, token)
+		if err != nil {
+			return nil, err
+		}
+		if status == http.StatusUnauthorized && attempt == 0 {
+			c.forget(token)
+			continue
+		}
+		if status < 200 || status > 299 {
+			return nil, apiError(status, raw)
+		}
+		return raw, nil
+	}
 }
 
 func recordsPath(collection, id string) string {

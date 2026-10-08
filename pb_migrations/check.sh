@@ -55,7 +55,7 @@ ME=$(token users "$ADMIN_EMAIL" "$ADMIN_PASSWORD")
 curl -s -H "Authorization: $SU" "$URL/api/collections/users/records" \
   -d "email=second@example.com&password=second-pass-123&passwordConfirm=second-pass-123" >/dev/null
 SECOND=$(token users second@example.com second-pass-123)
-for c in users agents devices settings commands; do
+for c in users agents devices settings commands knowledge_bases knowledge_documents; do
   for who in "" "$SECOND"; do
     got=$(total $c "$who")
     case $got in 0|refused) ;; *) fail "$c readable by '${who:0:6}': $got";; esac
@@ -66,7 +66,7 @@ for who in "" "$ME" "$SECOND"; do
     -d "email=third@example.com&password=third-pass-123&passwordConfirm=third-pass-123")
   [ "$code" -ge 400 ] || fail "users create allowed ($code)"
 done
-for c in agents devices settings commands; do
+for c in agents devices settings commands knowledge_bases knowledge_documents; do
   for who in "" "$SECOND"; do
     code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: $who" "$URL/api/collections/$c/records" -d 'name=x&key=x&device_id=x&code=123456')
     [ "$code" -ge 400 ] || fail "$c writable by '${who:0:6}' ($code)"
@@ -76,6 +76,20 @@ code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: $ME" -H 'Conten
   "$URL/api/collections/commands/records" \
   -d '{"type":"settings_reload","status":"pending","payload":{}}')
 [ "$code" = 200 ] || fail "console cannot create a command ($code)"
+KB=$(curl -s -H "Authorization: $ME" -H 'Content-Type: application/json' \
+  "$URL/api/collections/knowledge_bases/records" \
+  -d '{"name":"Cancello","provider":"ragflow","description":"codici di accesso","status":"active","retrieval_threshold":0.35}')
+echo "$KB" | jq -e '.provider == "ragflow" and .name == "Cancello"' >/dev/null || fail "console cannot create a knowledge base: $KB"
+KBID=$(echo "$KB" | jq -r .id)
+DOC=$(curl -s -H "Authorization: $ME" -H 'Content-Type: application/json' \
+  "$URL/api/collections/knowledge_documents/records" \
+  -d "{\"knowledge_base\":\"$KBID\",\"status\":\"pending\"}")
+echo "$DOC" | jq -e '.status == "pending" and .knowledge_base == "'"$KBID"'"' >/dev/null || fail "console cannot create a document: $DOC"
+AGENTID=$(echo "$AGENT" | jq -r .id)
+code=$(curl -s -o /dev/null -w '%{http_code}' -X PATCH -H "Authorization: $ME" -H 'Content-Type: application/json' \
+  "$URL/api/collections/agents/records/$AGENTID" \
+  -d "{\"knowledge_bases\":[\"$KBID\"],\"knowledge_enabled\":false}")
+[ "$code" = 200 ] || fail "console cannot link a knowledge base to the agent ($code)"
 stop
 
 # 4. Migrations repeat on another empty folder.

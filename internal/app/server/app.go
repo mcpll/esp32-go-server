@@ -502,6 +502,8 @@ func (a *App) registerHandler() {
 	pb.RegisterCommand("provider_test", func(ctx context.Context, payload map[string]any) (any, error) {
 		return providertest.FromCommand(ctx, payload)
 	})
+	pb.RegisterCommand("knowledge_upload", pb.KnowledgeUpload)
+	pb.RegisterCommand("knowledge_sync", pb.KnowledgeSync)
 	pb.ArmCommands()
 }
 
