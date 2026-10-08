@@ -1,9 +1,10 @@
 # Issue tracker: GitHub
 
-Issues and specs for this repo live as GitHub issues on `mcpll/esp32-go-server`. **Always use the GitHub MCP server** (namespace `user-github`, via `GetDynamicTools` then `CallDynamicTool`). Do not use the `gh` CLI, with one exception: issue dependencies (see Blocking), which the MCP server has no tool for.
+Issues and specs for this repo live as GitHub issues on `mcpll/esp32-go-server`. Reads and writes go through the GitHub MCP server (namespace `user-github`, via `GetDynamicTools` then `CallDynamicTool`). The only `gh` calls in this repo are the dependency calls under Blocking.
 
 ## Conventions
 
+- **Confirm a write**: after `issue_write` or `add_issue_comment`, `issue_read` the same issue. The write is done when the body or the new comment is on the issue. If the tool result is an approval card, retry that same MCP call so the card is shown, say so in one sentence, and stop.
 - **Create an issue**: `issue_write` with `method: create`, `title`, `body`, `labels`.
 - **Read an issue**: `issue_read` (`method: get`, and `get_comments` / `get_labels` for comments and labels).
 - **List issues**: `list_issues` with `state` and `labels` filters, or `search_issues` for keyword queries. Paginate in batches of 5-10.
