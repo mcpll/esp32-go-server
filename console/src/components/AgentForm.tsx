@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { actionClass, areaClass, controlClass } from '@/components/classes'
+import { McpAccessPoint } from '@/components/McpAccessPoint'
 import { StageEditor } from '@/components/StageEditor'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -81,6 +82,7 @@ export function AgentForm({ id }: { id: string }) {
               onChange={(event) => setPrompt(event.target.value)}
             />
           </div>
+          <McpAccessPoint agentId={agent.id} />
         </section>
         <section className="flex flex-col gap-4 border-t border-border px-6 py-6 lg:min-h-0 lg:overflow-y-auto lg:border-t-0">
           <div role="tablist" aria-label="Pipeline" className="flex gap-1 rounded-full bg-muted p-1">

@@ -1,3 +1,4 @@
+import { DeviceTools } from '@/components/DeviceTools'
 import { SendMessage } from '@/components/SendMessage'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
@@ -41,6 +42,7 @@ export function DeviceRow({ device }: { device: Device }) {
         </p>
       ) : null}
       <SendMessage device={device} />
+      <DeviceTools device={device} />
     </div>
   )
 }

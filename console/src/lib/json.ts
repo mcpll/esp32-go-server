@@ -12,7 +12,7 @@ export function asJsonObject(value: unknown, label: string): JsonObject {
   return value
 }
 
-function isJsonValue(value: unknown): value is JsonValue {
+export function isJsonValue(value: unknown): value is JsonValue {
   if (value === null) return true
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
     return true
