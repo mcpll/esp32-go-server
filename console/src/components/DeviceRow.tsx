@@ -1,3 +1,4 @@
+import { SendMessage } from '@/components/SendMessage'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { useSetDeviceActivated } from '@/hooks/useDevices'
@@ -39,6 +40,7 @@ export function DeviceRow({ device }: { device: Device }) {
           {message}
         </p>
       ) : null}
+      <SendMessage device={device} />
     </div>
   )
 }

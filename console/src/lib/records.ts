@@ -1,5 +1,6 @@
 import { asJsonObject, isJsonObject, type JsonObject } from '@/lib/json'
 import { readMemoryMode, type MemoryMode } from '@/lib/memoryMode'
+import { readOpenClaw, type OpenClawConfig } from '@/lib/openclawForm'
 import { stripSecrets } from '@/lib/providerForm'
 
 export type Agent = {
@@ -13,6 +14,7 @@ export type Agent = {
   llmConfig: JsonObject
   ttsProvider: string
   ttsConfig: JsonObject
+  openclaw: OpenClawConfig
 }
 
 export type Device = {
@@ -21,6 +23,7 @@ export type Device = {
   note: string
   activated: boolean
   online: boolean
+  deviceId: string
   agentId: string
   agentName: string
 }
@@ -38,6 +41,7 @@ export function readAgent(input: unknown): Agent {
     llmConfig: stripSecrets(asJsonObject(record.llm_config, 'llm_config')),
     ttsProvider: requiredString(record, 'tts_provider', 'Agent'),
     ttsConfig: stripSecrets(asJsonObject(record.tts_config, 'tts_config')),
+    openclaw: readOpenClaw(record.openclaw),
   }
 }
 
@@ -49,6 +53,7 @@ export function readDevice(input: unknown): Device {
     note: optionalString(record, 'note'),
     activated: requiredBool(record, 'activated'),
     online: requiredBool(record, 'online'),
+    deviceId: requiredString(record, 'device_id', 'Device'),
     agentId: relationId(record),
     agentName: expandedAgentName(record.expand),
   }

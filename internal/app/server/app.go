@@ -13,6 +13,8 @@ import (
 	"xiaozhi-esp32-server-golang/internal/app/server/types"
 	"xiaozhi-esp32-server-golang/internal/app/server/websocket"
 	user_config "xiaozhi-esp32-server-golang/internal/domain/config"
+	"xiaozhi-esp32-server-golang/internal/domain/config/pocketbase"
+	"xiaozhi-esp32-server-golang/internal/domain/config/providertest"
 	config_types "xiaozhi-esp32-server-golang/internal/domain/config/types"
 	"xiaozhi-esp32-server-golang/internal/domain/mcp"
 	"xiaozhi-esp32-server-golang/internal/domain/openclaw"
@@ -491,6 +493,31 @@ func (a *App) registerHandler() {
 	}
 	provider.RegisterMessageEventHandler(context.Background(), config_types.EventHandleMessageInject, a.HandleInjectMsg)
 	log.Infof("registerHandler: registered paths=[%s]", config_types.EventHandleMessageInject)
+
+	pb, ok := provider.(*pocketbase.Provider)
+	if !ok {
+		return
+	}
+	pb.RegisterCommand("inject_msg", a.injectCommand)
+	pb.RegisterCommand("provider_test", func(ctx context.Context, payload map[string]any) (any, error) {
+		return providertest.FromCommand(ctx, payload)
+	})
+	pb.ArmCommands()
+}
+
+// injectCommand speaks the text, or feeds it into the chat, through the same
+// path as a live session. On MQTT that path sends speak_request before the audio.
+func (a *App) injectCommand(ctx context.Context, payload map[string]any) (any, error) {
+	_, err := a.HandleInjectMsg(ctx, config_types.EventHandleMessageInject, map[string]interface{}{
+		"device_id":   payload["device"],
+		"message":     payload["message"],
+		"skip_llm":    payload["skip_llm"],
+		"auto_listen": payload["auto_listen"],
+	})
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"ok": true}, nil
 }
 
 // Inject a message to the client
