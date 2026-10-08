@@ -33,11 +33,13 @@ func Merge(data map[string]any) error {
 // MergeThen applies data, then runs then while the write lock is still held.
 // Keys written by the previous snapshot and absent from data are removed.
 // Keys never present in a snapshot (file secrets, VAD model config) stay.
+// An empty string is absent too: an empty seed never overrides the config file.
 // then may call viper.Set (secrets.ApplyEnv does) and must not call back into this package.
 func MergeThen(data map[string]any, then func()) error {
 	mu.Lock()
 	defer mu.Unlock()
 	cleaned := stripSecrets(cloneMap(data))
+	dropEmptyStrings(cleaned)
 	for _, key := range unionKeys(applied, cleaned) {
 		current := cloneStringMap(viper.Get(key))
 		if prev, ok := applied[key].(map[string]any); ok {
@@ -114,6 +116,21 @@ func cloneStringMap(v any) map[string]any {
 
 func stripSecrets(m map[string]any) map[string]any {
 	return stripAt(m, "")
+}
+
+// dropEmptyStrings removes "" leaves so they are not merged and not remembered
+// in the snapshot. An empty seed never overrides the config file.
+func dropEmptyStrings(m map[string]any) {
+	for k, v := range m {
+		switch child := v.(type) {
+		case string:
+			if child == "" {
+				delete(m, k)
+			}
+		case map[string]any:
+			dropEmptyStrings(child)
+		}
+	}
 }
 
 func stripAt(m map[string]any, prefix string) map[string]any {

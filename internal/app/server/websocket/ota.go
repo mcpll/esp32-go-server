@@ -94,7 +94,7 @@ func (s *WebSocketServer) handleOta(w http.ResponseWriter, r *http.Request) {
 	// Password
 	respData := &OtaResponse{
 		Websocket: WebsocketInfo{
-			Url:   store.GetString(otaConfigPrefix + "websocket.url"),
+			Url:   websocketURL(r, store.GetString(otaConfigPrefix+"websocket.url")),
 			Token: store.GetString("websocket.token"),
 		},
 		Mqtt: mqttInfo,
@@ -116,6 +116,24 @@ func (s *WebSocketServer) handleOta(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	return
+}
+
+// websocketURL returns the ota setting when it is set. An empty setting uses the
+// request Host and /xiaozhi/v1/, the same path Handler registers for device chat.
+// ponytail: r.Host and r.TLS only. Set the ota URL when a proxy rewrites the host
+// or the WebSocket port is not the check-in port.
+func websocketURL(r *http.Request, configured string) string {
+	if configured != "" {
+		return configured
+	}
+	if r.Host == "" {
+		return ""
+	}
+	scheme := "ws"
+	if r.TLS != nil {
+		scheme = "wss"
+	}
+	return scheme + "://" + r.Host + "/xiaozhi/v1/"
 }
 
 func getMqttInfo(deviceId, clientId, otaConfigPrefix, ip string) *MqttInfo {

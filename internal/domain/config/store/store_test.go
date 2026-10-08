@@ -58,6 +58,40 @@ func TestMergeDropsSecretsFromSettings(t *testing.T) {
 	}
 }
 
+func TestEmptySeedNeverOverridesFile(t *testing.T) {
+	resetViper(t)
+	viper.Set("ota.test.websocket.url", "ws://from-file/xiaozhi/v1/")
+	seed := map[string]any{
+		"ota": map[string]any{
+			"test": map[string]any{
+				"websocket": map[string]any{"url": ""},
+				"mqtt":      map[string]any{"enable": false, "endpoint": ""},
+			},
+		},
+	}
+	if err := Merge(seed); err != nil {
+		t.Fatal(err)
+	}
+	if err := Merge(seed); err != nil {
+		t.Fatal(err)
+	}
+	if got := viper.GetString("ota.test.websocket.url"); got != "ws://from-file/xiaozhi/v1/" {
+		t.Fatalf("url = %q", got)
+	}
+	if !viper.IsSet("ota.test.mqtt.enable") || viper.GetBool("ota.test.mqtt.enable") {
+		t.Fatalf("enable = %v, set=%v", viper.GetBool("ota.test.mqtt.enable"), viper.IsSet("ota.test.mqtt.enable"))
+	}
+
+	if err := Merge(map[string]any{
+		"ota": map[string]any{"test": map[string]any{"websocket": map[string]any{"url": "ws://from-settings/xiaozhi/v1/"}}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if got := viper.GetString("ota.test.websocket.url"); got != "ws://from-settings/xiaozhi/v1/" {
+		t.Fatalf("explicit url = %q", got)
+	}
+}
+
 func TestClearedSettingDropsTheOldValue(t *testing.T) {
 	resetViper(t)
 	viper.Set("vad.silero_vad.model_path", "config/models/vad/silero_vad.onnx")

@@ -71,7 +71,7 @@ Activating a device by hand:
 1. Point the device at `http://<host>:8989/xiaozhi/ota/`. The OTA response carries a six-digit `activation.code`, and a `devices` record appears in PocketBase with `activated=false`.
 2. In the console, open Devices, enter that code, pick the seeded agent, and add a note. That sets `agent` and `activated`.
 3. The next OTA response has no `activation` block and the device can talk. Edits to the agent (prompt, providers, voice) apply to the next session.
-4. In the `settings` collection, record `ota`, fill in `test.websocket.url` (for LAN clients) and `external.websocket.url` so the device gets a WebSocket address.
+4. The check-in returns `websocket.url` from the `ota` setting: `test.websocket.url` when the device is on 192.168, 10, or 127, otherwise `external.websocket.url`. When that value is empty, the server builds `ws://<Host>/xiaozhi/v1/` from the request Host (`wss://` when the check-in itself is TLS). Set the field in the console, under Settings, only when the device should connect to a different host. An empty setting leaves a URL from the config file in place.
 
 ## Roadmap
 
