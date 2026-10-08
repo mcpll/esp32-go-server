@@ -274,7 +274,7 @@ func TestGetUserConfigMergesAgentOntoViperSections(t *testing.T) {
 		t.Fatalf("openclaw = %+v", cfg.OpenClaw)
 	}
 	if len(cfg.VoiceIdentify) != 0 || len(cfg.KnowledgeBases) != 0 {
-		t.Fatalf("voiceprint and knowledge stay empty until their tickets: %+v %+v", cfg.VoiceIdentify, cfg.KnowledgeBases)
+		t.Fatalf("voiceprint stays empty while the agent switch is off, and knowledge stays empty until its ticket: %+v %+v", cfg.VoiceIdentify, cfg.KnowledgeBases)
 	}
 }
 
