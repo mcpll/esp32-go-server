@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -139,6 +140,47 @@ func TestOtaUrlChangesWithoutRestart(t *testing.T) {
 	}
 	if got := store.GetString("websocket.token"); got != "secret-token" {
 		t.Fatalf("token overridden: %q", got)
+	}
+}
+
+func TestOtaUsesRequestHostWhenUrlEmpty(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+	viper.Set("auth.enable", false)
+	viper.Set("websocket.token", "secret-token")
+
+	ask := func(host string, tlsOn bool) string {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodGet, "http://"+host+"/xiaozhi/ota/", nil)
+		req.Host = host
+		if tlsOn {
+			req.TLS = &tls.ConnectionState{}
+		}
+		req.Header.Set("Device-Id", "AA:BB:CC:DD:EE:01")
+		req.Header.Set("Client-Id", "client-1")
+		req.RemoteAddr = "192.168.1.20:1234"
+		rec := httptest.NewRecorder()
+		NewWebSocketServer(0).handleOta(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status %d, want 200: %s", rec.Code, rec.Body.String())
+		}
+		var resp OtaResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		return resp.Websocket.Url
+	}
+
+	if got := ask("192.168.1.20:8989", false); got != "ws://192.168.1.20:8989/xiaozhi/v1/" {
+		t.Fatalf("url = %q", got)
+	}
+	if got := ask("lan.example:8989", true); got != "wss://lan.example:8989/xiaozhi/v1/" {
+		t.Fatalf("tls url = %q", got)
+	}
+
+	viper.Set("ota.test.websocket.url", "ws://configured/xiaozhi/v1/")
+	if got := ask("192.168.1.20:8989", false); got != "ws://configured/xiaozhi/v1/" {
+		t.Fatalf("explicit url = %q", got)
 	}
 }
 
