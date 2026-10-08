@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"xiaozhi-esp32-server-golang/internal/domain/config/store"
+
 	"github.com/gorilla/websocket"
 	"github.com/spf13/viper"
 )
@@ -92,6 +94,51 @@ func TestOtaWebsocketTokenMatchesConfiguredToken(t *testing.T) {
 	}
 	if resp.Websocket.Token != "secret-token" {
 		t.Fatalf("websocket.token %q, want secret-token", resp.Websocket.Token)
+	}
+}
+
+func TestOtaUrlChangesWithoutRestart(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+	viper.Set("auth.enable", false)
+	viper.Set("websocket.token", "secret-token")
+
+	ask := func() string {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodGet, "/xiaozhi/ota/", nil)
+		req.Header.Set("Device-Id", "AA:BB:CC:DD:EE:01")
+		req.Header.Set("Client-Id", "client-1")
+		req.RemoteAddr = "127.0.0.1:1234"
+		rec := httptest.NewRecorder()
+		NewWebSocketServer(0).handleOta(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status %d, want 200: %s", rec.Code, rec.Body.String())
+		}
+		var resp OtaResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		return resp.Websocket.Url
+	}
+
+	if err := store.Merge(map[string]any{
+		"ota": map[string]any{"test": map[string]any{"websocket": map[string]any{"url": "ws://old/xiaozhi/v1/"}}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if got := ask(); got != "ws://old/xiaozhi/v1/" {
+		t.Fatalf("url = %q", got)
+	}
+	if err := store.Merge(map[string]any{
+		"ota": map[string]any{"test": map[string]any{"websocket": map[string]any{"url": "ws://new/xiaozhi/v1/"}}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if got := ask(); got != "ws://new/xiaozhi/v1/" {
+		t.Fatalf("url = %q", got)
+	}
+	if got := store.GetString("websocket.token"); got != "secret-token" {
+		t.Fatalf("token overridden: %q", got)
 	}
 }
 

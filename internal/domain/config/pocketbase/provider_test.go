@@ -24,6 +24,8 @@ func newTestProvider(t *testing.T, fake *fakePB) *Provider {
 	p := NewProvider(NewClient(fake.URL(), fakeEmail, fakePassword))
 	p.retryBase = 5 * time.Millisecond
 	p.retryMax = 20 * time.Millisecond
+	p.watchBase = 10 * time.Millisecond
+	p.watchMax = 40 * time.Millisecond
 	return p
 }
 
@@ -414,11 +416,23 @@ func TestStartLoadsSettingsAndSetsDevicesOffline(t *testing.T) {
 	fake.seed("devices", map[string]any{"device_id": "d1", "code": "123456", "online": true})
 	fake.seed("devices", map[string]any{"device_id": "d2", "code": "654321", "online": false})
 
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	var mu sync.Mutex
 	var got map[string]interface{}
-	p.Start(context.Background(), func(cfg map[string]interface{}) { got = cfg })
+	p.Start(ctx, func(cfg map[string]interface{}) {
+		mu.Lock()
+		if got == nil {
+			got = cfg
+		}
+		mu.Unlock()
+	})
 
-	if got["udp"] == nil {
-		t.Fatalf("settings not delivered before Start returned: %v", got)
+	mu.Lock()
+	snapshot := got
+	mu.Unlock()
+	if snapshot["udp"] == nil {
+		t.Fatalf("settings not delivered before Start returned: %v", snapshot)
 	}
 	if rec := fake.find("devices", "device_id", "d1"); rec["online"] != false {
 		t.Fatalf("device left online after start: %v", rec)
@@ -517,6 +531,98 @@ func TestClientReportsWrongCredentials(t *testing.T) {
 	if _, err := p.IsDeviceActivated(context.Background(), testDevice, "c"); err == nil {
 		t.Fatal("expected an authentication error")
 	}
+}
+
+func TestSettingsChangeReloadsTheOtaUrl(t *testing.T) {
+	fake := newFakePB(t)
+	p := newTestProvider(t, fake)
+	rec := fake.seed("settings", map[string]any{
+		"key": "ota",
+		"value": map[string]any{
+			"test": map[string]any{"websocket": map[string]any{"url": "ws://old/xiaozhi/v1/"}},
+		},
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	urls := make(chan string, 8)
+	p.Start(ctx, func(cfg map[string]interface{}) { urls <- otaTestURL(cfg) })
+
+	waitFor(t, func() bool { return fake.subscriptionCount() >= 1 })
+	if !contains(fake.lastSubscriptions(), "settings/*") {
+		t.Fatalf("subscriptions = %v", fake.lastSubscriptions())
+	}
+
+	fake.patch("settings", rec["id"].(string), map[string]any{
+		"value": map[string]any{
+			"test": map[string]any{"websocket": map[string]any{"url": "ws://new/xiaozhi/v1/"}},
+		},
+	})
+	fake.publish("settings/"+rec["id"].(string), `{"action":"update","record":{}}`)
+	waitForURL(t, urls, "ws://new/xiaozhi/v1/")
+}
+
+func TestRealtimeReconnectResubscribesAndReloadsSettings(t *testing.T) {
+	fake := newFakePB(t)
+	p := newTestProvider(t, fake)
+	rec := fake.seed("settings", map[string]any{
+		"key": "ota",
+		"value": map[string]any{
+			"test": map[string]any{"websocket": map[string]any{"url": "ws://old/xiaozhi/v1/"}},
+		},
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	urls := make(chan string, 16)
+	p.Start(ctx, func(cfg map[string]interface{}) { urls <- otaTestURL(cfg) })
+
+	waitFor(t, func() bool { return fake.subscriptionCount() >= 1 })
+	fake.holdSSE(true)
+	fake.dropStreams()
+	waitFor(t, func() bool { return fake.streamCount() == 0 })
+	fake.patch("settings", rec["id"].(string), map[string]any{
+		"value": map[string]any{
+			"test": map[string]any{"websocket": map[string]any{"url": "ws://reloaded/xiaozhi/v1/"}},
+		},
+	})
+	fake.holdSSE(false)
+
+	waitFor(t, func() bool { return fake.subscriptionCount() >= 2 })
+	if !contains(fake.lastSubscriptions(), "settings/*") {
+		t.Fatalf("subscriptions after reconnect = %v", fake.lastSubscriptions())
+	}
+	waitForURL(t, urls, "ws://reloaded/xiaozhi/v1/")
+}
+
+func otaTestURL(cfg map[string]interface{}) string {
+	ota, _ := cfg["ota"].(map[string]any)
+	testBlock, _ := ota["test"].(map[string]any)
+	ws, _ := testBlock["websocket"].(map[string]any)
+	url, _ := ws["url"].(string)
+	return url
+}
+
+func contains(items []string, want string) bool {
+	for _, item := range items {
+		if item == want {
+			return true
+		}
+	}
+	return false
+}
+
+func waitForURL(t *testing.T, urls <-chan string, want string) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		select {
+		case got := <-urls:
+			if got == want {
+				return
+			}
+		case <-time.After(15 * time.Millisecond):
+		}
+	}
+	t.Fatalf("timed out waiting for ota url %s", want)
 }
 
 func waitFor(t *testing.T, cond func() bool) {

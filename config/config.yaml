@@ -1,7 +1,8 @@
 # Server config.
-# What must exist before PocketBase answers, plus secrets, lives here. Everything else system-wide
-# (mqtt, udp, ota, mcp, vad, chat, ...) is read from the PocketBase `settings` collection at start
-# and overrides the values below.
+# What must exist before PocketBase answers, plus secrets and provider defaults, lives here.
+# mqtt, mqtt_server, udp, ota, mcp, voice_identify, knowledge, vision and chat are PocketBase
+# `settings` records. The server merges them at startup and again on every change.
+# A settings record cannot override a secret in this file or in the environment.
 
 # Server
 server:
@@ -13,13 +14,6 @@ server:
 # Device authentication: the OTA response carries an activation code until the owner binds the device
 auth:
   enable: true
-
-# Chat
-chat:
-  max_idle_duration: 30000         # max idle time of a session (ms), 0 means unlimited
-  chat_max_silence_duration: 400   # silence that ends a sentence (ms), default 400
-  speak_request_reuse_window_ms: 60000 # reuse window of the MQTT-UDP speak path (ms)
-  realtime_mode: 4 # 1: interrupt on VAD, 2: interrupt on ASR, 3: interrupt on ASR when a voiceprint is recognized, 4: interrupt when ASR returns a result (streaming or offline)
 
 chat_hooks:
   enabled: true
@@ -75,39 +69,11 @@ websocket:
   port: 8989       # WebSocket listen port
   token: ""
 
-# MQTT client (connects to an external MQTT broker)
-mqtt:
-  enable: true                # enable the MQTT client; when false the UDP server is closed as well
-  broker: "127.0.0.1"         # MQTT broker address
-  type: "tcp"                 # connection type
-  port: 2883                  # MQTT port
-  client_id: "xiaozhi_server" # client id
-  username: "admin"           # MQTT user name
-  password: ""                # MQTT password
-
-# MQTT server (runs the embedded broker)
+# Embedded broker secrets. Host, port, enable and TLS paths live in the settings record.
+# password: env MQTT_SERVER_PASSWORD. signature_key: env MQTT_SERVER_SIGNATURE_KEY when auth is on.
 mqtt_server:
-  enable: true                          # enable the MQTT server
-  listen_host: "0.0.0.0"                # listen address
-  listen_port: 2883                     # listen port
-  client_id: "xiaozhi_server"           # server client id
-  username: "admin"                     # default user name
-  password: ""                          # super-admin password; required (env MQTT_SERVER_PASSWORD)
-  signature_key: ""                     # required when enable_auth is true (env MQTT_SERVER_SIGNATURE_KEY)
-  enable_auth: false                    # enable authentication
-  # TLS
-  tls:
-    enable: false                # enable TLS
-    port: 8883                   # TLS port
-    pem: "config/server.pem"     # certificate file
-    key: "config/server.key"     # private key file
-
-# UDP server
-udp:
-  external_host: "127.0.0.1"  # address sent to the device in the hello message
-  external_port: 8990         # port sent to the device in the hello message
-  listen_host: "0.0.0.0"      # listen address
-  listen_port: 8990           # listen port
+  password: ""
+  signature_key: ""
 
 # Resource pools (shared defaults for every resource type)
 resource_pools:
@@ -350,11 +316,9 @@ llm:
     base_url: "https://ark.cn-beijing.volces.com/api/v3"  # API base URL
     max_tokens: 500                              # max generated tokens
 
-# Vision
+# Vision. enable_auth and vision_url live in settings. token: env VISION_TOKEN.
 vision:
-  enable_auth: false  # enable authentication
-  vision_url: "http://192.168.208.214:8989/xiaozhi/api/vision"  # vision API URL sent to the device
-  token: ""  # required; env VISION_TOKEN
+  token: ""
   # Vision language model
   vllm:
     provider: "aliyun_vision"  # vision model provider
@@ -373,42 +337,9 @@ vision:
       base_url: "https://ark.cn-beijing.volces.com/api/v3"  # API base URL
       max_tokens: 500                              # max generated tokens
 
-# OTA (over-the-air) config
+# OTA URLs live in settings. signature_key stays here.
 ota:
   signature_key: ""
-  # Test environment, for the local network
-  test:
-    websocket:
-      url: "ws://192.168.208.214:8989/xiaozhi/v1/"  # WebSocket URL
-    mqtt:
-      enable: false                # when true, the mqtt config is sent to the device
-      endpoint: "192.168.208.214"  # MQTT endpoint, may include a port
-  # External environment, for production
-  external:
-    websocket:
-      url: "wss://www.tb263.cn:55555/go_ws/xiaozhi/v1/"  # WebSocket URL
-    mqtt:
-      enable: false                # when true, the mqtt config is sent to the device
-      endpoint: "www.youdomain.cn" # MQTT endpoint, may include a port
-
-# MCP (Model Context Protocol)
-mcp:
-  # Global MCP servers
-  global:
-    enabled: true  # enable global MCP
-    servers:
-      # Filesystem MCP server
-      - name: "filesystem"
-        type: "sse"                           # connection type: SSE
-        url: "http://localhost:3001/sse"      # server URL
-        enabled: true                         # enabled
-      # Memory MCP server
-      - name: "memory"
-        type: "streamablehttp"                # connection type: streamable HTTP
-        url: "http://localhost:3002/mcp"      # server URL
-        enabled: true                         # enabled
-    reconnect_interval: 300      # reconnect interval (s)
-    max_reconnect_attempts: 10   # max reconnect attempts
 
 # Local MCP tools
 local_mcp:
@@ -449,8 +380,3 @@ wakeup_words:
   - "小智"      # Chinese kept: exact bytes the firmware wake word engine sends
   - "小知"      # Chinese kept: exact bytes the firmware wake word engine sends
   - "你好小智"  # Chinese kept: exact bytes the firmware wake word engine sends
-
-voice_identify:
-  enable: false
-  base_url: "http://192.168.208.214:8080"
-  threshold: 0.4  # voiceprint threshold, range 0.0-1.0
