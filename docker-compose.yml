@@ -1,0 +1,114 @@
+# Personal install: PocketBase (console) and the device server.
+# Redis and the voice server stay off unless their profiles are named.
+#
+#   cp .env.example .env    # then fill the values
+#   docker compose up --build -d
+#   docker compose --profile redis up --build -d
+#   docker compose --profile voice up --build -d
+#   docker compose down -v  # delete data
+name: esp32
+
+services:
+  pocketbase:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.pocketbase
+    image: esp32-pocketbase:local
+    restart: unless-stopped
+    environment:
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?ADMIN_EMAIL is required}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
+    volumes:
+      - pb_data:/pb_data
+    ports:
+      - "8090:8090"
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://127.0.0.1:8090/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 15s
+
+  server:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.server
+    image: esp32-server:local
+    restart: unless-stopped
+    depends_on:
+      pocketbase:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+        required: false
+    environment:
+      POCKETBASE_URL: http://pocketbase:8090
+      POCKETBASE_EMAIL: ${ADMIN_EMAIL:?ADMIN_EMAIL is required}
+      POCKETBASE_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
+      WEBSOCKET_TOKEN: ${WEBSOCKET_TOKEN:?WEBSOCKET_TOKEN is required}
+      ENDPOINT_AUTH_TOKEN: ${ENDPOINT_AUTH_TOKEN:?ENDPOINT_AUTH_TOKEN is required}
+      MQTT_SERVER_PASSWORD: ${MQTT_SERVER_PASSWORD:?MQTT_SERVER_PASSWORD is required}
+      MQTT_SERVER_SIGNATURE_KEY: ${MQTT_SERVER_SIGNATURE_KEY:-}
+      VISION_TOKEN: ${VISION_TOKEN:?VISION_TOKEN is required}
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      MEM0_API_KEY: ${MEM0_API_KEY:-}
+      REDIS_ENABLE: ${REDIS_ENABLE:-}
+      REDIS_HOST: ${REDIS_HOST:-}
+      REDIS_PORT: ${REDIS_PORT:-}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    volumes:
+      - server_logs:/workspace/logs
+    ports:
+      - "8989:8989"
+      - "2883:2883"
+      - "8990:8990/udp"
+    # /healthz is not a route. Curl still exits 0, and the OTA handler is not called.
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-o", "/dev/null", "--max-time", "3", "http://127.0.0.1:8989/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+
+  redis:
+    profiles: ["redis"]
+    image: redis:7-alpine
+    restart: unless-stopped
+    # Default matches config/config.yaml. Set REDIS_PASSWORD to override both sides.
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-ticket_dev}"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-ticket_dev}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  qdrant:
+    profiles: ["voice"]
+    image: qdrant/qdrant:v1.15.4
+    restart: unless-stopped
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  voice-server:
+    profiles: ["voice"]
+    image: ghcr.io/hackers365/voice_server:0.1.2
+    restart: unless-stopped
+    depends_on:
+      - qdrant
+    environment:
+      VAD_ASR_SPEAKER_ENABLED: "true"
+      VAD_ASR_SPEAKER_VECTOR_DB_HOST: qdrant
+      VAD_ASR_SPEAKER_VECTOR_DB_PORT: "6334"
+      VAD_ASR_SPEAKER_VECTOR_DB_COLLECTION_NAME: speaker_embeddings
+      VAD_ASR_SPEAKER_THRESHOLD: "0.6"
+      VAD_ASR_SPEAKER_LOGGING_LEVEL: info
+    ports:
+      - "8082:8080"
+    volumes:
+      - asr_data:/app/data
+
+volumes:
+  pb_data:
+  server_logs:
+  qdrant_data:
+  asr_data:
