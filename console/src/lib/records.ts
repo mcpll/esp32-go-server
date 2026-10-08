@@ -1,10 +1,12 @@
 import { asJsonObject, isJsonObject, type JsonObject } from '@/lib/json'
+import { readMemoryMode, type MemoryMode } from '@/lib/memoryMode'
 import { stripSecrets } from '@/lib/providerForm'
 
 export type Agent = {
   id: string
   name: string
   prompt: string
+  memoryMode: MemoryMode
   asrProvider: string
   asrConfig: JsonObject
   llmProvider: string
@@ -29,6 +31,7 @@ export function readAgent(input: unknown): Agent {
     id: requiredString(record, 'id', 'Agent'),
     name: requiredString(record, 'name', 'Agent'),
     prompt: requiredString(record, 'prompt', 'Agent'),
+    memoryMode: readMemoryMode(record.memory_mode),
     asrProvider: requiredString(record, 'asr_provider', 'Agent'),
     asrConfig: stripSecrets(asJsonObject(record.asr_config, 'asr_config')),
     llmProvider: requiredString(record, 'llm_provider', 'Agent'),

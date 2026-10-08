@@ -9,7 +9,7 @@ import type { JsonObject } from '@/lib/json'
 export async function fetchAgents(): Promise<Agent[]> {
   const records: unknown = await pb.collection('agents').getFullList({
     sort: 'name',
-    fields: 'id,name,prompt,asr_provider,asr_config,llm_provider,llm_config,tts_provider,tts_config',
+    fields: 'id,name,prompt,memory_mode,asr_provider,asr_config,llm_provider,llm_config,tts_provider,tts_config',
   })
   if (!Array.isArray(records)) throw new Error('Agent list is not an array')
   return records.map(readAgent)

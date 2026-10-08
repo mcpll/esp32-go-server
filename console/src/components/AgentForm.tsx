@@ -2,14 +2,17 @@ import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { actionClass, areaClass, controlClass } from '@/components/classes'
+import { MemoryModeField } from '@/components/MemoryModeField'
 import { StageEditor } from '@/components/StageEditor'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useAgent, useSaveAgent } from '@/hooks/useAgents'
+import { useSettings } from '@/hooks/useSettings'
 import { errorMessage } from '@/lib/errors'
 import { AGENTS_PATH } from '@/lib/gate'
+import { redisEnabledFromSettings, type MemoryMode } from '@/lib/memoryMode'
 import { draftFromConfig, type Stage } from '@/lib/providerForm'
 import { cn } from '@/lib/utils'
 
@@ -21,9 +24,12 @@ const STAGES: { id: Stage; label: string }[] = [
 
 export function AgentForm({ id }: { id: string }) {
   const { data: agent } = useAgent(id)
+  const { data: settings } = useSettings()
   const save = useSaveAgent()
+  const redisEnabled = redisEnabledFromSettings(settings)
   const [name, setName] = useState(agent.name)
   const [prompt, setPrompt] = useState(agent.prompt)
+  const [memoryMode, setMemoryMode] = useState<MemoryMode>(agent.memoryMode)
   const [asr, setAsr] = useState(() => draftFromConfig('asr', agent.asrProvider, agent.asrConfig))
   const [llm, setLlm] = useState(() => draftFromConfig('llm', agent.llmProvider, agent.llmConfig))
   const [tts, setTts] = useState(() => draftFromConfig('tts', agent.ttsProvider, agent.ttsConfig))
@@ -34,7 +40,7 @@ export function AgentForm({ id }: { id: string }) {
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    save.mutate({ id: agent.id, name, prompt, asr, llm, tts })
+    save.mutate({ id: agent.id, name, prompt, memoryMode, asr, llm, tts })
   }
 
   return (
@@ -81,6 +87,7 @@ export function AgentForm({ id }: { id: string }) {
               onChange={(event) => setPrompt(event.target.value)}
             />
           </div>
+          <MemoryModeField mode={memoryMode} redisEnabled={redisEnabled} onChange={setMemoryMode} />
         </section>
         <section className="flex flex-col gap-4 border-t border-border px-6 py-6 lg:min-h-0 lg:overflow-y-auto lg:border-t-0">
           <div role="tablist" aria-label="Pipeline" className="flex gap-1 rounded-full bg-muted p-1">

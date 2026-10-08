@@ -178,6 +178,11 @@ func initVad() error {
 }
 
 func initRedis() error {
+	if !store.GetBool("redis.enable") {
+		log.Infof("Redis is disabled; short memory is off")
+		return nil
+	}
+
 	// Init our unified Redis module
 	redisConfig := &redisdb.Config{
 		Host:     viper.GetString("redis.host"),

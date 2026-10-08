@@ -3,6 +3,7 @@ package pocketbase
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"sync"
 	"testing"
@@ -255,8 +256,8 @@ func TestGetUserConfigMergesAgentOntoViperSections(t *testing.T) {
 	if cfg.Tts.Provider != "aliyun_qwen" || cfg.Tts.Config["voice"] != "Cherry" || cfg.Tts.Config["language_type"] != "Italian" || cfg.Tts.Config["api_key"] != "tts-secret" {
 		t.Fatalf("tts = %+v", cfg.Tts)
 	}
-	if cfg.Memory.Provider != "mem0" || cfg.Memory.Config["api_key"] != "mem-secret" {
-		t.Fatalf("memory = %+v", cfg.Memory)
+	if cfg.Memory.Provider != "nomemo" || len(cfg.Memory.Config) != 0 {
+		t.Fatalf("none memory = %+v", cfg.Memory)
 	}
 	if cfg.Vad.Provider != "silero_vad" || cfg.Vad.Config["threshold"] != 0.5 {
 		t.Fatalf("vad = %+v", cfg.Vad)
@@ -275,6 +276,63 @@ func TestGetUserConfigMergesAgentOntoViperSections(t *testing.T) {
 	}
 	if len(cfg.VoiceIdentify) != 0 || len(cfg.KnowledgeBases) != 0 {
 		t.Fatalf("voiceprint and knowledge stay empty until their tickets: %+v %+v", cfg.VoiceIdentify, cfg.KnowledgeBases)
+	}
+}
+
+func TestGetUserConfigMemoryFollowsMode(t *testing.T) {
+	fake := newFakePB(t)
+	p := newTestProvider(t, fake)
+	ctx := context.Background()
+	viper.Set("memory.provider", "nomemo")
+	viper.Set("memory.mem0", map[string]any{"api_key": "mem-secret", "base_url": "https://mem0.example"})
+
+	agent := seedItalianAgent(fake)
+	_, _, _, _ = p.GetActivationInfo(ctx, testDevice, "c")
+	bind(fake, fake.find("devices", "device_id", testDevice), agent["id"].(string))
+
+	for _, mode := range []string{"none", "short"} {
+		fake.patch("agents", agent["id"].(string), map[string]any{"memory_mode": mode})
+		cfg, err := p.GetUserConfig(ctx, testDevice)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cfg.MemoryMode != mode || cfg.Memory.Provider != "nomemo" || len(cfg.Memory.Config) != 0 {
+			t.Fatalf("mode %s memory = %q %+v", mode, cfg.MemoryMode, cfg.Memory)
+		}
+	}
+
+	fake.patch("agents", agent["id"].(string), map[string]any{"memory_mode": "long"})
+	cfg, err := p.GetUserConfig(ctx, testDevice)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.MemoryMode != "long" || cfg.Memory.Provider != "mem0" || cfg.Memory.Config["api_key"] != "mem-secret" || cfg.Memory.Config["base_url"] != "https://mem0.example" {
+		t.Fatalf("long memory = %q %+v", cfg.MemoryMode, cfg.Memory)
+	}
+}
+
+func TestStartPublishesRedisAvailability(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		t.Run(fmt.Sprintf("enabled=%t", enabled), func(t *testing.T) {
+			fake := newFakePB(t)
+			p := newTestProvider(t, fake)
+			viper.Set("redis.enable", enabled)
+			viper.Set("redis.host", "127.0.0.1")
+			fake.seed("settings", map[string]any{"key": "udp", "value": map[string]any{"listen_port": float64(8990)}})
+
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
+			p.Start(ctx, func(map[string]interface{}) {})
+
+			rec := fake.find("settings", "key", "redis_available")
+			value, _ := rec["value"].(map[string]any)
+			if value["enabled"] != enabled {
+				t.Fatalf("redis_available = %v", rec)
+			}
+			if viper.GetBool("redis.enable") != enabled || viper.GetString("redis.host") != "127.0.0.1" {
+				t.Fatal("publishing the flag changed the Redis client config")
+			}
+		})
 	}
 }
 
