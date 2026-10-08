@@ -1,4 +1,5 @@
 import { asJsonObject, isJsonObject, type JsonObject, type JsonValue } from '@/lib/json'
+import { openClawUpdate, type OpenClawDraft, type OpenClawUpdate } from '@/lib/openclawForm'
 
 const SECRET_KEYS = new Set(['api_key', 'apikey', 'api_secret'])
 
@@ -130,6 +131,7 @@ export type AgentDraft = {
   asr: ProviderDraft
   llm: ProviderDraft
   tts: ProviderDraft
+  openclaw: OpenClawDraft
 }
 
 export type AgentUpdate = {
@@ -141,6 +143,7 @@ export type AgentUpdate = {
   llm_config: JsonObject
   tts_provider: string
   tts_config: JsonObject
+  openclaw: OpenClawUpdate
 }
 
 export function agentUpdate(draft: AgentDraft): AgentUpdate {
@@ -157,6 +160,7 @@ export function agentUpdate(draft: AgentDraft): AgentUpdate {
     llm_config: configFromDraft('llm', draft.llm),
     tts_provider: requiredProvider(draft.tts, 'TTS'),
     tts_config: configFromDraft('tts', draft.tts),
+    openclaw: openClawUpdate(draft.openclaw),
   }
 }
 

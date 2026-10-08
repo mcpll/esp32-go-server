@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { actionClass, areaClass, controlClass } from '@/components/classes'
+import { OpenClawBlock } from '@/components/OpenClawBlock'
 import { StageEditor } from '@/components/StageEditor'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useAgent, useSaveAgent } from '@/hooks/useAgents'
 import { errorMessage } from '@/lib/errors'
 import { AGENTS_PATH } from '@/lib/gate'
+import { draftFromOpenClaw } from '@/lib/openclawForm'
 import { draftFromConfig, type Stage } from '@/lib/providerForm'
 import { cn } from '@/lib/utils'
 
@@ -27,6 +29,7 @@ export function AgentForm({ id }: { id: string }) {
   const [asr, setAsr] = useState(() => draftFromConfig('asr', agent.asrProvider, agent.asrConfig))
   const [llm, setLlm] = useState(() => draftFromConfig('llm', agent.llmProvider, agent.llmConfig))
   const [tts, setTts] = useState(() => draftFromConfig('tts', agent.ttsProvider, agent.ttsConfig))
+  const [openclaw, setOpenclaw] = useState(() => draftFromOpenClaw(agent.openclaw))
   const [stage, setStage] = useState<Stage>('asr')
   const message = save.error === null ? null : errorMessage(save.error)
   const drafts = { asr, llm, tts }
@@ -34,7 +37,7 @@ export function AgentForm({ id }: { id: string }) {
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    save.mutate({ id: agent.id, name, prompt, asr, llm, tts })
+    save.mutate({ id: agent.id, name, prompt, asr, llm, tts, openclaw })
   }
 
   return (
@@ -81,6 +84,7 @@ export function AgentForm({ id }: { id: string }) {
               onChange={(event) => setPrompt(event.target.value)}
             />
           </div>
+          <OpenClawBlock draft={openclaw} onChange={setOpenclaw} />
         </section>
         <section className="flex flex-col gap-4 border-t border-border px-6 py-6 lg:min-h-0 lg:overflow-y-auto lg:border-t-0">
           <div role="tablist" aria-label="Pipeline" className="flex gap-1 rounded-full bg-muted p-1">

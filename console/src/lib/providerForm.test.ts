@@ -122,6 +122,11 @@ describe('agent update', () => {
         voice: 'Cherry',
         language_type: 'Italian',
       }),
+      openclaw: {
+        allowed: false,
+        enterPhrases: 'apri openclaw',
+        exitPhrases: 'chiudi openclaw',
+      },
     })
     expect(update).toEqual({
       name: 'Italiano',
@@ -142,6 +147,33 @@ describe('agent update', () => {
         voice: 'Cherry',
         language_type: 'Italian',
       },
+      openclaw: {
+        allowed: false,
+        enter_keywords: ['apri openclaw'],
+        exit_keywords: ['chiudi openclaw'],
+      },
     })
+  })
+
+  it('saves the OpenClaw phrases and leaves the endpoint token out', () => {
+    const update = agentUpdate({
+      name: 'Italiano',
+      prompt: 'Rispondi in italiano.',
+      asr: draftFromConfig('asr', 'aliyun_qwen3', { language: 'it' }),
+      llm: draftFromConfig('llm', 'aliyun', { model_name: 'qwen3.8-flash' }),
+      tts: draftFromConfig('tts', 'aliyun_qwen', { voice: 'Cherry' }),
+      openclaw: {
+        allowed: true,
+        enterPhrases: ' apri openclaw \nentra in openclaw\n',
+        exitPhrases: 'chiudi openclaw\n\nesci da openclaw',
+      },
+    })
+    expect(update.openclaw).toEqual({
+      allowed: true,
+      enter_keywords: ['apri openclaw', 'entra in openclaw'],
+      exit_keywords: ['chiudi openclaw', 'esci da openclaw'],
+    })
+    expect(update).not.toHaveProperty('token')
+    expect(JSON.stringify(update.openclaw)).not.toContain('ENDPOINT_AUTH_TOKEN')
   })
 })
