@@ -3,6 +3,7 @@ import { activationUpdate, bindDeviceUpdate, parseDeviceCode } from '@/lib/devic
 import { pb } from '@/lib/client'
 import { agentUpdate, type AgentDraft } from '@/lib/providerForm'
 import { readAgent, readDevice, type Agent, type Device } from '@/lib/records'
+import { readPoolStats, type PoolStats } from '@/lib/poolStats'
 import { readSetting, type Setting } from '@/lib/settingsForm'
 import type { JsonObject } from '@/lib/json'
 
@@ -65,6 +66,24 @@ export async function fetchSettings(): Promise<Setting[]> {
 
 export async function saveSetting(input: { id: string; value: JsonObject }): Promise<void> {
   await pb.collection('settings').update(input.id, { value: input.value })
+}
+
+export async function fetchPoolStats(): Promise<PoolStats | null> {
+  try {
+    const record: unknown = await pb.collection('pool_stats').getFirstListItem('key = "main"')
+    return readPoolStats(record)
+  } catch (error) {
+    if (error instanceof ClientResponseError && error.status === 404) return null
+    throw error
+  }
+}
+
+export function subscribePoolStats(
+  onEvent: (event: { action: string; record: unknown }) => void,
+): Promise<() => Promise<void>> {
+  return pb.collection('pool_stats').subscribe('*', (event) => {
+    onEvent({ action: event.action, record: event.record })
+  })
 }
 
 export async function setDeviceActivated(input: {

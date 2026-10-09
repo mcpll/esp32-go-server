@@ -74,6 +74,11 @@ resource_pools:
   validate_on_borrow: true
   validate_on_return: true
 
+# Pool stats for the console Status screen. false sends nothing.
+# true overwrites the pool_stats record (key "main") every 5s.
+pool_stats:
+  report_enabled: false
+
 # silero_vad works on both stacks. On linux/amd64 you can switch to "ten_vad";
 # linux/arm64 (Mac) has no ten-vad library, so keep silero_vad there.
 vad:
