@@ -35,6 +35,18 @@ func GetProvider(sType string) (UserConfigProvider, error) {
 	}
 }
 
+// PocketBaseRESTClient returns the process-wide superuser client, creating it from config on first use.
+func PocketBaseRESTClient() (*pocketbase.Client, error) {
+	p, err := sharedPocketBase()
+	if err != nil {
+		return nil, err
+	}
+	if p == nil || p.RESTClient() == nil {
+		return nil, fmt.Errorf("pocketbase client is not configured")
+	}
+	return p.RESTClient(), nil
+}
+
 func sharedPocketBase() (*pocketbase.Provider, error) {
 	pocketBaseOnce.Do(func() {
 		url := firstSet(os.Getenv("POCKETBASE_URL"), viper.GetString("pocketbase.url"))

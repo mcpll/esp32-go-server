@@ -58,6 +58,14 @@ type Provider struct {
 	handlers   map[string]types.EventHandler
 }
 
+// RESTClient returns the superuser client this provider uses.
+func (p *Provider) RESTClient() *Client {
+	if p == nil {
+		return nil
+	}
+	return p.client
+}
+
 // NewProvider returns a provider that reads and writes through client.
 func NewProvider(client *Client) *Provider {
 	return &Provider{

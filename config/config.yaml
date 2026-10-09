@@ -85,6 +85,11 @@ resource_pools:
   validate_on_borrow: true    # validate a resource when it is acquired
   validate_on_return: true    # validate a resource when it is returned
 
+# Pool stats for the console Status screen. false sends nothing.
+# true overwrites the pool_stats record (key "main") every 5s.
+pool_stats:
+  report_enabled: false
+
 # Voice activity detection (VAD)
 vad:
   provider: "silero_vad"  # VAD provider: webrtc_vad, silero_vad or ten_vad (ten_vad has no linux/arm64 build)
