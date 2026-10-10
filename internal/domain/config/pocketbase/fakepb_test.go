@@ -27,6 +27,7 @@ type fakePB struct {
 
 	mu          sync.Mutex
 	collections map[string][]map[string]any
+	files       map[string][]byte
 	nextID      int
 	down        bool
 	tokenTTL    time.Duration
@@ -59,6 +60,7 @@ func newFakePB(t *testing.T) *fakePB {
 	f := &fakePB{
 		t:           t,
 		collections: map[string][]map[string]any{},
+		files:       map[string][]byte{},
 		tokenTTL:    time.Hour,
 		validTokens: map[string]bool{},
 		sseIDs:      map[string]bool{},
@@ -96,6 +98,13 @@ func (f *fakePB) find(collection, field string, value any) map[string]any {
 		}
 	}
 	return nil
+}
+
+// seedFile stores the bytes PocketBase would serve for a file field.
+func (f *fakePB) seedFile(collection, id, name string, body []byte) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.files[collection+"/"+id+"/"+name] = append([]byte(nil), body...)
 }
 
 // patch edits a record the way the owner does in the dashboard.
@@ -185,6 +194,10 @@ func (f *fakePB) handle(w http.ResponseWriter, r *http.Request) {
 		f.subscribeLocked(w, r)
 		return
 	}
+	if strings.HasPrefix(r.URL.Path, "/api/files/") {
+		f.fileLocked(w, r)
+		return
+	}
 	m := recordsRoute.FindStringSubmatch(r.URL.Path)
 	if m == nil {
 		http.NotFound(w, r)
@@ -247,6 +260,18 @@ func matchFilter(rec map[string]any, filter string) (bool, error) {
 		return false, err
 	}
 	return rec[field] == unquoted, nil
+}
+
+func (f *fakePB) fileLocked(w http.ResponseWriter, r *http.Request) {
+	key := strings.TrimPrefix(r.URL.Path, "/api/files/")
+	body, ok := f.files[key]
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(body)
 }
 
 func (f *fakePB) listLocked(w http.ResponseWriter, r *http.Request, collection string) {
