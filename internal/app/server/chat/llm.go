@@ -50,7 +50,7 @@ const (
 	interruptExtraKey      = "interrupt"
 	interruptByExtraKey    = "interrupt_by"
 	interruptStageExtraKey = "interrupt_stage"
-	interruptContentSuffix = " [用户打断]"
+	interruptContentSuffix = " [user interrupted]"
 )
 
 // GetLastMessageID returns the MessageID of the last saved message (two-phase save)
@@ -335,7 +335,7 @@ func (l *LLMManager) handleLLMWithContextAndTools(
 		l.clientState.DeviceConfig.Llm.Config,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("获取LLM资源失败: %w", err)
+		return nil, fmt.Errorf("failed to get LLM resource: %w", err)
 	}
 
 	// Get provider
@@ -347,7 +347,7 @@ func (l *LLMManager) handleLLMWithContextAndTools(
 	pipeline, err := l.openOutputPipeline(ctx)
 	if err != nil {
 		pool.Release(llmWrapper)
-		return nil, fmt.Errorf("创建LLM输出流变换管线失败: %w", err)
+		return nil, fmt.Errorf("failed to create the LLM output stream pipeline: %w", err)
 	}
 
 	// Create response channel
@@ -754,7 +754,7 @@ func (l *LLMManager) handleLLMResponseChannelAsync(ctx context.Context, userMess
 	err := l.llmResponseQueue.Push(item)
 	if err != nil {
 		log.Warnf("llmResponseQueue full or closed, drop message")
-		return fmt.Errorf("llmResponseQueue 已满或已关闭, 丢弃消息")
+		return fmt.Errorf("llmResponseQueue is full or closed, dropping the message")
 	}
 	return nil
 }
@@ -992,7 +992,7 @@ func (l *LLMManager) handleLLMResponse(ctx context.Context, userMessage *schema.
 						if err != nil {
 							log.Errorf("Failed to handle tool call response: %v", err)
 							result.ok = true
-							return result, fmt.Errorf("处理工具调用响应失败: %v", err)
+							return result, fmt.Errorf("failed to handle the tool call response: %v", err)
 						}
 						result.suppressProtocolTtsStop = toolSummary.hasMediaOutput
 						if !toolSummary.invokeToolSuccess && strings.TrimSpace(llmResponse.Text) != "" {
@@ -1058,7 +1058,7 @@ func (l *LLMManager) DoLLmRequest(ctx context.Context, userMessage *schema.Messa
 	)
 	if err != nil {
 		log.Errorf("Failed to send LLM request with tools, seesionID: %s, error: %v", l.clientState.SessionID, err)
-		return fmt.Errorf("发送带工具的 LLM 请求失败: %v", err)
+		return fmt.Errorf("failed to send the LLM request with tools: %v", err)
 	}
 
 	log.Debugf("DoLLmRequest goroutine started - SessionID: %s, context status: %v", l.clientState.SessionID, ctx.Err())
@@ -1087,7 +1087,7 @@ func (l *LLMManager) DoLLmRequest(ctx context.Context, userMessage *schema.Messa
 func (l *LLMManager) AddMessage(ctx context.Context, msg *schema.Message) error {
 	if msg == nil {
 		log.Warnf("Tried to add nil message to chat history")
-		return fmt.Errorf("消息不能为 nil")
+		return fmt.Errorf("message must not be nil")
 	}
 
 	// Generate MessageID (MD5-shortened to fit DB varchar(64))
@@ -1176,10 +1176,10 @@ func (l *LLMManager) GetMessages(ctx context.Context, userMessage *schema.Messag
 
 	// Append current date/time
 	now := time.Now()
-	systemPrompt += fmt.Sprintf("\n当前时间和日期: %s %s", now.Format("2006年01月02日 15:04:05"), now.Format("Monday"))
+	systemPrompt += fmt.Sprintf("\nCurrent date and time: %s %s", now.Format("2006-01-02 15:04:05"), now.Format("Monday"))
 
 	if memoryMode == MemoryModeLong && l.clientState.MemoryContext != "" {
-		systemPrompt += fmt.Sprintf("\n用户个性化信息: \n%s", l.clientState.MemoryContext)
+		systemPrompt += fmt.Sprintf("\nUser profile:\n%s", l.clientState.MemoryContext)
 	}
 
 	log.Debugf("speakerResult: %+v, voiceIdentify: %+v", speakerResult, l.clientState.DeviceConfig.VoiceIdentify)
@@ -1192,7 +1192,7 @@ func (l *LLMManager) GetMessages(ctx context.Context, userMessage *schema.Messag
 			if speakerGroupInfo, found := l.clientState.DeviceConfig.VoiceIdentify[speakerResult.SpeakerName]; found {
 				// If a matching speakerGroup is found, fold its description into systemPrompt
 				if speakerGroupInfo.Prompt != "" {
-					systemPrompt += fmt.Sprintf("\n基于声纹识别到对话人信息: \n%s", speakerGroupInfo.Prompt)
+					systemPrompt += fmt.Sprintf("\nInformazioni sulla persona riconosciuta dalla voce:\n%s", speakerGroupInfo.Prompt)
 				}
 			}
 		}
@@ -1206,7 +1206,7 @@ func (l *LLMManager) GetMessages(ctx context.Context, userMessage *schema.Messag
 		}
 		log.Debugf("Memory search succeeded, input: %s, memory: %s", userMessage.Content, memoryContext)
 		if memoryContext != "" {
-			systemPrompt += fmt.Sprintf("\n历史关联信息: \n%s", memoryContext)
+			systemPrompt += fmt.Sprintf("\nRelated history:\n%s", memoryContext)
 		}
 	}
 
@@ -1273,9 +1273,9 @@ func buildKnowledgeSearchRoutingPolicy(knowledgeBases []config_types.KnowledgeBa
 		}
 		desc := strings.TrimSpace(kb.Description)
 		if desc == "" {
-			desc = "无描述"
+			desc = "no description"
 		}
-		availableKBs = append(availableKBs, fmt.Sprintf("%d: 名称=%s; 描述=%s", kb.ID, name, desc))
+		availableKBs = append(availableKBs, fmt.Sprintf("%d: name=%s; description=%s", kb.ID, name, desc))
 		if len(availableKBs) >= 8 {
 			break
 		}
@@ -1285,14 +1285,14 @@ func buildKnowledgeSearchRoutingPolicy(knowledgeBases []config_types.KnowledgeBa
 	}
 
 	return fmt.Sprintf(
-		"\n知识库检索规则（工具: search_knowledge）:\n可用知识库(id:名称+描述): %s\n"+
-			"1. 触发条件: 用户询问事实、流程、参数、规则、定义、条款、对比等需要文档依据的问题，或用户明确要求“按知识库/文档回答”。\n"+
-			"2. 不触发条件: 闲聊问候、情绪陪伴、纯创作、纯主观建议。\n"+
-			"3. 调用方式: 每轮最多调用1次，query提炼用户问题核心关键词，top_k默认5；如可判断具体知识库，请传 knowledge_base_ids（可多个）。\n"+
-			"4. 选择规则: 只传与当前问题语义最相关的知识库ID；若无法判断可不传 knowledge_base_ids。\n"+
-			"5. 信息不足处理: 若证据不足，不得编造，直接请用户补充更具体关键词。\n"+
-			"6. 输出要求: 回答时禁止提及“知识库”“检索”“MCP”“工具调用”“命中结果”等来源或过程信息。",
-		strings.Join(availableKBs, "、"),
+		"\nKnowledge search rules (tool: search_knowledge):\nAvailable knowledge bases (id: name + description): %s\n"+
+			"1. Call it when the user asks for facts, procedures, parameters, rules, definitions, clauses, comparisons, or anything that needs a document, or when they ask to answer from the knowledge base or a document.\n"+
+			"2. Do not call it for small talk, emotional support, pure creative writing, or purely subjective advice.\n"+
+			"3. At most once per turn. query is the core keywords of the question. top_k defaults to 5. Pass knowledge_base_ids (one or more) when a specific base is clear.\n"+
+			"4. Pass only the ids most relevant to the question. Omit knowledge_base_ids when unsure.\n"+
+			"5. If the evidence is not enough, do not invent an answer. Ask the user for more specific keywords.\n"+
+			"6. Do not mention the knowledge base, retrieval, MCP, tool calls, or hit results in the answer.",
+		strings.Join(availableKBs, ", "),
 	)
 }
 
