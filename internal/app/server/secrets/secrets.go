@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"xiaozhi-esp32-server-golang/internal/util"
+
 	"github.com/spf13/viper"
 )
 
@@ -17,7 +19,9 @@ const (
 
 func ApplyEnv() {
 	setFromEnv("WEBSOCKET_TOKEN", "websocket.token")
-	setFromEnv("ENDPOINT_AUTH_TOKEN", "manager.endpoint_auth_token")
+	// Always replace the config value, including with empty, so a file or a settings
+	// record cannot keep a token the server will not use.
+	viper.Set("manager.endpoint_auth_token", util.GetManagerEndpointAuthToken())
 	setFromEnv("MQTT_SERVER_PASSWORD", "mqtt_server.password")
 	setFromEnv("MQTT_SERVER_SIGNATURE_KEY", "mqtt_server.signature_key")
 	setFromEnv("VISION_TOKEN", "vision.token")
@@ -33,7 +37,7 @@ func Check() error {
 	if err := requireSecret("websocket.token"); err != nil {
 		return err
 	}
-	if err := requireSecret("manager.endpoint_auth_token", defaultMCPToken); err != nil {
+	if err := requireValue("ENDPOINT_AUTH_TOKEN", util.GetManagerEndpointAuthToken(), defaultMCPToken); err != nil {
 		return err
 	}
 	if err := requireSecret("mqtt_server.password", defaultMQTTPassword); err != nil {
@@ -51,13 +55,17 @@ func Check() error {
 }
 
 func requireSecret(key string, banned ...string) error {
-	v := strings.TrimSpace(viper.GetString(key))
+	return requireValue(key, viper.GetString(key), banned...)
+}
+
+func requireValue(name, value string, banned ...string) error {
+	v := strings.TrimSpace(value)
 	if v == "" {
-		return fmt.Errorf("%s is unset", key)
+		return fmt.Errorf("%s is unset", name)
 	}
 	for _, b := range banned {
 		if v == b {
-			return fmt.Errorf("%s uses a known default secret", key)
+			return fmt.Errorf("%s uses a known default secret", name)
 		}
 	}
 	return nil

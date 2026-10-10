@@ -38,7 +38,8 @@ pocketbase:
   email: ""
   password: ""
 
-# Signing token of the MCP/OpenClaw endpoint JWTs. Required. Env: ENDPOINT_AUTH_TOKEN
+# Signing token of the MCP/OpenClaw endpoint JWTs. Read from ENDPOINT_AUTH_TOKEN only.
+# The key below is not used.
 manager:
   endpoint_auth_token: ""
 
