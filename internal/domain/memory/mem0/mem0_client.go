@@ -39,93 +39,81 @@ var (
 	configOnce   sync.Once
 )
 
-// GetMem0ClientWithConfig returns the Mem0 client singleton from config
+// GetMem0ClientWithConfig returns the Mem0 client singleton from config.
+// The first config wins for the process.
 func GetMem0ClientWithConfig(config map[string]interface{}) (*Mem0Client, error) {
 	var err error
 	configOnce.Do(func() {
-		var enableSearch bool = true
-		var searchThreshold float64 = 0.5
-		var searchTopk int = 3
-		// parse config into the struct
-		var mem0Cfg Mem0Config
-
-		if enableSearchInterface, exists := config["enable_search"]; exists {
-			if iEnableSearch, ok := enableSearchInterface.(bool); ok {
-				enableSearch = iEnableSearch
-			}
-		}
-
-		if searchThresholdInterface, exists := config["search_threshold"]; exists {
-			if iSearchThreshold, ok := searchThresholdInterface.(float64); ok {
-				searchThreshold = iSearchThreshold
-			}
-		}
-
-		if searchTopkInterface, exists := config["search_topk"]; exists {
-			if iSearchTopk, ok := searchTopkInterface.(int); ok {
-				searchTopk = iSearchTopk
-			}
-		}
-
-		// read API Key
-		if apiKeyInterface, exists := config["api_key"]; exists {
-			if apiKey, ok := apiKeyInterface.(string); ok {
-				mem0Cfg.APIKey = apiKey
-			} else {
-				err = fmt.Errorf("mem0.api_key 必须是字符串")
-				return
-			}
-		}
-
-		// read Host
-		if hostInterface, exists := config["base_url"]; exists {
-			if host, ok := hostInterface.(string); ok {
-				mem0Cfg.BaseUrl = host
-			} else {
-				err = fmt.Errorf("mem0.host 必须是字符串")
-				return
-			}
-		}
-
-		// validate required config
-		if mem0Cfg.APIKey == "" {
-			err = fmt.Errorf("mem0.api_key 配置缺失或为空")
-			return
-		}
-
-		// set defaults
-		if mem0Cfg.BaseUrl == "" {
-			mem0Cfg.BaseUrl = "https://api.mem0.ai"
-		}
-
-		// create mem0 client
-		clientOptions := client.ClientOptions{
-			APIKey: mem0Cfg.APIKey,
-			/*Host:             mem0Cfg.Host,
-			OrganizationName: mem0Cfg.OrganizationName,
-			ProjectName:      mem0Cfg.ProjectName,
-			OrganizationID:   mem0Cfg.OrganizationID,
-			ProjectID:        mem0Cfg.ProjectID,*/
-		}
-
-		mem0Client, clientErr := client.NewMemoryClient(clientOptions)
-		if clientErr != nil {
-			err = fmt.Errorf("failed to create mem0 client: %w", clientErr)
-			return
-		}
-
-		mem0Instance = &Mem0Client{
-			client:          mem0Client,
-			config:          mem0Cfg,
-			EnableSearch:    enableSearch,
-			SearchThreshold: searchThreshold,
-			SearchTopk:      searchTopk,
-		}
-
-		log.Log().Infof("Mem0 client initialized, base_url: %s", mem0Cfg.BaseUrl)
+		mem0Instance, err = newMem0Client(config)
 	})
-
 	return mem0Instance, err
+}
+
+// newMem0Client builds a client. base_url is the mem0 host, and api_key is sent on every call.
+func newMem0Client(config map[string]interface{}) (*Mem0Client, error) {
+	enableSearch := true
+	searchThreshold := 0.5
+	searchTopk := 3
+	var mem0Cfg Mem0Config
+
+	if enableSearchInterface, exists := config["enable_search"]; exists {
+		if iEnableSearch, ok := enableSearchInterface.(bool); ok {
+			enableSearch = iEnableSearch
+		}
+	}
+
+	if searchThresholdInterface, exists := config["search_threshold"]; exists {
+		if iSearchThreshold, ok := searchThresholdInterface.(float64); ok {
+			searchThreshold = iSearchThreshold
+		}
+	}
+
+	if searchTopkInterface, exists := config["search_topk"]; exists {
+		if iSearchTopk, ok := searchTopkInterface.(int); ok {
+			searchTopk = iSearchTopk
+		}
+	}
+
+	if apiKeyInterface, exists := config["api_key"]; exists {
+		apiKey, ok := apiKeyInterface.(string)
+		if !ok {
+			return nil, fmt.Errorf("mem0.api_key must be a string")
+		}
+		mem0Cfg.APIKey = apiKey
+	}
+
+	if hostInterface, exists := config["base_url"]; exists {
+		host, ok := hostInterface.(string)
+		if !ok {
+			return nil, fmt.Errorf("mem0.base_url must be a string")
+		}
+		mem0Cfg.BaseUrl = host
+	}
+
+	if mem0Cfg.APIKey == "" {
+		return nil, fmt.Errorf("mem0.api_key is missing or empty")
+	}
+
+	if mem0Cfg.BaseUrl == "" {
+		mem0Cfg.BaseUrl = "https://api.mem0.ai"
+	}
+
+	mem0Client, clientErr := client.NewMemoryClient(client.ClientOptions{
+		APIKey: mem0Cfg.APIKey,
+		Host:   mem0Cfg.BaseUrl,
+	})
+	if clientErr != nil {
+		return nil, fmt.Errorf("failed to create mem0 client: %w", clientErr)
+	}
+
+	log.Log().Infof("Mem0 client initialized, base_url: %s", mem0Cfg.BaseUrl)
+	return &Mem0Client{
+		client:          mem0Client,
+		config:          mem0Cfg,
+		EnableSearch:    enableSearch,
+		SearchThreshold: searchThreshold,
+		SearchTopk:      searchTopk,
+	}, nil
 }
 
 // Init initializes the client

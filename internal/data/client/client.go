@@ -11,6 +11,7 @@ import (
 
 	"sync"
 
+	"xiaozhi-esp32-server-golang/internal/domain/config/store"
 	utypes "xiaozhi-esp32-server-golang/internal/domain/config/types"
 	"xiaozhi-esp32-server-golang/internal/domain/llm"
 	llm_common "xiaozhi-esp32-server-golang/internal/domain/llm/common"
@@ -181,7 +182,12 @@ func (c *ClientState) IsRealTime() bool {
 }
 
 func (c *ClientState) GetMemoryMode() string {
-	return NormalizeMemoryMode(c.DeviceConfig.MemoryMode)
+	mode := NormalizeMemoryMode(c.DeviceConfig.MemoryMode)
+	// short is Redis history. With Redis off it is the same as none.
+	if mode == MemoryModeShort && !store.GetBool("redis.enable") {
+		return MemoryModeNone
+	}
+	return mode
 }
 
 func (c *ClientState) GetSpeakerChatMode() string {

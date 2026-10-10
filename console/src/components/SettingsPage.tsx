@@ -2,18 +2,20 @@ import { useState } from 'react'
 import { SettingsBlock } from '@/components/SettingsBlock'
 import { useSettings } from '@/hooks/useSettings'
 import { blockFor, SETTINGS_BLOCKS } from '@/lib/settingsForm'
+import { consoleSettings } from '@/lib/memoryMode'
 import { cn } from '@/lib/utils'
 
 export function SettingsPage() {
   const { data } = useSettings()
+  const visible = consoleSettings(data)
   const known = new Set(SETTINGS_BLOCKS.map((block) => block.key))
-  const byKey = new Map(data.map((setting) => [setting.key, setting]))
+  const byKey = new Map(visible.map((setting) => [setting.key, setting]))
   const ordered = [
     ...SETTINGS_BLOCKS.flatMap((block) => {
       const setting = byKey.get(block.key)
       return setting === undefined ? [] : [setting]
     }),
-    ...data.filter((setting) => !known.has(setting.key)),
+    ...visible.filter((setting) => !known.has(setting.key)),
   ]
   const [picked, setPicked] = useState<string | null>(ordered[0]?.key ?? null)
   const [actionsHost, setActionsHost] = useState<HTMLDivElement | null>(null)

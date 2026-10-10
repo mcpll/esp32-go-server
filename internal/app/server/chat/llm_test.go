@@ -3,6 +3,7 @@ package chat
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,12 +12,13 @@ import (
 
 	"github.com/cloudwego/eino/schema"
 	mcp_go "github.com/mark3labs/mcp-go/mcp"
+	"github.com/spf13/viper"
 )
 
 func TestHandleToolResultAcceptsPlainText(t *testing.T) {
 	manager := &LLMManager{}
 
-	result, ok := manager.handleToolResult("普通文本返回")
+	result, ok := manager.handleToolResult("plain text result")
 	if !ok {
 		t.Fatal("expected plain text tool result to be accepted")
 	}
@@ -34,7 +36,7 @@ func TestHandleToolResultAcceptsPlainText(t *testing.T) {
 		t.Fatalf("expected text content, got %T", result.Content[0])
 	}
 
-	if textContent.Text != "普通文本返回" {
+	if textContent.Text != "plain text result" {
 		t.Fatalf("expected original text to be preserved, got %q", textContent.Text)
 	}
 }
@@ -42,7 +44,7 @@ func TestHandleToolResultAcceptsPlainText(t *testing.T) {
 func TestHandleToolResultAcceptsMCPJSON(t *testing.T) {
 	manager := &LLMManager{}
 
-	result, ok := manager.handleToolResult(`{"content":[{"type":"text","text":"json返回"}],"isError":false}`)
+	result, ok := manager.handleToolResult(`{"content":[{"type":"text","text":"json result"}],"isError":false}`)
 	if !ok {
 		t.Fatal("expected MCP JSON tool result to be accepted")
 	}
@@ -56,14 +58,14 @@ func TestHandleToolResultAcceptsMCPJSON(t *testing.T) {
 		t.Fatalf("expected text content, got %T", result.Content[0])
 	}
 
-	if textContent.Text != "json返回" {
+	if textContent.Text != "json result" {
 		t.Fatalf("expected parsed text content, got %q", textContent.Text)
 	}
 }
 
 func TestGetMessagesUsesToolRoundMessagesInNoneMode(t *testing.T) {
 	manager := newTestLLMManager(data_client.MemoryModeNone)
-	user := schema.UserMessage("帮我查一下上海天气")
+	user := schema.UserMessage("what is the weather in Milan")
 	assistant := schema.AssistantMessage("", []schema.ToolCall{
 		{
 			ID:   "call_weather_1",
@@ -74,7 +76,7 @@ func TestGetMessagesUsesToolRoundMessagesInNoneMode(t *testing.T) {
 			},
 		},
 	})
-	toolMsg := schema.ToolMessage("上海今天多云，22度", "call_weather_1")
+	toolMsg := schema.ToolMessage("Milan is cloudy, 22 degrees", "call_weather_1")
 
 	ctx := appendToolRoundMessagesToContext(context.Background(), []*schema.Message{user, assistant, toolMsg})
 	messages := manager.GetMessages(ctx, nil, 10, nil)
@@ -94,7 +96,7 @@ func TestGetMessagesUsesToolRoundMessagesInNoneMode(t *testing.T) {
 }
 
 func TestAppendToolRoundMessagesAccumulatesInOrder(t *testing.T) {
-	user := schema.UserMessage("帮我订闹钟")
+	user := schema.UserMessage("set an alarm")
 	assistant := schema.AssistantMessage("", []schema.ToolCall{
 		{
 			ID:   "call_alarm_1",
@@ -105,7 +107,7 @@ func TestAppendToolRoundMessagesAccumulatesInOrder(t *testing.T) {
 			},
 		},
 	})
-	toolMsg := schema.ToolMessage("闹钟已设置为早上7点半", "call_alarm_1")
+	toolMsg := schema.ToolMessage("alarm set for 7:30", "call_alarm_1")
 
 	ctx := context.Background()
 	ctx = appendToolRoundMessagesToContext(ctx, []*schema.Message{user})
@@ -121,12 +123,15 @@ func TestAppendToolRoundMessagesAccumulatesInOrder(t *testing.T) {
 }
 
 func TestGetMessagesIgnoresToolRoundMessagesOutsideNoneMode(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+	viper.Set("redis.enable", true)
 	manager := newTestLLMManager(data_client.MemoryModeShort)
-	historyUser := schema.UserMessage("历史消息")
+	historyUser := schema.UserMessage("earlier message")
 	manager.clientState.AddMessage(historyUser)
 
 	ctx := appendToolRoundMessagesToContext(context.Background(), []*schema.Message{
-		schema.UserMessage("工具链临时消息"),
+		schema.UserMessage("temporary tool message"),
 	})
 	messages := manager.GetMessages(ctx, nil, 10, nil)
 
@@ -231,6 +236,61 @@ func TestWaitForTTSTurnDrainIfRootSkipsNestedContexts(t *testing.T) {
 	}
 }
 
+func TestShortMemoryWithoutRedisDropsDialogueHistory(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+	viper.Set("redis.enable", false)
+	viper.Set("config_provider.type", "redis")
+
+	manager := newTestLLMManager(data_client.MemoryModeShort)
+	manager.clientState.AddMessage(schema.UserMessage("ieri"))
+	messages := manager.GetMessages(context.Background(), schema.UserMessage("oggi"), 10, nil)
+	for _, message := range messages {
+		if message.Content == "ieri" {
+			t.Fatalf("short without Redis kept dialogue history: %+v", messages)
+		}
+	}
+	if messages[len(messages)-1].Content != "oggi" {
+		t.Fatalf("current turn missing: %+v", messages)
+	}
+}
+
+func TestLongMemoryPromptIsItalian(t *testing.T) {
+	manager := newTestLLMManager(data_client.MemoryModeLong)
+	manager.clientState.AgentID = "agent-9"
+	manager.clientState.MemoryContext = "preferisce il tè"
+	manager.clientState.MemoryProvider = stubMemory{search: "ha un gatto di nome Nino"}
+
+	messages := manager.GetMessages(context.Background(), schema.UserMessage("come si chiama?"), 10, nil)
+	prompt := messages[0].Content
+	if !strings.Contains(prompt, "Informazioni personali:\npreferisce il tè") {
+		t.Fatalf("personal info prompt = %q", prompt)
+	}
+	if !strings.Contains(prompt, "Memorie correlate:\nha un gatto di nome Nino") {
+		t.Fatalf("recall prompt = %q", prompt)
+	}
+}
+
+type stubMemory struct {
+	search string
+}
+
+func (s stubMemory) AddMessage(context.Context, string, schema.Message) error { return nil }
+
+func (s stubMemory) GetMessages(context.Context, string, int) ([]*schema.Message, error) {
+	return nil, nil
+}
+
+func (s stubMemory) GetContext(context.Context, string, int) (string, error) { return "", nil }
+
+func (s stubMemory) Search(context.Context, string, string, int, int64) (string, error) {
+	return s.search, nil
+}
+
+func (s stubMemory) Flush(context.Context, string) error { return nil }
+
+func (s stubMemory) ResetMemory(context.Context, string) error { return nil }
+
 func newTestLLMManager(memoryMode string) *LLMManager {
 	return &LLMManager{
 		clientState: &data_client.ClientState{
@@ -238,7 +298,7 @@ func newTestLLMManager(memoryMode string) *LLMManager {
 			DeviceConfig: config_types.UConfig{
 				MemoryMode: memoryMode,
 			},
-			SystemPrompt: "你是一个测试助手",
+			SystemPrompt: "You are a test assistant",
 		},
 	}
 }
