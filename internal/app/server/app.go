@@ -9,6 +9,7 @@ import (
 	"time"
 	"xiaozhi-esp32-server-golang/internal/app/mqtt_server"
 	"xiaozhi-esp32-server-golang/internal/app/server/chat"
+	"xiaozhi-esp32-server-golang/internal/app/server/mcpaccess"
 	"xiaozhi-esp32-server-golang/internal/app/server/mqtt_udp"
 	"xiaozhi-esp32-server-golang/internal/app/server/types"
 	"xiaozhi-esp32-server-golang/internal/app/server/websocket"
@@ -502,6 +503,9 @@ func (a *App) registerHandler() {
 	pb.RegisterCommand("provider_test", func(ctx context.Context, payload map[string]any) (any, error) {
 		return providertest.FromCommand(ctx, payload)
 	})
+	pb.RegisterCommand("mcp_tools", mcpaccess.Tools)
+	pb.RegisterCommand("mcp_call", mcpaccess.Call)
+	pb.RegisterCommand("mcp_endpoint", mcpaccess.Endpoint)
 	pb.ArmCommands()
 }
 
