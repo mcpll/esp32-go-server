@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -79,6 +80,115 @@ func TestApplyEnvOverridesEmptyYaml(t *testing.T) {
 	}
 	if got := viper.GetString("websocket.token"); got != "env-ws" {
 		t.Fatalf("websocket.token %q", got)
+	}
+}
+
+func TestApplyEnvFillsItalianProviderKeysFromDashScope(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+	viper.Set("asr.aliyun_qwen3.api_key", "")
+	viper.Set("llm.aliyun.api_key", "")
+	viper.Set("tts.aliyun_qwen.api_key", "")
+	t.Setenv("DASHSCOPE_API_KEY", "dash-key")
+	ApplyEnv()
+	if got := viper.GetString("asr.aliyun_qwen3.api_key"); got != "dash-key" {
+		t.Fatalf("asr api_key %q", got)
+	}
+	if got := viper.GetString("llm.aliyun.api_key"); got != "dash-key" {
+		t.Fatalf("llm api_key %q", got)
+	}
+	if got := viper.GetString("tts.aliyun_qwen.api_key"); got != "dash-key" {
+		t.Fatalf("tts api_key %q", got)
+	}
+}
+
+func TestApplyEnvLeavesProviderKeysWhenDashScopeUnset(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+	viper.Set("asr.aliyun_qwen3.api_key", "from-file")
+	t.Setenv("DASHSCOPE_API_KEY", "")
+	ApplyEnv()
+	if got := viper.GetString("asr.aliyun_qwen3.api_key"); got != "from-file" {
+		t.Fatalf("asr api_key %q", got)
+	}
+}
+
+func TestApplyEnvFillsRedisAndMem0WhenSet(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+	viper.Set("redis.enable", false)
+	viper.Set("redis.host", "127.0.0.1")
+	viper.Set("redis.port", 6379)
+	viper.Set("redis.password", "ticket_dev")
+	viper.Set("memory.mem0.api_key", "your_mem0_api_key_here")
+	t.Setenv("REDIS_ENABLE", "true")
+	t.Setenv("REDIS_HOST", "redis")
+	t.Setenv("REDIS_PORT", "6380")
+	t.Setenv("REDIS_PASSWORD", "redis-pass")
+	t.Setenv("MEM0_API_KEY", "mem-key")
+	ApplyEnv()
+	if !viper.GetBool("redis.enable") {
+		t.Fatal("redis.enable = false")
+	}
+	if got := viper.GetString("redis.host"); got != "redis" {
+		t.Fatalf("redis.host %q", got)
+	}
+	if got := viper.GetInt("redis.port"); got != 6380 {
+		t.Fatalf("redis.port %d", got)
+	}
+	if got := viper.GetString("redis.password"); got != "redis-pass" {
+		t.Fatalf("redis.password %q", got)
+	}
+	if got := viper.GetString("memory.mem0.api_key"); got != "mem-key" {
+		t.Fatalf("mem0 api_key %q", got)
+	}
+}
+
+func TestApplyEnvFillsKeysLoadedFromYAML(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+	viper.SetConfigType("yaml")
+	body := []byte(`
+asr:
+  aliyun_qwen3:
+    api_key: ""
+llm:
+  aliyun:
+    api_key: ""
+tts:
+  aliyun_qwen:
+    api_key: ""
+redis:
+  enable: false
+  host: "127.0.0.1"
+  port: 6379
+  password: "ticket_dev"
+memory:
+  mem0:
+    api_key: "your_mem0_api_key_here"
+`)
+	if err := viper.ReadConfig(bytes.NewReader(body)); err != nil {
+		t.Fatalf("ReadConfig: %v", err)
+	}
+	t.Setenv("DASHSCOPE_API_KEY", "dash-key")
+	t.Setenv("REDIS_ENABLE", "true")
+	t.Setenv("REDIS_HOST", "redis")
+	t.Setenv("MEM0_API_KEY", "mem-key")
+	ApplyEnv()
+	if got := viper.GetString("asr.aliyun_qwen3.api_key"); got != "dash-key" {
+		t.Fatalf("asr api_key %q", got)
+	}
+	if got := viper.GetString("llm.aliyun.api_key"); got != "dash-key" {
+		t.Fatalf("llm api_key %q", got)
+	}
+	if got := viper.GetString("tts.aliyun_qwen.api_key"); got != "dash-key" {
+		t.Fatalf("tts api_key %q", got)
+	}
+	if !viper.GetBool("redis.enable") || viper.GetString("redis.host") != "redis" {
+		t.Fatalf("redis enable=%v host=%q", viper.GetBool("redis.enable"), viper.GetString("redis.host"))
+	}
+	if got := viper.GetString("memory.mem0.api_key"); got != "mem-key" {
+		t.Fatalf("mem0 api_key %q", got)
 	}
 }
 
