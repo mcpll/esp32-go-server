@@ -103,7 +103,12 @@ export function AgentForm({ id }: { id: string }) {
             ))}
           </div>
           <div role="tabpanel" id={`stage-panel-${stage}`} aria-labelledby={`stage-tab-${stage}`}>
-            <StageEditor stage={stage} draft={drafts[stage]} onChange={setDraft[stage]} />
+            <StageEditor
+              stage={stage}
+              draft={drafts[stage]}
+              agentId={agent.id}
+              onChange={setDraft[stage]}
+            />
           </div>
           <p className="text-sm text-muted-foreground">Applies on the next session. API keys stay in the server config.</p>
         </section>

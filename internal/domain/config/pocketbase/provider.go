@@ -22,6 +22,7 @@ import (
 const (
 	devicesCollection  = "devices"
 	settingsCollection = "settings"
+	commandsCollection = "commands"
 
 	// activationTimeoutMs is how long the device keeps showing its code (five minutes).
 	activationTimeoutMs = 300000
@@ -56,18 +57,28 @@ type Provider struct {
 
 	handlersMu sync.RWMutex
 	handlers   map[string]types.EventHandler
+
+	commandMu       sync.Mutex
+	commandHandlers map[string]CommandHandler
+	commandsArmed   bool
+	rootCtx         context.Context
+	onSystemConfig  func(map[string]interface{})
+	scanMu          sync.Mutex
+	now             func() time.Time
 }
 
 // NewProvider returns a provider that reads and writes through client.
 func NewProvider(client *Client) *Provider {
 	return &Provider{
-		client:    client,
-		newCode:   randomSixDigits,
-		retryBase: defaultRetryBase,
-		retryMax:  defaultRetryMax,
-		watchBase: time.Second,
-		watchMax:  30 * time.Second,
-		handlers:  map[string]types.EventHandler{},
+		client:          client,
+		newCode:         randomSixDigits,
+		retryBase:       defaultRetryBase,
+		retryMax:        defaultRetryMax,
+		watchBase:       time.Second,
+		watchMax:        30 * time.Second,
+		handlers:        map[string]types.EventHandler{},
+		commandHandlers: map[string]CommandHandler{},
+		now:             time.Now,
 	}
 }
 
@@ -226,6 +237,13 @@ func (p *Provider) GetUserConfig(ctx context.Context, deviceID string) (types.UC
 	return cfg, nil
 }
 
+// MergeStage lays a command's provider config over the viper section for that provider.
+// Keys the console omits, including the API key, stay from the server config.
+func MergeStage(stage, provider string, overrides map[string]any) map[string]any {
+	_, merged := mergeSection(stage, provider, overrides)
+	return merged
+}
+
 // mergeSection returns the provider name and its config for one stage. The base is the yaml
 // section viper holds for that provider; the agent's JSON keys are laid over a copy of it, so
 // secrets and defaults stay in the yaml and nothing is written back into viper.
@@ -351,8 +369,8 @@ func (p *Provider) NotifyDeviceEvent(ctx context.Context, eventType string, even
 	}
 }
 
-// RegisterMessageEventHandler keeps the handler for a downlink event. The commands channel
-// that fires them arrives in a later ticket.
+// RegisterMessageEventHandler keeps the handler for a downlink event.
+// inject_msg reaches the device through the commands channel, which calls the registered handler.
 func (p *Provider) RegisterMessageEventHandler(ctx context.Context, eventType string, eventHandler types.EventHandler) {
 	p.handlersMu.Lock()
 	defer p.handlersMu.Unlock()
@@ -366,6 +384,10 @@ func (p *Provider) RegisterMessageEventHandler(ctx context.Context, eventType st
 // start. If PocketBase does not answer, Start returns anyway and keeps retrying in the background
 // until the work is done or ctx ends. onSystemConfig receives the settings object on each load.
 func (p *Provider) Start(ctx context.Context, onSystemConfig func(map[string]interface{})) {
+	p.commandMu.Lock()
+	p.rootCtx = ctx
+	p.onSystemConfig = onSystemConfig
+	p.commandMu.Unlock()
 	go p.watchSettings(ctx, onSystemConfig)
 
 	first, cancel := context.WithTimeout(ctx, startupAttemptTimeout)
@@ -378,9 +400,9 @@ func (p *Provider) Start(ctx context.Context, onSystemConfig func(map[string]int
 	go p.retryStartup(ctx, onSystemConfig)
 }
 
-// watchSettings subscribes to settings and reloads them on every event and
-// after every reconnect. Events are lost while the stream is down, so a
-// reconnect always reloads the whole collection.
+// watchSettings subscribes to settings and commands. Settings reload on every
+// event and after every reconnect. Commands are scanned on every event and
+// after every reconnect, because events are lost while the stream is down.
 func (p *Provider) watchSettings(ctx context.Context, onSystemConfig func(map[string]interface{})) {
 	base, max := p.watchBase, p.watchMax
 	if base <= 0 {
@@ -394,18 +416,25 @@ func (p *Provider) watchSettings(ctx context.Context, onSystemConfig func(map[st
 		if ctx.Err() != nil {
 			return
 		}
-		subscribed, err := p.client.Watch(ctx, []string{settingsCollection + "/*"}, func() {
+		subscribed, err := p.client.Watch(ctx, []string{
+			settingsCollection + "/*",
+			commandsCollection + "/*",
+		}, func() {
 			p.reloadSettings(ctx, onSystemConfig)
+			p.scanCommands(ctx)
 		}, func(event string) {
-			if strings.HasPrefix(event, settingsCollection) {
+			switch {
+			case strings.HasPrefix(event, settingsCollection):
 				p.reloadSettings(ctx, onSystemConfig)
+			case strings.HasPrefix(event, commandsCollection):
+				p.scanCommands(ctx)
 			}
 		})
 		if ctx.Err() != nil {
 			return
 		}
 		if err != nil {
-			log.Warnf("pocketbase: settings realtime dropped: %v", err)
+			log.Warnf("pocketbase: realtime dropped: %v", err)
 		}
 		if subscribed {
 			delay = base
