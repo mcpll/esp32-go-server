@@ -2,7 +2,9 @@ package mem0
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net"
 	"strings"
 	"sync"
 
@@ -17,6 +19,7 @@ import (
 type Mem0Client struct {
 	client          *client.MemoryClient
 	config          Mem0Config
+	initErr         error // host refused the constructor ping; calls fail, the process stays up
 	mu              sync.RWMutex
 	EnableSearch    bool    `mapstructure:"enable_search"`
 	SearchThreshold float64 `mapstructure:"search_threshold"`
@@ -34,19 +37,24 @@ type Mem0Config struct {
 }
 
 var (
+	mem0Mu       sync.Mutex
 	mem0Instance *Mem0Client
-	mem0Once     sync.Once
-	configOnce   sync.Once
 )
 
 // GetMem0ClientWithConfig returns the Mem0 client singleton from config.
-// The first config wins for the process.
+// The first client that is built wins until restart. A missing api key is not stored.
 func GetMem0ClientWithConfig(config map[string]interface{}) (*Mem0Client, error) {
-	var err error
-	configOnce.Do(func() {
-		mem0Instance, err = newMem0Client(config)
-	})
-	return mem0Instance, err
+	mem0Mu.Lock()
+	defer mem0Mu.Unlock()
+	if mem0Instance != nil {
+		return mem0Instance, nil
+	}
+	created, err := newMem0Client(config)
+	if err != nil {
+		return nil, err
+	}
+	mem0Instance = created
+	return mem0Instance, nil
 }
 
 // newMem0Client builds a client. base_url is the mem0 host, and api_key is sent on every call.
@@ -102,7 +110,8 @@ func newMem0Client(config map[string]interface{}) (*Mem0Client, error) {
 		APIKey: mem0Cfg.APIKey,
 		Host:   mem0Cfg.BaseUrl,
 	})
-	if clientErr != nil {
+	// ponytail: a refused ping is cached as this process's host. Search and add fail later; restart to change host.
+	if clientErr != nil && !hostUnreachable(clientErr) {
 		return nil, fmt.Errorf("failed to create mem0 client: %w", clientErr)
 	}
 
@@ -110,10 +119,26 @@ func newMem0Client(config map[string]interface{}) (*Mem0Client, error) {
 	return &Mem0Client{
 		client:          mem0Client,
 		config:          mem0Cfg,
+		initErr:         clientErr,
 		EnableSearch:    enableSearch,
 		SearchThreshold: searchThreshold,
 		SearchTopk:      searchTopk,
 	}, nil
+}
+
+func hostUnreachable(err error) bool {
+	var netErr net.Error
+	return errors.As(err, &netErr)
+}
+
+func (m *Mem0Client) ready() error {
+	if m == nil || m.client == nil {
+		if m != nil && m.initErr != nil {
+			return m.initErr
+		}
+		return fmt.Errorf("mem0 client is not initialized")
+	}
+	return nil
 }
 
 // Init initializes the client
@@ -125,6 +150,9 @@ func (m *Mem0Client) Init() error {
 
 // Get fetches memories (internal)
 func (m *Mem0Client) Get(userID string) (interface{}, error) {
+	if err := m.ready(); err != nil {
+		return nil, err
+	}
 	// search all memories for the user
 	results, err := m.client.Search("", &types.SearchOptions{
 		MemoryOptions: types.MemoryOptions{
@@ -141,6 +169,9 @@ func (m *Mem0Client) Get(userID string) (interface{}, error) {
 
 // AddMessage adds a message to memory
 func (m *Mem0Client) AddMessage(ctx context.Context, agentID string, msg schema.Message) error {
+	if err := m.ready(); err != nil {
+		return err
+	}
 	message := types.Message{
 		Role:    string(msg.Role),
 		Content: msg.Content,
@@ -160,6 +191,9 @@ func (m *Mem0Client) AddMessage(ctx context.Context, agentID string, msg schema.
 
 // GetMessages returns the user's message history
 func (m *Mem0Client) GetMessages(ctx context.Context, agentID string, count int) ([]*schema.Message, error) {
+	if err := m.ready(); err != nil {
+		return nil, err
+	}
 	var memoryOptions = types.MemoryOptions{
 		AgentID: agentID,
 	}
@@ -206,7 +240,9 @@ func (m *Mem0Client) GetMessages(ctx context.Context, agentID string, count int)
 
 // ResetMemory resets user memory
 func (m *Mem0Client) ResetMemory(ctx context.Context, userID string) error {
-
+	if err := m.ready(); err != nil {
+		return err
+	}
 	// delete all memories for the user
 	err := m.client.DeleteUser(userID)
 	if err != nil {
@@ -250,6 +286,9 @@ func (m *Mem0Client) Flush(ctx context.Context, agentID string) error {
 }
 
 func (m *Mem0Client) actionSearch(ctx context.Context, agentID string, query string, topK int, threshold float64) ([]types.Memory, error) {
+	if err := m.ready(); err != nil {
+		return nil, err
+	}
 	// search related memories
 	results, err := m.client.Search(query, &types.SearchOptions{
 		MemoryOptions: types.MemoryOptions{
@@ -268,7 +307,9 @@ func (m *Mem0Client) actionSearch(ctx context.Context, agentID string, query str
 
 // AddBatchMessages adds messages in batch
 func (m *Mem0Client) AddBatchMessages(ctx context.Context, agentID string, messages []schema.Message) error {
-
+	if err := m.ready(); err != nil {
+		return err
+	}
 	// prepare batch messages
 	var batchMessages []string
 	for _, msg := range messages {

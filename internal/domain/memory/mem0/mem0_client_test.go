@@ -110,3 +110,57 @@ func messageContents(raw any) []string {
 	}
 	return out
 }
+
+func resetMem0() {
+	mem0Mu.Lock()
+	mem0Instance = nil
+	mem0Mu.Unlock()
+}
+
+func TestEmptyAPIKeyIsReportedEveryCall(t *testing.T) {
+	resetMem0()
+	t.Cleanup(resetMem0)
+
+	_, err1 := GetMem0ClientWithConfig(map[string]interface{}{"api_key": ""})
+	_, err2 := GetMem0ClientWithConfig(map[string]interface{}{"api_key": ""})
+	if err1 == nil || !strings.Contains(err1.Error(), "mem0.api_key is missing or empty") {
+		t.Fatalf("first error = %v", err1)
+	}
+	if err2 == nil || !strings.Contains(err2.Error(), "mem0.api_key is missing or empty") {
+		t.Fatalf("second error = %v", err2)
+	}
+	if mem0Instance != nil {
+		t.Fatal("empty api key was cached")
+	}
+}
+
+func TestUnreachableHostStaysTheFirstClient(t *testing.T) {
+	resetMem0()
+	t.Cleanup(resetMem0)
+
+	first, err := GetMem0ClientWithConfig(map[string]interface{}{
+		"api_key":  "dummy",
+		"base_url": "http://127.0.0.1:9",
+	})
+	if err != nil || first == nil {
+		t.Fatalf("first client = %v, %v", first, err)
+	}
+	second, err := GetMem0ClientWithConfig(map[string]interface{}{
+		"api_key":  "other",
+		"base_url": "https://api.mem0.ai",
+	})
+	if err != nil || second != first {
+		t.Fatalf("second client = %p %v, want %p", second, err, first)
+	}
+	if first.config.BaseUrl != "http://127.0.0.1:9" {
+		t.Fatalf("base url = %s", first.config.BaseUrl)
+	}
+	err = first.AddMessage(context.Background(), "agent", schema.Message{Role: schema.User, Content: "nino"})
+	if err == nil {
+		t.Fatal("add on a refused host returned nil")
+	}
+	_, err = first.Search(context.Background(), "agent", "gatto", 3, 0)
+	if err == nil {
+		t.Fatal("search on a refused host returned nil")
+	}
+}
