@@ -1192,7 +1192,7 @@ func (l *LLMManager) GetMessages(ctx context.Context, userMessage *schema.Messag
 			if speakerGroupInfo, found := l.clientState.DeviceConfig.VoiceIdentify[speakerResult.SpeakerName]; found {
 				// If a matching speakerGroup is found, fold its description into systemPrompt
 				if speakerGroupInfo.Prompt != "" {
-					systemPrompt += fmt.Sprintf("\nIdentified speaker:\n%s", speakerGroupInfo.Prompt)
+					systemPrompt += fmt.Sprintf("\nInformazioni sulla persona riconosciuta dalla voce:\n%s", speakerGroupInfo.Prompt)
 				}
 			}
 		}

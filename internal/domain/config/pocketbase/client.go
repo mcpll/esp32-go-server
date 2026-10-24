@@ -330,6 +330,11 @@ func (c *Client) Update(ctx context.Context, collection, id string, fields map[s
 	return c.do(ctx, http.MethodPatch, recordsPath(collection, id), nil, fields, nil)
 }
 
+// Delete removes a record.
+func (c *Client) Delete(ctx context.Context, collection, id string) error {
+	return c.do(ctx, http.MethodDelete, recordsPath(collection, id), nil, nil, nil)
+}
+
 // File downloads one file field. name is the filename PocketBase stored on the record.
 func (c *Client) File(ctx context.Context, collection, recordID, name string) ([]byte, error) {
 	path := "/api/files/" + url.PathEscape(collection) + "/" + url.PathEscape(recordID) + "/" + url.PathEscape(name)
