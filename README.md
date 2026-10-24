@@ -19,6 +19,28 @@ One install for one owner: one admin, with their agents and devices.
 
 The voice loop is Italian, hold-to-talk, over the protocol the Eye firmware already speaks. The goal is that it feels as fluid as the hosted xiaozhi.me; there is no latency tooling, acceptance is by ear on the device.
 
+## Platform capabilities
+
+What you can do with this install. Columns: **Console** = React UI at PocketBase `:8090`; **Device** = spoken / firmware path; **Other** = env, Compose, or PocketBase admin. Features that exist on the server but have no console screen are listed in [`docs/console-coverage.md`](docs/console-coverage.md).
+
+| Capability | What it does | Console | Device / voice | Other |
+|---|---|---|---|---|
+| Login | One owner account | Login screen | — | `ADMIN_EMAIL` / `ADMIN_PASSWORD` |
+| Agents | Name, Italian prompt, ASR / LLM / TTS providers, Test button | Agents list and editor | Next session uses the agent | Provider API keys stay in env / `config.yaml` |
+| Memory mode | None, short (Redis), or long (mem0) | Memory control on the agent | Recall during dialogue when long | Short needs Redis profile; long needs `MEM0_API_KEY` |
+| OpenClaw | Enter / exit phrases per agent | OpenClaw block on the agent | Spoken phrases switch mode | `ENDPOINT_AUTH_TOKEN` signs the endpoint |
+| Voiceprint | Groups, WAV samples, enroll / delete | Voiceprint on the agent; Settings → Voiceprint for the voice server | Identify speaker, optional chat gate, group voice | Compose `--profile voice` |
+| MCP access point | Stable URL for an external MCP client | Copy URL on the agent | — | JWT signed with `ENDPOINT_AUTH_TOKEN` |
+| Devices | Bind by six-digit code, note, activated toggle, online | Devices | OTA shows the code | See [Bind a device](#bind-a-device) |
+| Speak / inject | Send text to a device (speak or as user input) | Send message on the device row | Device speaks or chats | — |
+| Device MCP tools | List and call firmware tools | Tools panel on the device row | Tools also available in dialogue | — |
+| Settings | MQTT, OTA URLs, global MCP, voiceprint server, knowledge providers JSON, vision, chat, VAD | Settings | Next session / check-in uses most keys | Secrets never live in Settings |
+| Knowledge (RAG) | Answer from uploaded documents when knowledge is on | Providers JSON in Settings only | Spoken Q&A when enabled | Upload / sync via PocketBase or `commands` — see coverage doc |
+| Status | Pool resource counters | Status screen | — | Enable with `pool_stats.report_enabled` in server config |
+| Hold-to-talk dialogue | ASR → LLM → TTS in Italian | — | Primary product path | Seeded DashScope stack; needs `DASHSCOPE_API_KEY` |
+| OTA check-in | Activation code, WebSocket URL and token | OTA URLs in Settings | Device polls `/xiaozhi/ota/` | Firmware delivery is not implemented |
+| Deploy | PocketBase + server (optional Redis, voice) | Served by PocketBase | — | `docker compose up` — see [Install](#install) |
+
 ## What changes from upstream
 
 - Removed: the Gin/GORM manager and its Vue console, voice clone, role switching, persisted chat history.
@@ -140,12 +162,12 @@ npm test
 npm run build  # writes ../pb_public; the test stack serves that directory
 ```
 
-Log in with `ADMIN_EMAIL` and `ADMIN_PASSWORD`. While logged out, only the login screen is reachable. The console edits agents and devices in PocketBase. It does not store API keys and it does not call a vendor. The install image builds this console itself. Binding a device is described in [Bind a device](#bind-a-device).
+Log in with `ADMIN_EMAIL` and `ADMIN_PASSWORD`. While logged out, only the login screen is reachable. Screens: Agents, Devices, Settings, Status. The console does not store API keys and it does not call a vendor. The install image builds this console itself. Binding a device is described in [Bind a device](#bind-a-device). What the platform can do that the console cannot operate is in [`docs/console-coverage.md`](docs/console-coverage.md).
 
 ## Roadmap
 
-- Spec: [#8](https://github.com/mcpll/esp32-go-server/issues/8)
-- Tickets: the sub-issues of #8, starting at [#9](https://github.com/mcpll/esp32-go-server/issues/9)
+- Spec: [#8](https://github.com/mcpll/esp32-go-server/issues/8) (slices through deploy and voiceprint console are on `main`)
+- Remaining gaps vs the console: [`docs/console-coverage.md`](docs/console-coverage.md)
 - Research notes: [`docs/research/`](docs/research/)
 
 ## License
