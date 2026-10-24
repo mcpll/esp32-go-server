@@ -1,10 +1,6 @@
 import { pb } from '@/lib/client'
-import {
-  commandBody,
-  readCommand,
-  speakerDeleteGroupPayload,
-  type Command,
-} from '@/lib/commands'
+import { commandBody, speakerDeleteGroupPayload, type Command } from '@/lib/commands'
+import { asJsonObject } from '@/lib/json'
 import {
   createCommand,
   deleteSpeakerGroupRecord,
@@ -29,8 +25,10 @@ async function deleteCommandsForAgent(agentId: string): Promise<void> {
   })
   if (!Array.isArray(records)) throw new Error('Command list is not an array')
   for (const record of records) {
-    const command = readCommand(record)
-    await pb.collection('commands').delete(command.id)
+    const row = asJsonObject(record, 'Command')
+    const id = row.id
+    if (typeof id !== 'string' || id.trim() === '') throw new Error('Command id is missing')
+    await pb.collection('commands').delete(id)
   }
 }
 
