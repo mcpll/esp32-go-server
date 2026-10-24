@@ -4,6 +4,7 @@ import { pb } from '@/lib/client'
 import { agentUpdate, type AgentDraft } from '@/lib/providerForm'
 import { readCommand, type Command } from '@/lib/commands'
 import { readAgent, readDevice, type Agent, type Device } from '@/lib/records'
+import { readPoolStats, type PoolStats } from '@/lib/poolStats'
 import { readSetting, type Setting } from '@/lib/settingsForm'
 import { readSpeakerGroup, readSpeakerSample, type SpeakerGroup } from '@/lib/speakers'
 import type { JsonObject } from '@/lib/json'
@@ -12,7 +13,7 @@ export async function fetchAgents(): Promise<Agent[]> {
   const records: unknown = await pb.collection('agents').getFullList({
     sort: 'name',
     fields:
-      'id,name,prompt,asr_provider,asr_config,llm_provider,llm_config,tts_provider,tts_config,voiceprint_enabled,speaker_chat_mode',
+      'id,name,prompt,memory_mode,asr_provider,asr_config,llm_provider,llm_config,tts_provider,tts_config,openclaw,voiceprint_enabled,speaker_chat_mode',
   })
   if (!Array.isArray(records)) throw new Error('Agent list is not an array')
   return records.map(readAgent)
@@ -68,6 +69,24 @@ export async function fetchSettings(): Promise<Setting[]> {
 
 export async function saveSetting(input: { id: string; value: JsonObject }): Promise<void> {
   await pb.collection('settings').update(input.id, { value: input.value })
+}
+
+export async function fetchPoolStats(): Promise<PoolStats | null> {
+  try {
+    const record: unknown = await pb.collection('pool_stats').getFirstListItem('key = "main"')
+    return readPoolStats(record)
+  } catch (error) {
+    if (error instanceof ClientResponseError && error.status === 404) return null
+    throw error
+  }
+}
+
+export function subscribePoolStats(
+  onEvent: (event: { action: string; record: unknown }) => void,
+): Promise<() => Promise<void>> {
+  return pb.collection('pool_stats').subscribe('*', (event) => {
+    onEvent({ action: event.action, record: event.record })
+  })
 }
 
 export async function createCommand(body: JsonObject): Promise<Command> {

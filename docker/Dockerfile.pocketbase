@@ -1,0 +1,29 @@
+# PocketBase image for linux/amd64 and linux/arm64.
+# The console is built on the native build arch (plain JS) and copied into the runtime image.
+# Migrations are baked in so a clean host only needs Docker.
+FROM --platform=$BUILDPLATFORM node:22-bookworm AS console
+
+WORKDIR /src/console
+COPY console/package.json console/package-lock.json ./
+RUN npm ci
+COPY console/ ./
+RUN npm run build
+
+FROM alpine:3.20
+
+ARG PB_VERSION=0.40.4
+ARG TARGETARCH
+
+RUN apk add --no-cache curl unzip ca-certificates \
+    && curl -fsSL "https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_${TARGETARCH}.zip" -o /tmp/pb.zip \
+    && unzip /tmp/pb.zip pocketbase -d /usr/local/bin \
+    && rm /tmp/pb.zip \
+    && chmod +x /usr/local/bin/pocketbase
+
+COPY pb_migrations /pb_migrations
+COPY --from=console /src/pb_public /pb_public
+COPY docker/pocketbase-entrypoint.sh /usr/local/bin/pocketbase-entrypoint
+RUN chmod +x /usr/local/bin/pocketbase-entrypoint
+
+EXPOSE 8090
+ENTRYPOINT ["pocketbase-entrypoint"]

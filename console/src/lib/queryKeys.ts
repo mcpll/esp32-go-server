@@ -16,3 +16,7 @@ export const speakerKeys = {
   groups: (agentId: string) => ['speaker-groups', agentId] as const,
   samples: (groupId: string) => ['speaker-samples', groupId] as const,
 }
+
+export const poolStatsKeys = {
+  main: ['pool-stats'] as const,
+}

@@ -38,7 +38,8 @@ pocketbase:
   email: ""
   password: ""
 
-# Signing token of the MCP/OpenClaw endpoint JWTs. Required. Env: ENDPOINT_AUTH_TOKEN
+# Signing token of the MCP/OpenClaw endpoint JWTs. Read from ENDPOINT_AUTH_TOKEN only.
+# The key below is not used.
 manager:
   endpoint_auth_token: ""
 
@@ -84,6 +85,11 @@ resource_pools:
   idle_timeout: 10m           # idle timeout of a resource
   validate_on_borrow: true    # validate a resource when it is acquired
   validate_on_return: true    # validate a resource when it is returned
+
+# Pool stats for the console Status screen. false sends nothing.
+# true overwrites the pool_stats record (key "main") every 5s.
+pool_stats:
+  report_enabled: false
 
 # Voice activity detection (VAD)
 vad:

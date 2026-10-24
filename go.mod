@@ -4,6 +4,7 @@ go 1.26.4
 
 require (
 	github.com/ThinkInAIXYZ/go-mcp v0.2.19
+	github.com/alicebob/miniredis/v2 v2.39.0
 	github.com/antonfisher/nested-logrus-formatter v1.3.1
 	github.com/asaskevich/EventBus v0.0.0-20200907212545-49d423059eef
 	github.com/bytedance/sonic v1.15.4
@@ -108,6 +109,7 @@ require (
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/yargevad/filepathx v1.0.0 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
+	github.com/yuin/gopher-lua v1.1.1 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/arch v0.11.0 // indirect
 	golang.org/x/crypto v0.44.0 // indirect

@@ -109,6 +109,7 @@ describe('agent update', () => {
     const update = agentUpdate({
       name: ' Italiano ',
       prompt: ' Rispondi in italiano. ',
+      memoryMode: 'long',
       asr: draftFromConfig('asr', 'aliyun_qwen3', { language: 'it', auto_end: false }),
       llm: draftFromConfig('llm', 'aliyun', {
         type: 'openai',
@@ -122,12 +123,18 @@ describe('agent update', () => {
         voice: 'Cherry',
         language_type: 'Italian',
       }),
+      openclaw: {
+        allowed: false,
+        enterPhrases: 'apri openclaw',
+        exitPhrases: 'chiudi openclaw',
+      },
       voiceprintEnabled: true,
       speakerChatMode: 'identified_only',
     })
     expect(update).toEqual({
       name: 'Italiano',
       prompt: 'Rispondi in italiano.',
+      memory_mode: 'long',
       asr_provider: 'aliyun_qwen3',
       asr_config: { language: 'it', auto_end: false },
       llm_provider: 'aliyun',
@@ -144,8 +151,38 @@ describe('agent update', () => {
         voice: 'Cherry',
         language_type: 'Italian',
       },
+      openclaw: {
+        allowed: false,
+        enter_keywords: ['apri openclaw'],
+        exit_keywords: ['chiudi openclaw'],
+      },
       voiceprint_enabled: true,
       speaker_chat_mode: 'identified_only',
     })
+  })
+
+  it('saves the OpenClaw phrases and leaves the endpoint token out', () => {
+    const update = agentUpdate({
+      name: 'Italiano',
+      prompt: 'Rispondi in italiano.',
+      memoryMode: 'none',
+      asr: draftFromConfig('asr', 'aliyun_qwen3', { language: 'it' }),
+      llm: draftFromConfig('llm', 'aliyun', { model_name: 'qwen3.8-flash' }),
+      tts: draftFromConfig('tts', 'aliyun_qwen', { voice: 'Cherry' }),
+      openclaw: {
+        allowed: true,
+        enterPhrases: ' apri openclaw \nentra in openclaw\n',
+        exitPhrases: 'chiudi openclaw\n\nesci da openclaw',
+      },
+      voiceprintEnabled: false,
+      speakerChatMode: 'off',
+    })
+    expect(update.openclaw).toEqual({
+      allowed: true,
+      enter_keywords: ['apri openclaw', 'entra in openclaw'],
+      exit_keywords: ['chiudi openclaw', 'esci da openclaw'],
+    })
+    expect(update).not.toHaveProperty('token')
+    expect(JSON.stringify(update.openclaw)).not.toContain('ENDPOINT_AUTH_TOKEN')
   })
 })
