@@ -506,6 +506,8 @@ func (a *App) registerHandler() {
 	pb.RegisterCommand("mcp_tools", mcpaccess.Tools)
 	pb.RegisterCommand("mcp_call", mcpaccess.Call)
 	pb.RegisterCommand("mcp_endpoint", mcpaccess.Endpoint)
+	pb.RegisterCommand("knowledge_upload", pb.KnowledgeUpload)
+	pb.RegisterCommand("knowledge_sync", pb.KnowledgeSync)
 	pb.ArmCommands()
 }
 

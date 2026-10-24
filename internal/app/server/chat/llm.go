@@ -1273,9 +1273,9 @@ func buildKnowledgeSearchRoutingPolicy(knowledgeBases []config_types.KnowledgeBa
 		}
 		desc := strings.TrimSpace(kb.Description)
 		if desc == "" {
-			desc = "no description"
+			desc = "nessuna descrizione"
 		}
-		availableKBs = append(availableKBs, fmt.Sprintf("%d: name=%s; description=%s", kb.ID, name, desc))
+		availableKBs = append(availableKBs, fmt.Sprintf("%d: nome=%s; descrizione=%s", kb.ID, name, desc))
 		if len(availableKBs) >= 8 {
 			break
 		}
@@ -1285,14 +1285,14 @@ func buildKnowledgeSearchRoutingPolicy(knowledgeBases []config_types.KnowledgeBa
 	}
 
 	return fmt.Sprintf(
-		"\nKnowledge search rules (tool: search_knowledge):\nAvailable knowledge bases (id: name + description): %s\n"+
-			"1. When to call: the user asks for facts, procedures, parameters, rules, definitions, clauses, or comparisons that need a document, or explicitly asks to answer from the knowledge base or the documents.\n"+
-			"2. When not to call: small talk, emotional support, pure creative writing, or purely subjective advice.\n"+
-			"3. How to call: at most once per turn. query is the core keywords of the user's question. top_k defaults to 5. If a specific knowledge base is clear, pass knowledge_base_ids (one or more).\n"+
-			"4. Selection: pass only the knowledge base IDs most relevant to the question. Omit knowledge_base_ids when it is unclear.\n"+
-			"5. When evidence is thin: do not invent an answer. Ask the user for more specific keywords.\n"+
-			"6. Output: do not mention the knowledge base, retrieval, MCP, tool calls, or hit results.",
-		strings.Join(availableKBs, ", "),
+		"\nRegole di ricerca (strumento: search_knowledge):\nBasi disponibili (id: nome + descrizione): %s\n"+
+			"1. Chiamalo quando l'utente chiede fatti, procedure, parametri, regole, definizioni, clausole o confronti che richiedono un documento, oppure chiede di rispondere in base ai documenti.\n"+
+			"2. Non chiamarlo per saluti, compagnia, invenzioni o pareri solo personali.\n"+
+			"3. Al massimo una volta per turno: la query sono le parole chiave della domanda, top_k è 5; se capisci quale base serve, passa knowledge_base_ids (anche più di uno).\n"+
+			"4. Passa solo gli id pertinenti alla domanda; se non capisci quale base, ometti knowledge_base_ids.\n"+
+			"5. Se i passaggi non bastano, non inventare: chiedi parole chiave più precise.\n"+
+			"6. Nella risposta non nominare la base di conoscenza, la ricerca, MCP, la chiamata allo strumento o i risultati trovati.",
+		strings.Join(availableKBs, "; "),
 	)
 }
 
