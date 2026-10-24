@@ -1,5 +1,5 @@
 import { Suspense, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { actionClass, areaClass, controlClass } from '@/components/classes'
 import { McpAccessPoint } from '@/components/McpAccessPoint'
@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { useAgent, useSaveAgent } from '@/hooks/useAgents'
+import { useAgent, useDeleteAgent, useSaveAgent } from '@/hooks/useAgents'
 import { useSettings } from '@/hooks/useSettings'
 import { errorMessage } from '@/lib/errors'
 import { AGENTS_PATH } from '@/lib/gate'
@@ -27,9 +27,11 @@ const STAGES: { id: Stage; label: string }[] = [
 ]
 
 export function AgentForm({ id }: { id: string }) {
+  const navigate = useNavigate()
   const { data: agent } = useAgent(id)
   const { data: settings } = useSettings()
   const save = useSaveAgent()
+  const remove = useDeleteAgent()
   const redisEnabled = redisEnabledFromSettings(settings)
   const [name, setName] = useState(agent.name)
   const [prompt, setPrompt] = useState(agent.prompt)
@@ -41,9 +43,21 @@ export function AgentForm({ id }: { id: string }) {
   const [stage, setStage] = useState<Stage>('asr')
   const [voiceprintEnabled, setVoiceprintEnabled] = useState(agent.voiceprintEnabled)
   const [speakerChatMode, setSpeakerChatMode] = useState(agent.speakerChatMode)
-  const message = save.error === null ? null : errorMessage(save.error)
+  const busy = save.isPending || remove.isPending
+  const saveMessage = save.error === null ? null : errorMessage(save.error)
+  const deleteMessage = remove.error === null ? null : errorMessage(remove.error)
+  const message = deleteMessage ?? saveMessage
   const drafts = { asr, llm, tts }
   const setDraft = { asr: setAsr, llm: setLlm, tts: setTts }
+
+  function onDelete() {
+    const label = name.trim() === '' ? agent.name : name.trim()
+    const ok = window.confirm(`Delete agent “${label}”? This cannot be undone.`)
+    if (!ok) return
+    remove.mutate(agent.id, {
+      onSuccess: () => navigate(AGENTS_PATH),
+    })
+  }
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -73,11 +87,20 @@ export function AgentForm({ id }: { id: string }) {
         </Link>
         <h1 className="min-w-0 flex-1 truncate text-sm font-semibold">{agent.name}</h1>
         {message !== null ? (
-          <p className="max-w-48 truncate text-sm text-destructive" role="alert">
+          <p className="max-w-md truncate text-sm text-destructive" role="alert" title={message}>
             {message}
           </p>
         ) : null}
-        <Button className={actionClass} type="submit" form="agent-form" disabled={save.isPending}>
+        <Button
+          className={actionClass}
+          type="button"
+          variant="destructive"
+          disabled={busy}
+          onClick={() => onDelete()}
+        >
+          {remove.isPending ? 'Deleting…' : 'Delete'}
+        </Button>
+        <Button className={actionClass} type="submit" form="agent-form" disabled={busy}>
           {save.isPending ? 'Saving…' : 'Save'}
         </Button>
       </header>

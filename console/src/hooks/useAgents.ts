@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { fetchAgent, fetchAgents, saveAgent } from '@/lib/api'
-import { agentKeys, deviceKeys } from '@/lib/queryKeys'
+import { deleteAgent } from '@/lib/deleteAgent'
+import { agentKeys, deviceKeys, speakerKeys } from '@/lib/queryKeys'
 
 export function useAgents() {
   return useSuspenseQuery({
@@ -25,6 +26,21 @@ export function useSaveAgent() {
         queryClient.invalidateQueries({ queryKey: agentKeys.all }),
         queryClient.invalidateQueries({ queryKey: agentKeys.detail(variables.id) }),
         queryClient.invalidateQueries({ queryKey: deviceKeys.screen }),
+      ])
+    },
+  })
+}
+
+export function useDeleteAgent() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: deleteAgent,
+    onSuccess: async (_result, agentId) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: agentKeys.all }),
+        queryClient.removeQueries({ queryKey: agentKeys.detail(agentId) }),
+        queryClient.invalidateQueries({ queryKey: deviceKeys.screen }),
+        queryClient.removeQueries({ queryKey: speakerKeys.groups(agentId) }),
       ])
     },
   })
