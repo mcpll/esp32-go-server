@@ -1,4 +1,5 @@
 import { asJsonObject, isJsonObject, type JsonObject, type JsonValue } from '@/lib/json'
+import type { MemoryMode } from '@/lib/memoryMode'
 import { openClawUpdate, type OpenClawDraft, type OpenClawUpdate } from '@/lib/openclawForm'
 
 const SECRET_KEYS = new Set(['api_key', 'apikey', 'api_secret'])
@@ -128,6 +129,7 @@ export function withProvider(stage: Stage, draft: ProviderDraft, provider: strin
 export type AgentDraft = {
   name: string
   prompt: string
+  memoryMode: MemoryMode
   asr: ProviderDraft
   llm: ProviderDraft
   tts: ProviderDraft
@@ -137,6 +139,7 @@ export type AgentDraft = {
 export type AgentUpdate = {
   name: string
   prompt: string
+  memory_mode: MemoryMode
   asr_provider: string
   asr_config: JsonObject
   llm_provider: string
@@ -154,6 +157,7 @@ export function agentUpdate(draft: AgentDraft): AgentUpdate {
   return {
     name,
     prompt,
+    memory_mode: draft.memoryMode,
     asr_provider: requiredProvider(draft.asr, 'ASR'),
     asr_config: configFromDraft('asr', draft.asr),
     llm_provider: requiredProvider(draft.llm, 'LLM'),

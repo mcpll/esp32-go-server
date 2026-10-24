@@ -109,6 +109,7 @@ describe('agent update', () => {
     const update = agentUpdate({
       name: ' Italiano ',
       prompt: ' Rispondi in italiano. ',
+      memoryMode: 'long',
       asr: draftFromConfig('asr', 'aliyun_qwen3', { language: 'it', auto_end: false }),
       llm: draftFromConfig('llm', 'aliyun', {
         type: 'openai',
@@ -131,6 +132,7 @@ describe('agent update', () => {
     expect(update).toEqual({
       name: 'Italiano',
       prompt: 'Rispondi in italiano.',
+      memory_mode: 'long',
       asr_provider: 'aliyun_qwen3',
       asr_config: { language: 'it', auto_end: false },
       llm_provider: 'aliyun',
@@ -159,6 +161,7 @@ describe('agent update', () => {
     const update = agentUpdate({
       name: 'Italiano',
       prompt: 'Rispondi in italiano.',
+      memoryMode: 'none',
       asr: draftFromConfig('asr', 'aliyun_qwen3', { language: 'it' }),
       llm: draftFromConfig('llm', 'aliyun', { model_name: 'qwen3.8-flash' }),
       tts: draftFromConfig('tts', 'aliyun_qwen', { voice: 'Cherry' }),

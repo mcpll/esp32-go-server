@@ -2,7 +2,9 @@ package mem0
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net"
 	"strings"
 	"sync"
 
@@ -17,6 +19,7 @@ import (
 type Mem0Client struct {
 	client          *client.MemoryClient
 	config          Mem0Config
+	initErr         error // host refused the constructor ping; calls fail, the process stays up
 	mu              sync.RWMutex
 	EnableSearch    bool    `mapstructure:"enable_search"`
 	SearchThreshold float64 `mapstructure:"search_threshold"`
@@ -34,98 +37,108 @@ type Mem0Config struct {
 }
 
 var (
+	mem0Mu       sync.Mutex
 	mem0Instance *Mem0Client
-	mem0Once     sync.Once
-	configOnce   sync.Once
 )
 
-// GetMem0ClientWithConfig returns the Mem0 client singleton from config
+// GetMem0ClientWithConfig returns the Mem0 client singleton from config.
+// The first client that is built wins until restart. A missing api key is not stored.
 func GetMem0ClientWithConfig(config map[string]interface{}) (*Mem0Client, error) {
-	var err error
-	configOnce.Do(func() {
-		var enableSearch bool = true
-		var searchThreshold float64 = 0.5
-		var searchTopk int = 3
-		// parse config into the struct
-		var mem0Cfg Mem0Config
+	mem0Mu.Lock()
+	defer mem0Mu.Unlock()
+	if mem0Instance != nil {
+		return mem0Instance, nil
+	}
+	created, err := newMem0Client(config)
+	if err != nil {
+		return nil, err
+	}
+	mem0Instance = created
+	return mem0Instance, nil
+}
 
-		if enableSearchInterface, exists := config["enable_search"]; exists {
-			if iEnableSearch, ok := enableSearchInterface.(bool); ok {
-				enableSearch = iEnableSearch
-			}
+// newMem0Client builds a client. base_url is the mem0 host, and api_key is sent on every call.
+func newMem0Client(config map[string]interface{}) (*Mem0Client, error) {
+	enableSearch := true
+	searchThreshold := 0.5
+	searchTopk := 3
+	var mem0Cfg Mem0Config
+
+	if enableSearchInterface, exists := config["enable_search"]; exists {
+		if iEnableSearch, ok := enableSearchInterface.(bool); ok {
+			enableSearch = iEnableSearch
 		}
+	}
 
-		if searchThresholdInterface, exists := config["search_threshold"]; exists {
-			if iSearchThreshold, ok := searchThresholdInterface.(float64); ok {
-				searchThreshold = iSearchThreshold
-			}
+	if searchThresholdInterface, exists := config["search_threshold"]; exists {
+		if iSearchThreshold, ok := searchThresholdInterface.(float64); ok {
+			searchThreshold = iSearchThreshold
 		}
+	}
 
-		if searchTopkInterface, exists := config["search_topk"]; exists {
-			if iSearchTopk, ok := searchTopkInterface.(int); ok {
-				searchTopk = iSearchTopk
-			}
+	if searchTopkInterface, exists := config["search_topk"]; exists {
+		if iSearchTopk, ok := searchTopkInterface.(int); ok {
+			searchTopk = iSearchTopk
 		}
+	}
 
-		// read API Key
-		if apiKeyInterface, exists := config["api_key"]; exists {
-			if apiKey, ok := apiKeyInterface.(string); ok {
-				mem0Cfg.APIKey = apiKey
-			} else {
-				err = fmt.Errorf("mem0.api_key 必须是字符串")
-				return
-			}
+	if apiKeyInterface, exists := config["api_key"]; exists {
+		apiKey, ok := apiKeyInterface.(string)
+		if !ok {
+			return nil, fmt.Errorf("mem0.api_key must be a string")
 		}
+		mem0Cfg.APIKey = apiKey
+	}
 
-		// read Host
-		if hostInterface, exists := config["base_url"]; exists {
-			if host, ok := hostInterface.(string); ok {
-				mem0Cfg.BaseUrl = host
-			} else {
-				err = fmt.Errorf("mem0.host 必须是字符串")
-				return
-			}
+	if hostInterface, exists := config["base_url"]; exists {
+		host, ok := hostInterface.(string)
+		if !ok {
+			return nil, fmt.Errorf("mem0.base_url must be a string")
 		}
+		mem0Cfg.BaseUrl = host
+	}
 
-		// validate required config
-		if mem0Cfg.APIKey == "" {
-			err = fmt.Errorf("mem0.api_key 配置缺失或为空")
-			return
-		}
+	if mem0Cfg.APIKey == "" {
+		return nil, fmt.Errorf("mem0.api_key is missing or empty")
+	}
 
-		// set defaults
-		if mem0Cfg.BaseUrl == "" {
-			mem0Cfg.BaseUrl = "https://api.mem0.ai"
-		}
+	if mem0Cfg.BaseUrl == "" {
+		mem0Cfg.BaseUrl = "https://api.mem0.ai"
+	}
 
-		// create mem0 client
-		clientOptions := client.ClientOptions{
-			APIKey: mem0Cfg.APIKey,
-			/*Host:             mem0Cfg.Host,
-			OrganizationName: mem0Cfg.OrganizationName,
-			ProjectName:      mem0Cfg.ProjectName,
-			OrganizationID:   mem0Cfg.OrganizationID,
-			ProjectID:        mem0Cfg.ProjectID,*/
-		}
-
-		mem0Client, clientErr := client.NewMemoryClient(clientOptions)
-		if clientErr != nil {
-			err = fmt.Errorf("failed to create mem0 client: %w", clientErr)
-			return
-		}
-
-		mem0Instance = &Mem0Client{
-			client:          mem0Client,
-			config:          mem0Cfg,
-			EnableSearch:    enableSearch,
-			SearchThreshold: searchThreshold,
-			SearchTopk:      searchTopk,
-		}
-
-		log.Log().Infof("Mem0 client initialized, base_url: %s", mem0Cfg.BaseUrl)
+	mem0Client, clientErr := client.NewMemoryClient(client.ClientOptions{
+		APIKey: mem0Cfg.APIKey,
+		Host:   mem0Cfg.BaseUrl,
 	})
+	// ponytail: a refused ping is cached as this process's host. Search and add fail later; restart to change host.
+	if clientErr != nil && !hostUnreachable(clientErr) {
+		return nil, fmt.Errorf("failed to create mem0 client: %w", clientErr)
+	}
 
-	return mem0Instance, err
+	log.Log().Infof("Mem0 client initialized, base_url: %s", mem0Cfg.BaseUrl)
+	return &Mem0Client{
+		client:          mem0Client,
+		config:          mem0Cfg,
+		initErr:         clientErr,
+		EnableSearch:    enableSearch,
+		SearchThreshold: searchThreshold,
+		SearchTopk:      searchTopk,
+	}, nil
+}
+
+func hostUnreachable(err error) bool {
+	var netErr net.Error
+	return errors.As(err, &netErr)
+}
+
+func (m *Mem0Client) ready() error {
+	if m == nil || m.client == nil {
+		if m != nil && m.initErr != nil {
+			return m.initErr
+		}
+		return fmt.Errorf("mem0 client is not initialized")
+	}
+	return nil
 }
 
 // Init initializes the client
@@ -137,6 +150,9 @@ func (m *Mem0Client) Init() error {
 
 // Get fetches memories (internal)
 func (m *Mem0Client) Get(userID string) (interface{}, error) {
+	if err := m.ready(); err != nil {
+		return nil, err
+	}
 	// search all memories for the user
 	results, err := m.client.Search("", &types.SearchOptions{
 		MemoryOptions: types.MemoryOptions{
@@ -153,6 +169,9 @@ func (m *Mem0Client) Get(userID string) (interface{}, error) {
 
 // AddMessage adds a message to memory
 func (m *Mem0Client) AddMessage(ctx context.Context, agentID string, msg schema.Message) error {
+	if err := m.ready(); err != nil {
+		return err
+	}
 	message := types.Message{
 		Role:    string(msg.Role),
 		Content: msg.Content,
@@ -172,6 +191,9 @@ func (m *Mem0Client) AddMessage(ctx context.Context, agentID string, msg schema.
 
 // GetMessages returns the user's message history
 func (m *Mem0Client) GetMessages(ctx context.Context, agentID string, count int) ([]*schema.Message, error) {
+	if err := m.ready(); err != nil {
+		return nil, err
+	}
 	var memoryOptions = types.MemoryOptions{
 		AgentID: agentID,
 	}
@@ -218,7 +240,9 @@ func (m *Mem0Client) GetMessages(ctx context.Context, agentID string, count int)
 
 // ResetMemory resets user memory
 func (m *Mem0Client) ResetMemory(ctx context.Context, userID string) error {
-
+	if err := m.ready(); err != nil {
+		return err
+	}
 	// delete all memories for the user
 	err := m.client.DeleteUser(userID)
 	if err != nil {
@@ -262,6 +286,9 @@ func (m *Mem0Client) Flush(ctx context.Context, agentID string) error {
 }
 
 func (m *Mem0Client) actionSearch(ctx context.Context, agentID string, query string, topK int, threshold float64) ([]types.Memory, error) {
+	if err := m.ready(); err != nil {
+		return nil, err
+	}
 	// search related memories
 	results, err := m.client.Search(query, &types.SearchOptions{
 		MemoryOptions: types.MemoryOptions{
@@ -280,7 +307,9 @@ func (m *Mem0Client) actionSearch(ctx context.Context, agentID string, query str
 
 // AddBatchMessages adds messages in batch
 func (m *Mem0Client) AddBatchMessages(ctx context.Context, agentID string, messages []schema.Message) error {
-
+	if err := m.ready(); err != nil {
+		return err
+	}
 	// prepare batch messages
 	var batchMessages []string
 	for _, msg := range messages {
