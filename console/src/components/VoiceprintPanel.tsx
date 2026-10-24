@@ -38,6 +38,7 @@ import type { SpeakerChatMode, SpeakerGroup, SpeakerSample } from '@/lib/speaker
 
 type VoiceprintPanelProps = {
   agentId: string
+  frozen?: boolean
   voiceprintEnabled: boolean
   speakerChatMode: SpeakerChatMode
   onVoiceprintEnabledChange: (value: boolean) => void
@@ -46,6 +47,7 @@ type VoiceprintPanelProps = {
 
 export function VoiceprintPanel({
   agentId,
+  frozen = false,
   voiceprintEnabled,
   speakerChatMode,
   onVoiceprintEnabledChange,
@@ -59,6 +61,7 @@ export function VoiceprintPanel({
   const [localError, setLocalError] = useState<string | null>(null)
 
   async function runCommand(body: ReturnType<typeof commandBody>) {
+    if (frozen) return null
     setLocalError(null)
     const finished = await send(body)
     if (finished?.status === 'done') {
@@ -68,6 +71,7 @@ export function VoiceprintPanel({
   }
 
   async function onCreateGroup() {
+    if (frozen) return
     setLocalError(null)
     try {
       await createGroup.mutateAsync({ agentId, name: newGroupName, prompt: '', voice: '' })
@@ -97,6 +101,7 @@ export function VoiceprintPanel({
         <Switch
           id="agent-voiceprint"
           checked={voiceprintEnabled}
+          disabled={frozen}
           onCheckedChange={onVoiceprintEnabledChange}
         />
       </div>
@@ -105,6 +110,7 @@ export function VoiceprintPanel({
         <Label htmlFor="speaker-chat-mode">Chat access</Label>
         <Select
           value={speakerChatMode}
+          disabled={frozen}
           onValueChange={(value) => onSpeakerChatModeChange(value as SpeakerChatMode)}
           items={{
             off: 'Anyone may chat',
@@ -135,7 +141,7 @@ export function VoiceprintPanel({
         <Button
           className={actionClass}
           type="button"
-          disabled={createGroup.isPending || newGroupName.trim() === ''}
+          disabled={frozen || createGroup.isPending || newGroupName.trim() === ''}
           onClick={() => void onCreateGroup()}
         >
           Add group
@@ -151,7 +157,7 @@ export function VoiceprintPanel({
               key={group.id}
               agentId={agentId}
               group={group}
-              busy={sending}
+              busy={frozen || sending}
               runCommand={runCommand}
             />
           ))}

@@ -38,9 +38,16 @@ function speakerDeleteFailed(command: Command): Error {
   return new Error(command.error === '' ? 'Voiceprint cleanup failed' : command.error)
 }
 
+async function assertNoDevicesBound(agentId: string): Promise<void> {
+  assertNoDevicesForAgent(await countDevicesForAgent(agentId))
+}
+
 async function deleteSpeakerGroupsForAgent(agentId: string): Promise<void> {
-  const groups = await fetchSpeakerGroups(agentId)
-  for (const group of groups) {
+  for (;;) {
+    await assertNoDevicesBound(agentId)
+    const groups = await fetchSpeakerGroups(agentId)
+    if (groups.length === 0) break
+    const group = groups[0]
     const created = await createCommand(
       commandBody({
         type: 'speaker_delete',
@@ -55,8 +62,10 @@ async function deleteSpeakerGroupsForAgent(agentId: string): Promise<void> {
 }
 
 export async function deleteAgent(agentId: string): Promise<void> {
-  assertNoDevicesForAgent(await countDevicesForAgent(agentId))
+  await assertNoDevicesBound(agentId)
   await deleteSpeakerGroupsForAgent(agentId)
+  await assertNoDevicesBound(agentId)
   await deleteCommandsForAgent(agentId)
+  await assertNoDevicesBound(agentId)
   await pb.collection('agents').delete(agentId)
 }

@@ -104,11 +104,11 @@ export function AgentForm({ id }: { id: string }) {
           {save.isPending ? 'Saving…' : 'Save'}
         </Button>
       </header>
-      <form
-        id="agent-form"
-        className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:grid lg:grid-cols-2 lg:overflow-hidden"
-        onSubmit={onSubmit}
-      >
+      <form id="agent-form" className="flex min-h-0 flex-1 flex-col" onSubmit={onSubmit}>
+        <fieldset
+          disabled={busy}
+          className="flex min-h-0 flex-1 flex-col overflow-y-auto border-0 p-0 m-0 lg:grid lg:grid-cols-2 lg:overflow-hidden"
+        >
         <section className="flex flex-col gap-4 px-6 py-6 lg:min-h-0 lg:overflow-y-auto lg:border-r lg:border-border">
           <div className="grid gap-2">
             <Label htmlFor="agent-name">Name</Label>
@@ -134,6 +134,7 @@ export function AgentForm({ id }: { id: string }) {
           <Suspense fallback={<p className="text-sm text-muted-foreground">Loading voiceprint…</p>}>
             <VoiceprintPanel
               agentId={agent.id}
+              frozen={busy}
               voiceprintEnabled={voiceprintEnabled}
               speakerChatMode={speakerChatMode}
               onVoiceprintEnabledChange={setVoiceprintEnabled}
@@ -171,6 +172,7 @@ export function AgentForm({ id }: { id: string }) {
           </div>
           <p className="text-sm text-muted-foreground">Applies on the next session. API keys stay in the server config.</p>
         </section>
+        </fieldset>
       </form>
     </div>
   )

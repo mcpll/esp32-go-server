@@ -35,13 +35,17 @@ export function useDeleteAgent() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: deleteAgent,
-    onSuccess: async (_result, agentId) => {
+    onSettled: async (_result, error, agentId) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: agentKeys.all }),
-        queryClient.removeQueries({ queryKey: agentKeys.detail(agentId) }),
+        queryClient.invalidateQueries({ queryKey: agentKeys.detail(agentId) }),
         queryClient.invalidateQueries({ queryKey: deviceKeys.screen }),
-        queryClient.removeQueries({ queryKey: speakerKeys.groups(agentId) }),
+        queryClient.invalidateQueries({ queryKey: speakerKeys.groups(agentId) }),
       ])
+      if (error === null) {
+        queryClient.removeQueries({ queryKey: agentKeys.detail(agentId) })
+        queryClient.removeQueries({ queryKey: speakerKeys.groups(agentId) })
+      }
     },
   })
 }
