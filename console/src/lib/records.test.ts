@@ -87,6 +87,7 @@ describe('record parsing', () => {
         note: 'kitchen',
         activated: false,
         online: true,
+        device_id: 'AA:BB:CC:DD:EE:01',
         agent: 'a1',
         expand: { agent: { name: 'Italiano' } },
       }),
@@ -96,6 +97,7 @@ describe('record parsing', () => {
       note: 'kitchen',
       activated: false,
       online: true,
+      deviceId: 'AA:BB:CC:DD:EE:01',
       agentId: 'a1',
       agentName: 'Italiano',
     })

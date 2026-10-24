@@ -21,6 +21,7 @@ export type Device = {
   note: string
   activated: boolean
   online: boolean
+  deviceId: string
   agentId: string
   agentName: string
 }
@@ -49,6 +50,7 @@ export function readDevice(input: unknown): Device {
     note: optionalString(record, 'note'),
     activated: requiredBool(record, 'activated'),
     online: requiredBool(record, 'online'),
+    deviceId: requiredString(record, 'device_id', 'Device'),
     agentId: relationId(record),
     agentName: expandedAgentName(record.expand),
   }
