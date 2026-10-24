@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"math/big"
 	"strings"
 	"sync"
@@ -14,14 +15,27 @@ import (
 
 	"xiaozhi-esp32-server-golang/internal/domain/config/store"
 	"xiaozhi-esp32-server-golang/internal/domain/config/types"
+	"xiaozhi-esp32-server-golang/internal/domain/speaker"
 	log "xiaozhi-esp32-server-golang/logger"
 
 	"github.com/google/uuid"
 )
 
 const (
-	devicesCollection  = "devices"
-	settingsCollection = "settings"
+	devicesCollection            = "devices"
+	settingsCollection           = "settings"
+	commandsCollection           = "commands"
+	usersCollection              = "users"
+	speakerGroupsCollection      = "speaker_groups"
+	speakerSamplesCollection     = "speaker_samples"
+	knowledgeBasesCollection     = "knowledge_bases"
+	knowledgeDocumentsCollection = "knowledge_documents"
+
+	speakerSampleEnrolled = "enrolled"
+
+	// redisAvailableKey is the settings record the console reads to know
+	// whether short memory can be chosen. It is not the Redis client config.
+	redisAvailableKey = "redis_available"
 
 	// activationTimeoutMs is how long the device keeps showing its code (five minutes).
 	activationTimeoutMs = 300000
@@ -56,6 +70,14 @@ type Provider struct {
 
 	handlersMu sync.RWMutex
 	handlers   map[string]types.EventHandler
+
+	commandMu       sync.Mutex
+	commandHandlers map[string]CommandHandler
+	commandsArmed   bool
+	rootCtx         context.Context
+	onSystemConfig  func(map[string]interface{})
+	scanMu          sync.Mutex
+	now             func() time.Time
 }
 
 // RESTClient returns the superuser client this provider uses.
@@ -68,15 +90,20 @@ func (p *Provider) RESTClient() *Client {
 
 // NewProvider returns a provider that reads and writes through client.
 func NewProvider(client *Client) *Provider {
-	return &Provider{
-		client:    client,
-		newCode:   randomSixDigits,
-		retryBase: defaultRetryBase,
-		retryMax:  defaultRetryMax,
-		watchBase: time.Second,
-		watchMax:  30 * time.Second,
-		handlers:  map[string]types.EventHandler{},
+	p := &Provider{
+		client:          client,
+		newCode:         randomSixDigits,
+		retryBase:       defaultRetryBase,
+		retryMax:        defaultRetryMax,
+		watchBase:       time.Second,
+		watchMax:        30 * time.Second,
+		handlers:        map[string]types.EventHandler{},
+		commandHandlers: map[string]CommandHandler{},
+		now:             time.Now,
 	}
+	p.commandHandlers["speaker_enroll"] = p.enrollSpeaker
+	p.commandHandlers["speaker_delete"] = p.deleteSpeakerCommand
+	return p
 }
 
 func randomSixDigits() string {
@@ -208,7 +235,7 @@ func (p *Provider) GetUserConfig(ctx context.Context, deviceID string) (types.UC
 	asrProvider, asrConfig := mergeSection("asr", agent.String("asr_provider"), agent.Object("asr_config"))
 	llmProvider, llmConfig := mergeSection("llm", agent.String("llm_provider"), agent.Object("llm_config"))
 	ttsProvider, ttsConfig := mergeSection("tts", agent.String("tts_provider"), agent.Object("tts_config"))
-	memoryProvider, memoryConfig := mergeSection("memory", "", nil)
+	memoryProvider, memoryConfig := memorySection(agent.String("memory_mode"))
 	vadProvider, vadConfig := mergeSection("vad", "", nil)
 
 	openclaw := Record(agent.Object("openclaw"))
@@ -220,7 +247,7 @@ func (p *Provider) GetUserConfig(ctx context.Context, deviceID string) (types.UC
 		Tts:             types.TtsConfig{Provider: ttsProvider, Config: ttsConfig},
 		Memory:          types.MemoryConfig{Provider: memoryProvider, Config: memoryConfig},
 		Vad:             types.VadConfig{Provider: vadProvider, Config: vadConfig},
-		VoiceIdentify:   map[string]types.SpeakerGroupInfo{},
+		VoiceIdentify:   p.voiceIdentify(ctx, agent),
 		MemoryMode:      normalizeMemoryMode(agent.String("memory_mode")),
 		SpeakerChatMode: normalizeSpeakerChatMode(agent.String("speaker_chat_mode")),
 		AgentId:         agent.String("id"),
@@ -231,7 +258,62 @@ func (p *Provider) GetUserConfig(ctx context.Context, deviceID string) (types.UC
 			ExitKeywords:  openclaw.Strings("exit_keywords"),
 		},
 	}
+	bases, err := p.knowledgeBases(ctx, agent)
+	if err != nil {
+		return types.UConfig{}, err
+	}
+	cfg.KnowledgeBases = bases
 	return cfg, nil
+}
+
+// knowledgeBases is filled only when the agent switch is on. The search tool and the
+// routing prompt both ignore a base whose id is 0, so the PocketBase id is folded into
+// a stable non-zero uint the unchanged tool can pass back as knowledge_base_ids.
+func (p *Provider) knowledgeBases(ctx context.Context, agent Record) ([]types.KnowledgeBaseRef, error) {
+	if !agent.Bool("knowledge_enabled") {
+		return nil, nil
+	}
+	var refs []types.KnowledgeBaseRef
+	for _, id := range agent.Strings("knowledge_bases") {
+		rec, err := p.client.First(ctx, knowledgeBasesCollection, textEquals("id", id), "")
+		if err != nil {
+			return nil, fmt.Errorf("knowledge base %s: %w", id, err)
+		}
+		ref := types.KnowledgeBaseRef{
+			ID:           knowledgeRefID(rec.String("id")),
+			Name:         rec.String("name"),
+			Description:  rec.String("description"),
+			Provider:     rec.String("provider"),
+			ExternalKBID: rec.String("external_kb_id"),
+			Status:       rec.String("status"),
+		}
+		if threshold, ok := rec.Float("retrieval_threshold"); ok {
+			ref.RetrievalThreshold = &threshold
+		}
+		refs = append(refs, ref)
+	}
+	return refs, nil
+}
+
+func knowledgeRefID(recordID string) uint {
+	sum := fnv.New64a()
+	_, _ = sum.Write([]byte(recordID))
+	n := sum.Sum64()
+	id := uint(n)
+	if id == 0 {
+		id = uint(n >> 32)
+	}
+	if id == 0 {
+		id = 1
+	}
+	return id
+}
+
+// MergeStage lays a command's provider config over the viper section for that provider.
+// Keys the console omits, including the API key, stay from the server config.
+func MergeStage(stage, provider string, overrides map[string]any) map[string]any {
+	_, merged := mergeSection(stage, provider, overrides)
+	return merged
 }
 
 // mergeSection returns the provider name and its config for one stage. The base is the yaml
@@ -274,6 +356,16 @@ func cloneValue(v any) any {
 	}
 }
 
+// memorySection follows memory_mode. long uses the system mem0 config.
+// none and short do not open a long-memory provider.
+func memorySection(mode string) (string, map[string]any) {
+	if normalizeMemoryMode(mode) != "long" {
+		return "nomemo", map[string]any{}
+	}
+	_, cfg := mergeSection("memory", "mem0", nil)
+	return "mem0", cfg
+}
+
 func normalizeMemoryMode(mode string) string {
 	switch strings.ToLower(strings.TrimSpace(mode)) {
 	case "short":
@@ -283,6 +375,65 @@ func normalizeMemoryMode(mode string) string {
 	default:
 		return "none"
 	}
+}
+
+// voiceIdentify fills the session's speaker groups only when voiceprint can run:
+// the system switch, a voice server that answers /health, the agent switch, and
+// at least one group. Any missing piece leaves the map empty, so the chat gate,
+// the prompt and the voice swap all stay off.
+func (p *Provider) voiceIdentify(ctx context.Context, agent Record) map[string]types.SpeakerGroupInfo {
+	empty := map[string]types.SpeakerGroupInfo{}
+	if !agent.Bool("voiceprint_enabled") || !store.GetBool("voice_identify.enable") {
+		return empty
+	}
+	baseURL := store.GetString("voice_identify.base_url")
+	if !speaker.Reachable(ctx, baseURL) {
+		return empty
+	}
+	groups, err := p.client.List(ctx, speakerGroupsCollection, textEquals("agent", agent.String("id")), "")
+	if err != nil {
+		log.Warnf("pocketbase: list speaker groups: %v", err)
+		return empty
+	}
+	out := make(map[string]types.SpeakerGroupInfo, len(groups))
+	for _, group := range groups {
+		name := strings.TrimSpace(group.String("name"))
+		if name == "" {
+			continue
+		}
+		info := types.SpeakerGroupInfo{
+			Name:   name,
+			Prompt: group.String("prompt"),
+			Uuids:  p.enrolledUUIDs(ctx, group.String("id")),
+		}
+		if voice := strings.TrimSpace(group.String("voice")); voice != "" {
+			voiceCopy := voice
+			info.Voice = &voiceCopy
+		}
+		out[name] = info
+	}
+	if len(out) == 0 {
+		return empty
+	}
+	return out
+}
+
+func (p *Provider) enrolledUUIDs(ctx context.Context, groupID string) []string {
+	samples, err := p.client.List(ctx, speakerSamplesCollection, textEquals("group", groupID), "")
+	if err != nil {
+		log.Warnf("pocketbase: list speaker samples: %v", err)
+		return nil
+	}
+	var uuids []string
+	for _, sample := range samples {
+		if sample.String("status") != speakerSampleEnrolled {
+			continue
+		}
+		if id := strings.TrimSpace(sample.String("uuid")); id != "" {
+			uuids = append(uuids, id)
+		}
+	}
+	return uuids
 }
 
 func normalizeSpeakerChatMode(mode string) string {
@@ -359,8 +510,8 @@ func (p *Provider) NotifyDeviceEvent(ctx context.Context, eventType string, even
 	}
 }
 
-// RegisterMessageEventHandler keeps the handler for a downlink event. The commands channel
-// that fires them arrives in a later ticket.
+// RegisterMessageEventHandler keeps the handler for a downlink event.
+// inject_msg reaches the device through the commands channel, which calls the registered handler.
 func (p *Provider) RegisterMessageEventHandler(ctx context.Context, eventType string, eventHandler types.EventHandler) {
 	p.handlersMu.Lock()
 	defer p.handlersMu.Unlock()
@@ -374,6 +525,10 @@ func (p *Provider) RegisterMessageEventHandler(ctx context.Context, eventType st
 // start. If PocketBase does not answer, Start returns anyway and keeps retrying in the background
 // until the work is done or ctx ends. onSystemConfig receives the settings object on each load.
 func (p *Provider) Start(ctx context.Context, onSystemConfig func(map[string]interface{})) {
+	p.commandMu.Lock()
+	p.rootCtx = ctx
+	p.onSystemConfig = onSystemConfig
+	p.commandMu.Unlock()
 	go p.watchSettings(ctx, onSystemConfig)
 
 	first, cancel := context.WithTimeout(ctx, startupAttemptTimeout)
@@ -386,9 +541,9 @@ func (p *Provider) Start(ctx context.Context, onSystemConfig func(map[string]int
 	go p.retryStartup(ctx, onSystemConfig)
 }
 
-// watchSettings subscribes to settings and reloads them on every event and
-// after every reconnect. Events are lost while the stream is down, so a
-// reconnect always reloads the whole collection.
+// watchSettings subscribes to settings and commands. Settings reload on every
+// event and after every reconnect. Commands are scanned on every event and
+// after every reconnect, because events are lost while the stream is down.
 func (p *Provider) watchSettings(ctx context.Context, onSystemConfig func(map[string]interface{})) {
 	base, max := p.watchBase, p.watchMax
 	if base <= 0 {
@@ -402,18 +557,25 @@ func (p *Provider) watchSettings(ctx context.Context, onSystemConfig func(map[st
 		if ctx.Err() != nil {
 			return
 		}
-		subscribed, err := p.client.Watch(ctx, []string{settingsCollection + "/*"}, func() {
+		subscribed, err := p.client.Watch(ctx, []string{
+			settingsCollection + "/*",
+			commandsCollection + "/*",
+		}, func() {
 			p.reloadSettings(ctx, onSystemConfig)
+			p.scanCommands(ctx)
 		}, func(event string) {
-			if strings.HasPrefix(event, settingsCollection) {
+			switch {
+			case strings.HasPrefix(event, settingsCollection):
 				p.reloadSettings(ctx, onSystemConfig)
+			case strings.HasPrefix(event, commandsCollection):
+				p.scanCommands(ctx)
 			}
 		})
 		if ctx.Err() != nil {
 			return
 		}
 		if err != nil {
-			log.Warnf("pocketbase: settings realtime dropped: %v", err)
+			log.Warnf("pocketbase: realtime dropped: %v", err)
 		}
 		if subscribed {
 			delay = base
@@ -469,6 +631,9 @@ func (p *Provider) retryStartup(ctx context.Context, onSystemConfig func(map[str
 }
 
 func (p *Provider) startup(ctx context.Context, onSystemConfig func(map[string]interface{})) error {
+	if err := p.publishRedisAvailable(ctx); err != nil {
+		return err
+	}
 	cfg, err := p.LoadSystemConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("load settings: %w", err)
@@ -477,6 +642,29 @@ func (p *Provider) startup(ctx context.Context, onSystemConfig func(map[string]i
 		onSystemConfig(cfg)
 	}
 	return p.markAllDevicesOffline(ctx)
+}
+
+// publishRedisAvailable records whether Redis is on so the console can disable short memory.
+// The value is copied from redis.enable. A later settings merge must not turn the client on.
+func (p *Provider) publishRedisAvailable(ctx context.Context) error {
+	enabled := store.GetBool("redis.enable")
+	value := map[string]any{"enabled": enabled}
+	rec, err := p.client.First(ctx, settingsCollection, textEquals("key", redisAvailableKey), "")
+	if errors.Is(err, ErrNotFound) {
+		_, err = p.client.Create(ctx, settingsCollection, map[string]any{
+			"key":   redisAvailableKey,
+			"value": value,
+		})
+		return err
+	}
+	if err != nil {
+		return err
+	}
+	current := rec.Object("value")
+	if current != nil && current["enabled"] == enabled {
+		return nil
+	}
+	return p.client.Update(ctx, settingsCollection, rec.String("id"), map[string]any{"value": value})
 }
 
 // markAllDevicesOffline clears the online flag that a previous run may have left behind.

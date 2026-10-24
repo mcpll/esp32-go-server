@@ -64,6 +64,7 @@ services:
       POCKETBASE_URL: http://pocketbase:8090
       POCKETBASE_EMAIL: ${ADMIN_EMAIL:-owner@example.com}
       POCKETBASE_PASSWORD: ${ADMIN_PASSWORD:-console-pass-123}
+      ENDPOINT_AUTH_TOKEN: ${ENDPOINT_AUTH_TOKEN:-test-endpoint-token}
     volumes:
       - ../config.yaml:/workspace/config/config.yaml:ro
       - ../../../config/models:/workspace/config/models:ro
