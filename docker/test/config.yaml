@@ -42,8 +42,9 @@ websocket:
   port: 8989
   token: "test-ws-token"
 
+# OpenClaw/MCP endpoint token is ENDPOINT_AUTH_TOKEN in the compose file, not this key.
 manager:
-  endpoint_auth_token: "test-endpoint-token"
+  endpoint_auth_token: ""
 
 mqtt:
   enable: false

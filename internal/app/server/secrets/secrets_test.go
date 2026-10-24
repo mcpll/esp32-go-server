@@ -11,10 +11,11 @@ import (
 )
 
 func TestCheckRejectsUnsetAndKnownDefaults(t *testing.T) {
-	good := func() {
+	good := func(t *testing.T) {
 		viper.Reset()
+		t.Setenv("ENDPOINT_AUTH_TOKEN", "mcp-token")
 		viper.Set("websocket.token", "ws-token")
-		viper.Set("manager.endpoint_auth_token", "mcp-token")
+		viper.Set("manager.endpoint_auth_token", "from-yaml")
 		viper.Set("mqtt_server.password", "mqtt-pass")
 		viper.Set("mqtt_server.enable_auth", false)
 		viper.Set("vision.token", "vision-token")
@@ -22,20 +23,20 @@ func TestCheckRejectsUnsetAndKnownDefaults(t *testing.T) {
 
 	cases := []struct {
 		name string
-		mut  func()
+		mut  func(t *testing.T)
 	}{
-		{"websocket token empty", func() { viper.Set("websocket.token", "") }},
-		{"mcp token empty", func() { viper.Set("manager.endpoint_auth_token", "") }},
-		{"mcp token default", func() { viper.Set("manager.endpoint_auth_token", "xiaozhi_mcp_openclaw_secret_key") }},
-		{"mqtt password empty", func() { viper.Set("mqtt_server.password", "") }},
-		{"mqtt password default", func() { viper.Set("mqtt_server.password", "test!@#") }},
-		{"vision token empty", func() { viper.Set("vision.token", "") }},
-		{"vision token default", func() { viper.Set("vision.token", "1234567890") }},
-		{"mqtt signature empty when auth on", func() {
+		{"websocket token empty", func(*testing.T) { viper.Set("websocket.token", "") }},
+		{"mcp token empty", func(t *testing.T) { t.Setenv("ENDPOINT_AUTH_TOKEN", "") }},
+		{"mcp token default", func(t *testing.T) { t.Setenv("ENDPOINT_AUTH_TOKEN", "xiaozhi_mcp_openclaw_secret_key") }},
+		{"mqtt password empty", func(*testing.T) { viper.Set("mqtt_server.password", "") }},
+		{"mqtt password default", func(*testing.T) { viper.Set("mqtt_server.password", "test!@#") }},
+		{"vision token empty", func(*testing.T) { viper.Set("vision.token", "") }},
+		{"vision token default", func(*testing.T) { viper.Set("vision.token", "1234567890") }},
+		{"mqtt signature empty when auth on", func(*testing.T) {
 			viper.Set("mqtt_server.enable_auth", true)
 			viper.Set("mqtt_server.signature_key", "")
 		}},
-		{"mqtt signature default when auth on", func() {
+		{"mqtt signature default when auth on", func(*testing.T) {
 			viper.Set("mqtt_server.enable_auth", true)
 			viper.Set("mqtt_server.signature_key", "your_ota_signature_key_here")
 		}},
@@ -44,8 +45,8 @@ func TestCheckRejectsUnsetAndKnownDefaults(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Cleanup(viper.Reset)
-			good()
-			tc.mut()
+			good(t)
+			tc.mut(t)
 			if err := Check(); err == nil {
 				t.Fatal("Check() = nil, want error")
 			}
@@ -53,11 +54,26 @@ func TestCheckRejectsUnsetAndKnownDefaults(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsEndpointTokenThatExistsOnlyInConfig(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+	t.Setenv("ENDPOINT_AUTH_TOKEN", "")
+	viper.Set("websocket.token", "ws-token")
+	viper.Set("manager.endpoint_auth_token", "from-yaml")
+	viper.Set("mqtt_server.password", "mqtt-pass")
+	viper.Set("mqtt_server.enable_auth", false)
+	viper.Set("vision.token", "vision-token")
+	if err := Check(); err == nil {
+		t.Fatal("Check() accepted an endpoint token that is not in the environment")
+	}
+}
+
 func TestCheckAcceptsNonDefaultSecrets(t *testing.T) {
 	viper.Reset()
 	t.Cleanup(viper.Reset)
+	t.Setenv("ENDPOINT_AUTH_TOKEN", "mcp-token")
 	viper.Set("websocket.token", "ws-token")
-	viper.Set("manager.endpoint_auth_token", "mcp-token")
+	viper.Set("manager.endpoint_auth_token", "from-yaml")
 	viper.Set("mqtt_server.password", "mqtt-pass")
 	viper.Set("mqtt_server.enable_auth", false)
 	viper.Set("vision.token", "vision-token")
