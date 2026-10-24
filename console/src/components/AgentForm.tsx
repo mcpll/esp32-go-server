@@ -1,8 +1,9 @@
-import { useState, type FormEvent } from 'react'
+import { Suspense, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { actionClass, areaClass, controlClass } from '@/components/classes'
 import { McpAccessPoint } from '@/components/McpAccessPoint'
+import { VoiceprintPanel } from '@/components/VoiceprintPanel'
 import { StageEditor } from '@/components/StageEditor'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -29,13 +30,24 @@ export function AgentForm({ id }: { id: string }) {
   const [llm, setLlm] = useState(() => draftFromConfig('llm', agent.llmProvider, agent.llmConfig))
   const [tts, setTts] = useState(() => draftFromConfig('tts', agent.ttsProvider, agent.ttsConfig))
   const [stage, setStage] = useState<Stage>('asr')
+  const [voiceprintEnabled, setVoiceprintEnabled] = useState(agent.voiceprintEnabled)
+  const [speakerChatMode, setSpeakerChatMode] = useState(agent.speakerChatMode)
   const message = save.error === null ? null : errorMessage(save.error)
   const drafts = { asr, llm, tts }
   const setDraft = { asr: setAsr, llm: setLlm, tts: setTts }
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    save.mutate({ id: agent.id, name, prompt, asr, llm, tts })
+    save.mutate({
+      id: agent.id,
+      name,
+      prompt,
+      asr,
+      llm,
+      tts,
+      voiceprintEnabled,
+      speakerChatMode,
+    })
   }
 
   return (
@@ -83,6 +95,15 @@ export function AgentForm({ id }: { id: string }) {
             />
           </div>
           <McpAccessPoint agentId={agent.id} />
+          <Suspense fallback={<p className="text-sm text-muted-foreground">Loading voiceprint…</p>}>
+            <VoiceprintPanel
+              agentId={agent.id}
+              voiceprintEnabled={voiceprintEnabled}
+              speakerChatMode={speakerChatMode}
+              onVoiceprintEnabledChange={setVoiceprintEnabled}
+              onSpeakerChatModeChange={setSpeakerChatMode}
+            />
+          </Suspense>
         </section>
         <section className="flex flex-col gap-4 border-t border-border px-6 py-6 lg:min-h-0 lg:overflow-y-auto lg:border-t-0">
           <div role="tablist" aria-label="Pipeline" className="flex gap-1 rounded-full bg-muted p-1">

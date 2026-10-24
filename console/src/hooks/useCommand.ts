@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { createCommand, fetchCommand } from '@/lib/api'
+import { createCommand, waitForCommand } from '@/lib/api'
 import { pb } from '@/lib/client'
 import { readCommand, type Command } from '@/lib/commands'
 import { errorMessage } from '@/lib/errors'
@@ -17,7 +17,7 @@ export function useCommand() {
     }
   }, [])
 
-  const send = useCallback(async (body: JsonObject): Promise<void> => {
+  const send = useCallback(async (body: JsonObject): Promise<Command | null> => {
     setSending(true)
     setError(null)
     try {
@@ -34,9 +34,15 @@ export function useCommand() {
           setError(errorMessage(caught))
         }
       })
-      setCommand(await fetchCommand(created.id))
+      const finished = await waitForCommand(created.id)
+      setCommand(finished)
+      if (finished.status === 'error') {
+        setError(finished.error === '' ? 'Command failed' : finished.error)
+      }
+      return finished
     } catch (caught) {
       setError(errorMessage(caught))
+      return null
     } finally {
       setSending(false)
     }

@@ -1708,11 +1708,9 @@ func (s *ChatSession) switchTTSForSpeaker(speakerResult *speaker.IdentifyResult)
 		return nil
 	}
 
-	// 3. Check whether a custom voice is configured
+	// 3. A group voice with no separate TTS config uses the agent's own TTS provider.
 	if speakerGroupInfo.TTSConfigID == nil || *speakerGroupInfo.TTSConfigID == "" {
-		// No custom voice; clear speaker TTS config
-		log.Debugf("Speaker group %s has no custom TTS, clear speaker TTS config", speakerResult.SpeakerName)
-		return nil
+		return s.applyAgentVoiceForSpeaker(speakerResult.SpeakerName, speakerGroupInfo)
 	}
 
 	// 4. Find matching TTS config in system config (viper)
@@ -1787,6 +1785,29 @@ func (s *ChatSession) switchTTSForSpeaker(speakerResult *speaker.IdentifyResult)
 		targetTTSConfig.ConfigID,
 		speakerGroupInfo.Voice)
 
+	return nil
+}
+
+// applyAgentVoiceForSpeaker speaks this turn with the group's voice on the agent's TTS provider.
+func (s *ChatSession) applyAgentVoiceForSpeaker(speakerName string, info types.SpeakerGroupInfo) error {
+	if info.Voice == nil || strings.TrimSpace(*info.Voice) == "" {
+		log.Debugf("Speaker group %s has no voice, clear speaker TTS config", speakerName)
+		return nil
+	}
+	voice := strings.TrimSpace(*info.Voice)
+	ttsConfig := make(map[string]interface{}, len(s.clientState.DeviceConfig.Tts.Config)+1)
+	for k, v := range s.clientState.DeviceConfig.Tts.Config {
+		ttsConfig[k] = v
+	}
+	provider := s.clientState.DeviceConfig.Tts.Provider
+	if provider == "cosyvoice" {
+		ttsConfig["spk_id"] = voice
+	} else {
+		ttsConfig["voice"] = voice
+	}
+	ttsConfig["provider"] = provider
+	s.clientState.SpeakerTTSConfig = ttsConfig
+	log.Infof("Switched TTS voice for speaker %s to %s on provider %s", speakerName, voice, provider)
 	return nil
 }
 

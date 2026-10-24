@@ -7,6 +7,8 @@ export type CommandType =
   | 'mcp_tools'
   | 'mcp_call'
   | 'mcp_endpoint'
+  | 'speaker_enroll'
+  | 'speaker_delete'
 
 export type CommandStatus = 'pending' | 'running' | 'done' | 'error'
 
@@ -42,6 +44,18 @@ export function mcpCallPayload(deviceMac: string, tool: string, args: JsonObject
 
 export function mcpEndpointPayload(agentId: string): JsonObject {
   return { agent: agentId }
+}
+
+export function speakerEnrollPayload(sampleId: string): JsonObject {
+  return { sample: sampleId }
+}
+
+export function speakerDeleteSamplePayload(sampleId: string): JsonObject {
+  return { sample: sampleId }
+}
+
+export function speakerDeleteGroupPayload(groupId: string): JsonObject {
+  return { group: groupId }
 }
 
 export type DeviceTool = {

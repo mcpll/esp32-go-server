@@ -314,6 +314,34 @@ func (c *Client) Update(ctx context.Context, collection, id string, fields map[s
 	return c.do(ctx, http.MethodPatch, recordsPath(collection, id), nil, fields, nil)
 }
 
+// Delete removes a record.
+func (c *Client) Delete(ctx context.Context, collection, id string) error {
+	return c.do(ctx, http.MethodDelete, recordsPath(collection, id), nil, nil, nil)
+}
+
+// File downloads one file stored on a record.
+func (c *Client) File(ctx context.Context, collection, id, name string) ([]byte, error) {
+	path := "/api/files/" + url.PathEscape(collection) + "/" + url.PathEscape(id) + "/" + url.PathEscape(name)
+	for attempt := 0; ; attempt++ {
+		token, err := c.authorize(ctx)
+		if err != nil {
+			return nil, err
+		}
+		status, raw, err := c.send(ctx, http.MethodGet, path, nil, nil, token)
+		if err != nil {
+			return nil, err
+		}
+		if status == http.StatusUnauthorized && attempt == 0 {
+			c.forget(token)
+			continue
+		}
+		if status < 200 || status > 299 {
+			return nil, apiError(status, raw)
+		}
+		return raw, nil
+	}
+}
+
 func recordsPath(collection, id string) string {
 	p := "/api/collections/" + url.PathEscape(collection) + "/records"
 	if id != "" {

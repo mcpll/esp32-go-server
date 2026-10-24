@@ -7,6 +7,8 @@ import {
   mcpEndpointPayload,
   mcpToolsPayload,
   providerTestPayload,
+  speakerDeleteSamplePayload,
+  speakerEnrollPayload,
   readCallResult,
   readCommand,
   readMcpEndpoint,
@@ -40,6 +42,33 @@ describe('commands', () => {
       message: 'che ore sono',
       skip_llm: false,
       auto_listen: false,
+    })
+  })
+
+  it('builds speaker enroll and delete commands', () => {
+    expect(
+      commandBody({
+        type: 'speaker_enroll',
+        agentId: 'a1',
+        payload: speakerEnrollPayload('s1'),
+      }),
+    ).toEqual({
+      type: 'speaker_enroll',
+      agent: 'a1',
+      status: 'pending',
+      payload: { sample: 's1' },
+    })
+    expect(
+      commandBody({
+        type: 'speaker_delete',
+        agentId: 'a1',
+        payload: speakerDeleteSamplePayload('s1'),
+      }),
+    ).toEqual({
+      type: 'speaker_delete',
+      agent: 'a1',
+      status: 'pending',
+      payload: { sample: 's1' },
     })
   })
 

@@ -122,6 +122,8 @@ describe('agent update', () => {
         voice: 'Cherry',
         language_type: 'Italian',
       }),
+      voiceprintEnabled: true,
+      speakerChatMode: 'identified_only',
     })
     expect(update).toEqual({
       name: 'Italiano',
@@ -142,6 +144,8 @@ describe('agent update', () => {
         voice: 'Cherry',
         language_type: 'Italian',
       },
+      voiceprint_enabled: true,
+      speaker_chat_mode: 'identified_only',
     })
   })
 })

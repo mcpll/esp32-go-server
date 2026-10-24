@@ -25,6 +25,8 @@ describe('record parsing', () => {
       llmConfig: { model_name: 'qwen3.8-flash' },
       ttsProvider: 'aliyun_qwen',
       ttsConfig: { voice: 'Cherry' },
+      voiceprintEnabled: false,
+      speakerChatMode: 'off',
     })
   })
 

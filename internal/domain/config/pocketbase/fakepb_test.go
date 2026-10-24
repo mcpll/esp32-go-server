@@ -27,6 +27,7 @@ type fakePB struct {
 
 	mu          sync.Mutex
 	collections map[string][]map[string]any
+	files       map[string][]byte
 	nextID      int
 	down        bool
 	tokenTTL    time.Duration
@@ -59,6 +60,7 @@ func newFakePB(t *testing.T) *fakePB {
 	f := &fakePB{
 		t:           t,
 		collections: map[string][]map[string]any{},
+		files:       map[string][]byte{},
 		tokenTTL:    time.Hour,
 		validTokens: map[string]bool{},
 		sseIDs:      map[string]bool{},
@@ -113,6 +115,13 @@ func (f *fakePB) patch(collection, id string, fields map[string]any) {
 	f.t.Fatalf("patch: no %s record %s", collection, id)
 }
 
+// storeFile keeps the wav bytes a sample record points at.
+func (f *fakePB) storeFile(collection, id, name string, body []byte) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.files[collection+"/"+id+"/"+name] = append([]byte(nil), body...)
+}
+
 func (f *fakePB) count(collection string) int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -149,6 +158,7 @@ var uniqueFields = map[string][]string{
 }
 
 var recordsRoute = regexp.MustCompile(`^/api/collections/([a-z_]+)/records(?:/([A-Za-z0-9]+))?$`)
+var filesRoute = regexp.MustCompile(`^/api/files/([a-z_]+)/([A-Za-z0-9]+)/([^/]+)$`)
 
 func (f *fakePB) handle(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/api/realtime" && r.Method == http.MethodGet {
@@ -185,6 +195,16 @@ func (f *fakePB) handle(w http.ResponseWriter, r *http.Request) {
 		f.subscribeLocked(w, r)
 		return
 	}
+	if fm := filesRoute.FindStringSubmatch(r.URL.Path); fm != nil && r.Method == http.MethodGet {
+		body, ok := f.files[fm[1]+"/"+fm[2]+"/"+fm[3]]
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "audio/wav")
+		_, _ = w.Write(body)
+		return
+	}
 	m := recordsRoute.FindStringSubmatch(r.URL.Path)
 	if m == nil {
 		http.NotFound(w, r)
@@ -198,6 +218,8 @@ func (f *fakePB) handle(w http.ResponseWriter, r *http.Request) {
 		f.createLocked(w, r, collection)
 	case r.Method == http.MethodPatch && id != "":
 		f.updateLocked(w, r, collection, id)
+	case r.Method == http.MethodDelete && id != "":
+		f.deleteLocked(w, collection, id)
 	default:
 		http.NotFound(w, r)
 	}
@@ -341,6 +363,19 @@ func (f *fakePB) updateLocked(w http.ResponseWriter, r *http.Request, collection
 			rec[k] = v
 		}
 		writeJSON(w, http.StatusOK, rec)
+		return
+	}
+	writeJSON(w, http.StatusNotFound, map[string]any{"message": "The requested resource wasn't found."})
+}
+
+func (f *fakePB) deleteLocked(w http.ResponseWriter, collection, id string) {
+	recs := f.collections[collection]
+	for i, rec := range recs {
+		if rec["id"] != id {
+			continue
+		}
+		f.collections[collection] = append(recs[:i], recs[i+1:]...)
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 	writeJSON(w, http.StatusNotFound, map[string]any{"message": "The requested resource wasn't found."})

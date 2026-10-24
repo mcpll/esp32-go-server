@@ -14,15 +14,21 @@ import (
 
 	"xiaozhi-esp32-server-golang/internal/domain/config/store"
 	"xiaozhi-esp32-server-golang/internal/domain/config/types"
+	"xiaozhi-esp32-server-golang/internal/domain/speaker"
 	log "xiaozhi-esp32-server-golang/logger"
 
 	"github.com/google/uuid"
 )
 
 const (
-	devicesCollection  = "devices"
-	settingsCollection = "settings"
-	commandsCollection = "commands"
+	devicesCollection        = "devices"
+	settingsCollection       = "settings"
+	commandsCollection       = "commands"
+	usersCollection          = "users"
+	speakerGroupsCollection  = "speaker_groups"
+	speakerSamplesCollection = "speaker_samples"
+
+	speakerSampleEnrolled = "enrolled"
 
 	// activationTimeoutMs is how long the device keeps showing its code (five minutes).
 	activationTimeoutMs = 300000
@@ -69,7 +75,7 @@ type Provider struct {
 
 // NewProvider returns a provider that reads and writes through client.
 func NewProvider(client *Client) *Provider {
-	return &Provider{
+	p := &Provider{
 		client:          client,
 		newCode:         randomSixDigits,
 		retryBase:       defaultRetryBase,
@@ -80,6 +86,9 @@ func NewProvider(client *Client) *Provider {
 		commandHandlers: map[string]CommandHandler{},
 		now:             time.Now,
 	}
+	p.commandHandlers["speaker_enroll"] = p.enrollSpeaker
+	p.commandHandlers["speaker_delete"] = p.deleteSpeakerCommand
+	return p
 }
 
 func randomSixDigits() string {
@@ -223,7 +232,7 @@ func (p *Provider) GetUserConfig(ctx context.Context, deviceID string) (types.UC
 		Tts:             types.TtsConfig{Provider: ttsProvider, Config: ttsConfig},
 		Memory:          types.MemoryConfig{Provider: memoryProvider, Config: memoryConfig},
 		Vad:             types.VadConfig{Provider: vadProvider, Config: vadConfig},
-		VoiceIdentify:   map[string]types.SpeakerGroupInfo{},
+		VoiceIdentify:   p.voiceIdentify(ctx, agent),
 		MemoryMode:      normalizeMemoryMode(agent.String("memory_mode")),
 		SpeakerChatMode: normalizeSpeakerChatMode(agent.String("speaker_chat_mode")),
 		AgentId:         agent.String("id"),
@@ -293,6 +302,65 @@ func normalizeMemoryMode(mode string) string {
 	default:
 		return "none"
 	}
+}
+
+// voiceIdentify fills the session's speaker groups only when voiceprint can run:
+// the system switch, a voice server that answers /health, the agent switch, and
+// at least one group. Any missing piece leaves the map empty, so the chat gate,
+// the prompt and the voice swap all stay off.
+func (p *Provider) voiceIdentify(ctx context.Context, agent Record) map[string]types.SpeakerGroupInfo {
+	empty := map[string]types.SpeakerGroupInfo{}
+	if !agent.Bool("voiceprint_enabled") || !store.GetBool("voice_identify.enable") {
+		return empty
+	}
+	baseURL := store.GetString("voice_identify.base_url")
+	if !speaker.Reachable(ctx, baseURL) {
+		return empty
+	}
+	groups, err := p.client.List(ctx, speakerGroupsCollection, textEquals("agent", agent.String("id")), "")
+	if err != nil {
+		log.Warnf("pocketbase: list speaker groups: %v", err)
+		return empty
+	}
+	out := make(map[string]types.SpeakerGroupInfo, len(groups))
+	for _, group := range groups {
+		name := strings.TrimSpace(group.String("name"))
+		if name == "" {
+			continue
+		}
+		info := types.SpeakerGroupInfo{
+			Name:   name,
+			Prompt: group.String("prompt"),
+			Uuids:  p.enrolledUUIDs(ctx, group.String("id")),
+		}
+		if voice := strings.TrimSpace(group.String("voice")); voice != "" {
+			voiceCopy := voice
+			info.Voice = &voiceCopy
+		}
+		out[name] = info
+	}
+	if len(out) == 0 {
+		return empty
+	}
+	return out
+}
+
+func (p *Provider) enrolledUUIDs(ctx context.Context, groupID string) []string {
+	samples, err := p.client.List(ctx, speakerSamplesCollection, textEquals("group", groupID), "")
+	if err != nil {
+		log.Warnf("pocketbase: list speaker samples: %v", err)
+		return nil
+	}
+	var uuids []string
+	for _, sample := range samples {
+		if sample.String("status") != speakerSampleEnrolled {
+			continue
+		}
+		if id := strings.TrimSpace(sample.String("uuid")); id != "" {
+			uuids = append(uuids, id)
+		}
+	}
+	return uuids
 }
 
 func normalizeSpeakerChatMode(mode string) string {
