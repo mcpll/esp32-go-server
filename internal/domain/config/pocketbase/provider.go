@@ -80,6 +80,14 @@ type Provider struct {
 	now             func() time.Time
 }
 
+// RESTClient returns the superuser client this provider uses.
+func (p *Provider) RESTClient() *Client {
+	if p == nil {
+		return nil
+	}
+	return p.client
+}
+
 // NewProvider returns a provider that reads and writes through client.
 func NewProvider(client *Client) *Provider {
 	p := &Provider{
