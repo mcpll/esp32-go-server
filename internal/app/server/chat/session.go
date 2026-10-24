@@ -298,13 +298,13 @@ func (s *ChatSession) Start(pctx context.Context) error {
 	return nil
 }
 
-// Load chat history into memory
+// Load chat history into memory.
+// Redis history is short memory only, and only when Redis is enabled.
+// The config provider type does not choose this path.
 func (s *ChatSession) initHistoryMessages() error {
-	var historyMessages []*schema.Message
-	var err error
-
-	if s.clientState.GetMemoryMode() == MemoryModeNone {
-		log.Debugf("Device %s memory mode=none, skip loading history messages", s.clientState.DeviceID)
+	mode := s.clientState.GetMemoryMode()
+	if mode != MemoryModeShort {
+		log.Debugf("Device %s memory mode=%s, skip loading Redis history", s.clientState.DeviceID, mode)
 		return nil
 	}
 
@@ -314,13 +314,7 @@ func (s *ChatSession) initHistoryMessages() error {
 		return nil
 	}
 
-	// Short memory lives in Redis and only exists when Redis is enabled
-	if !viper.GetBool("redis.enable") {
-		log.Debugf("Redis disabled, skip loading history messages")
-		return nil
-	}
-
-	historyMessages, err = llm_memory.Get().GetMessages(
+	historyMessages, err := llm_memory.Get().GetMessages(
 		s.ctx,
 		s.clientState.DeviceID,
 		s.clientState.AgentID,
@@ -1708,11 +1702,9 @@ func (s *ChatSession) switchTTSForSpeaker(speakerResult *speaker.IdentifyResult)
 		return nil
 	}
 
-	// 3. Check whether a custom voice is configured
+	// 3. A group voice with no separate TTS config uses the agent's own TTS provider.
 	if speakerGroupInfo.TTSConfigID == nil || *speakerGroupInfo.TTSConfigID == "" {
-		// No custom voice; clear speaker TTS config
-		log.Debugf("Speaker group %s has no custom TTS, clear speaker TTS config", speakerResult.SpeakerName)
-		return nil
+		return s.applyAgentVoiceForSpeaker(speakerResult.SpeakerName, speakerGroupInfo)
 	}
 
 	// 4. Find matching TTS config in system config (viper)
@@ -1787,6 +1779,29 @@ func (s *ChatSession) switchTTSForSpeaker(speakerResult *speaker.IdentifyResult)
 		targetTTSConfig.ConfigID,
 		speakerGroupInfo.Voice)
 
+	return nil
+}
+
+// applyAgentVoiceForSpeaker speaks this turn with the group's voice on the agent's TTS provider.
+func (s *ChatSession) applyAgentVoiceForSpeaker(speakerName string, info types.SpeakerGroupInfo) error {
+	if info.Voice == nil || strings.TrimSpace(*info.Voice) == "" {
+		log.Debugf("Speaker group %s has no voice, clear speaker TTS config", speakerName)
+		return nil
+	}
+	voice := strings.TrimSpace(*info.Voice)
+	ttsConfig := make(map[string]interface{}, len(s.clientState.DeviceConfig.Tts.Config)+1)
+	for k, v := range s.clientState.DeviceConfig.Tts.Config {
+		ttsConfig[k] = v
+	}
+	provider := s.clientState.DeviceConfig.Tts.Provider
+	if provider == "cosyvoice" {
+		ttsConfig["spk_id"] = voice
+	} else {
+		ttsConfig["voice"] = voice
+	}
+	ttsConfig["provider"] = provider
+	s.clientState.SpeakerTTSConfig = ttsConfig
+	log.Infof("Switched TTS voice for speaker %s to %s on provider %s", speakerName, voice, provider)
 	return nil
 }
 

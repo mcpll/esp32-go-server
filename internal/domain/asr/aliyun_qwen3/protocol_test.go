@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -30,11 +31,11 @@ func TestServerEventUnmarshalConversationItemCreatedStringID(t *testing.T) {
 
 func TestGetTranscriptionTextPrefersTranscript(t *testing.T) {
 	event := &ServerEvent{
-		Transcript: "你们看花花呢？",
-		Stash:      "你们看花花呢",
+		Transcript: "are you looking at the flowers?",
+		Stash:      "are you looking at the flowers",
 	}
 
-	if got := GetTranscriptionText(event); got != "你们看花花呢？" {
+	if got := GetTranscriptionText(event); got != "are you looking at the flowers?" {
 		t.Fatalf("expected transcript text, got %q", got)
 	}
 }
@@ -42,10 +43,10 @@ func TestGetTranscriptionTextPrefersTranscript(t *testing.T) {
 func TestGetTranscriptionTextFallsBackToStash(t *testing.T) {
 	event := &ServerEvent{
 		Text:  "",
-		Stash: "你们看花花呢",
+		Stash: "are you looking at the flowers",
 	}
 
-	if got := GetTranscriptionText(event); got != "你们看花花呢" {
+	if got := GetTranscriptionText(event); got != "are you looking at the flowers" {
 		t.Fatalf("expected stash fallback, got %q", got)
 	}
 }
@@ -118,4 +119,98 @@ func TestStreamingRecognizeSendsSessionUpdateWithLanguageBeforeAudio(t *testing.
 	case <-ctx.Done():
 		t.Fatalf("timed out waiting for first websocket message: %v", ctx.Err())
 	}
+}
+
+// A finished Qwen session stays open and repeats the first transcript.
+// A second utterance must open a new websocket, or the same question is sent again.
+func TestSecondUtteranceDoesNotReplayTheFirstTranscript(t *testing.T) {
+	var dials atomic.Int32
+	upgrader := websocket.Upgrader{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := dials.Add(1)
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+
+		label := "prima"
+		if n > 1 {
+			label = "seconda"
+		}
+		var finished bool
+		for {
+			_, message, err := conn.ReadMessage()
+			if err != nil {
+				return
+			}
+			var event ClientEvent
+			if err := json.Unmarshal(message, &event); err != nil {
+				continue
+			}
+			switch event.Type {
+			case "session.update":
+				_ = conn.WriteJSON(ServerEvent{Type: "session.updated"})
+			case "input_audio_buffer.commit":
+				text := label
+				if finished {
+					text = "prima"
+				}
+				_ = conn.WriteJSON(ServerEvent{Type: "input_audio_buffer.committed"})
+				_ = conn.WriteJSON(ServerEvent{
+					Type:       "conversation.item.input_audio_transcription.completed",
+					Transcript: text,
+				})
+			case "session.finish":
+				_ = conn.WriteJSON(ServerEvent{Type: "session.finished"})
+				finished = true
+			}
+		}
+	}))
+	defer server.Close()
+
+	asr, err := NewAliyunQwen3ASR(Config{
+		APIKey:     "test-key",
+		WsURL:      "ws" + strings.TrimPrefix(server.URL, "http"),
+		Model:      "qwen3-asr-flash-realtime",
+		Format:     "pcm",
+		SampleRate: 16000,
+		Language:   "it",
+		Timeout:    2 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("create asr failed: %v", err)
+	}
+	defer asr.Close()
+
+	if got := recognizeOnce(t, asr, 0.1); got != "prima" {
+		t.Fatalf("first transcript = %q, want prima", got)
+	}
+	if got := recognizeOnce(t, asr, 0.9); got != "seconda" {
+		t.Fatalf("second transcript = %q, want seconda", got)
+	}
+}
+
+func recognizeOnce(t *testing.T, asr *AliyunQwen3ASR, sample float32) string {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	audio := make(chan []float32, 1)
+	audio <- []float32{sample, sample}
+	close(audio)
+
+	results, err := asr.StreamingRecognize(ctx, audio)
+	if err != nil {
+		t.Fatalf("streaming recognize failed: %v", err)
+	}
+	var text string
+	for result := range results {
+		if result.Error != nil {
+			t.Fatalf("asr error: %v", result.Error)
+		}
+		if result.IsFinal {
+			text = result.Text
+		}
+	}
+	return text
 }

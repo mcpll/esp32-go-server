@@ -199,12 +199,11 @@ func (a *AliyunQwen3ASR) StreamingRecognize(ctx context.Context, audioStream <-c
 		connectOnce.Do(func() {
 			a.connMu.Lock()
 			existing := a.conn
+			a.conn = nil
 			a.connMu.Unlock()
 			if existing != nil {
-				log.Debugf("[aliyun_qwen3] reuse websocket connection")
-				conn = existing
-				close(connectReady)
-				return
+				// A finished Qwen session repeats the previous transcript. Always dial a new one.
+				_ = existing.Close()
 			}
 
 			log.Debugf("[aliyun_qwen3] connecting to: %s", wsURL)
@@ -360,9 +359,10 @@ func (a *AliyunQwen3ASR) StreamingRecognize(ctx context.Context, audioStream <-c
 				})
 
 			case "session.finished":
-				// Session finished.
+				// Session finished. The next utterance needs a new websocket.
 				log.Debugf("[aliyun_qwen3] session.finished received")
 				sessionFinished = true
+				a.resetConn(conn)
 				return
 
 			case "error":
@@ -463,6 +463,10 @@ func (a *AliyunQwen3ASR) StreamingRecognize(ctx context.Context, audioStream <-c
 			log.Debugf("[aliyun_qwen3] sender exiting: sent %d chunks, %d bytes total", audioChunkCount, totalAudioBytes)
 		}()
 		defer func() {
+			// No session was opened (the turn had no audio). Finish would write a nil conn and kill the process.
+			if conn == nil {
+				return
+			}
 			// Wait for the final transcription (max 5s).
 			log.Debugf("[aliyun_qwen3] waiting for final transcription...")
 			waitForResult := true

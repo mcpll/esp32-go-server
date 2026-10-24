@@ -11,3 +11,7 @@ export const deviceKeys = {
 export const settingKeys = {
   all: ['settings'] as const,
 }
+
+export const poolStatsKeys = {
+  main: ['pool-stats'] as const,
+}
