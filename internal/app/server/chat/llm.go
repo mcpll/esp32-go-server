@@ -335,7 +335,7 @@ func (l *LLMManager) handleLLMWithContextAndTools(
 		l.clientState.DeviceConfig.Llm.Config,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get LLM resource: %w", err)
+		return nil, fmt.Errorf("failed to acquire LLM resource: %w", err)
 	}
 
 	// Get provider
@@ -347,7 +347,7 @@ func (l *LLMManager) handleLLMWithContextAndTools(
 	pipeline, err := l.openOutputPipeline(ctx)
 	if err != nil {
 		pool.Release(llmWrapper)
-		return nil, fmt.Errorf("failed to create the LLM output stream pipeline: %w", err)
+		return nil, fmt.Errorf("failed to create the LLM output transform pipeline: %w", err)
 	}
 
 	// Create response channel
@@ -992,7 +992,7 @@ func (l *LLMManager) handleLLMResponse(ctx context.Context, userMessage *schema.
 						if err != nil {
 							log.Errorf("Failed to handle tool call response: %v", err)
 							result.ok = true
-							return result, fmt.Errorf("failed to handle the tool call response: %v", err)
+							return result, fmt.Errorf("failed to handle the tool-call response: %v", err)
 						}
 						result.suppressProtocolTtsStop = toolSummary.hasMediaOutput
 						if !toolSummary.invokeToolSuccess && strings.TrimSpace(llmResponse.Text) != "" {
@@ -1176,10 +1176,10 @@ func (l *LLMManager) GetMessages(ctx context.Context, userMessage *schema.Messag
 
 	// Append current date/time
 	now := time.Now()
-	systemPrompt += fmt.Sprintf("\nCurrent date and time: %s %s", now.Format("2006-01-02 15:04:05"), now.Format("Monday"))
+	systemPrompt += fmt.Sprintf("\nCurrent time and date: %s %s", now.Format("2006-01-02 15:04:05"), now.Format("Monday"))
 
 	if memoryMode == MemoryModeLong && l.clientState.MemoryContext != "" {
-		systemPrompt += fmt.Sprintf("\nUser profile:\n%s", l.clientState.MemoryContext)
+		systemPrompt += fmt.Sprintf("\nInformazioni personali:\n%s", l.clientState.MemoryContext)
 	}
 
 	log.Debugf("speakerResult: %+v, voiceIdentify: %+v", speakerResult, l.clientState.DeviceConfig.VoiceIdentify)
@@ -1206,7 +1206,7 @@ func (l *LLMManager) GetMessages(ctx context.Context, userMessage *schema.Messag
 		}
 		log.Debugf("Memory search succeeded, input: %s, memory: %s", userMessage.Content, memoryContext)
 		if memoryContext != "" {
-			systemPrompt += fmt.Sprintf("\nRelated history:\n%s", memoryContext)
+			systemPrompt += fmt.Sprintf("\nMemorie correlate:\n%s", memoryContext)
 		}
 	}
 
@@ -1273,9 +1273,9 @@ func buildKnowledgeSearchRoutingPolicy(knowledgeBases []config_types.KnowledgeBa
 		}
 		desc := strings.TrimSpace(kb.Description)
 		if desc == "" {
-			desc = "no description"
+			desc = "nessuna descrizione"
 		}
-		availableKBs = append(availableKBs, fmt.Sprintf("%d: name=%s; description=%s", kb.ID, name, desc))
+		availableKBs = append(availableKBs, fmt.Sprintf("%d: nome=%s; descrizione=%s", kb.ID, name, desc))
 		if len(availableKBs) >= 8 {
 			break
 		}
@@ -1285,14 +1285,14 @@ func buildKnowledgeSearchRoutingPolicy(knowledgeBases []config_types.KnowledgeBa
 	}
 
 	return fmt.Sprintf(
-		"\nKnowledge search rules (tool: search_knowledge):\nAvailable knowledge bases (id: name + description): %s\n"+
-			"1. Call it when the user asks for facts, procedures, parameters, rules, definitions, clauses, comparisons, or anything that needs a document, or when they ask to answer from the knowledge base or a document.\n"+
-			"2. Do not call it for small talk, emotional support, pure creative writing, or purely subjective advice.\n"+
-			"3. At most once per turn. query is the core keywords of the question. top_k defaults to 5. Pass knowledge_base_ids (one or more) when a specific base is clear.\n"+
-			"4. Pass only the ids most relevant to the question. Omit knowledge_base_ids when unsure.\n"+
-			"5. If the evidence is not enough, do not invent an answer. Ask the user for more specific keywords.\n"+
-			"6. Do not mention the knowledge base, retrieval, MCP, tool calls, or hit results in the answer.",
-		strings.Join(availableKBs, ", "),
+		"\nRegole di ricerca (strumento: search_knowledge):\nBasi disponibili (id: nome + descrizione): %s\n"+
+			"1. Chiamalo quando l'utente chiede fatti, procedure, parametri, regole, definizioni, clausole o confronti che richiedono un documento, oppure chiede di rispondere in base ai documenti.\n"+
+			"2. Non chiamarlo per saluti, compagnia, invenzioni o pareri solo personali.\n"+
+			"3. Al massimo una volta per turno: la query sono le parole chiave della domanda, top_k è 5; se capisci quale base serve, passa knowledge_base_ids (anche più di uno).\n"+
+			"4. Passa solo gli id pertinenti alla domanda; se non capisci quale base, ometti knowledge_base_ids.\n"+
+			"5. Se i passaggi non bastano, non inventare: chiedi parole chiave più precise.\n"+
+			"6. Nella risposta non nominare la base di conoscenza, la ricerca, MCP, la chiamata allo strumento o i risultati trovati.",
+		strings.Join(availableKBs, "; "),
 	)
 }
 

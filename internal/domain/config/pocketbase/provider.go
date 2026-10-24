@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"math/big"
 	"strings"
 	"sync"
@@ -21,14 +22,20 @@ import (
 )
 
 const (
-	devicesCollection        = "devices"
-	settingsCollection       = "settings"
-	commandsCollection       = "commands"
-	usersCollection          = "users"
-	speakerGroupsCollection  = "speaker_groups"
-	speakerSamplesCollection = "speaker_samples"
+	devicesCollection            = "devices"
+	settingsCollection           = "settings"
+	commandsCollection           = "commands"
+	usersCollection              = "users"
+	speakerGroupsCollection      = "speaker_groups"
+	speakerSamplesCollection     = "speaker_samples"
+	knowledgeBasesCollection     = "knowledge_bases"
+	knowledgeDocumentsCollection = "knowledge_documents"
 
 	speakerSampleEnrolled = "enrolled"
+
+	// redisAvailableKey is the settings record the console reads to know
+	// whether short memory can be chosen. It is not the Redis client config.
+	redisAvailableKey = "redis_available"
 
 	// activationTimeoutMs is how long the device keeps showing its code (five minutes).
 	activationTimeoutMs = 300000
@@ -220,7 +227,7 @@ func (p *Provider) GetUserConfig(ctx context.Context, deviceID string) (types.UC
 	asrProvider, asrConfig := mergeSection("asr", agent.String("asr_provider"), agent.Object("asr_config"))
 	llmProvider, llmConfig := mergeSection("llm", agent.String("llm_provider"), agent.Object("llm_config"))
 	ttsProvider, ttsConfig := mergeSection("tts", agent.String("tts_provider"), agent.Object("tts_config"))
-	memoryProvider, memoryConfig := mergeSection("memory", "", nil)
+	memoryProvider, memoryConfig := memorySection(agent.String("memory_mode"))
 	vadProvider, vadConfig := mergeSection("vad", "", nil)
 
 	openclaw := Record(agent.Object("openclaw"))
@@ -243,7 +250,55 @@ func (p *Provider) GetUserConfig(ctx context.Context, deviceID string) (types.UC
 			ExitKeywords:  openclaw.Strings("exit_keywords"),
 		},
 	}
+	bases, err := p.knowledgeBases(ctx, agent)
+	if err != nil {
+		return types.UConfig{}, err
+	}
+	cfg.KnowledgeBases = bases
 	return cfg, nil
+}
+
+// knowledgeBases is filled only when the agent switch is on. The search tool and the
+// routing prompt both ignore a base whose id is 0, so the PocketBase id is folded into
+// a stable non-zero uint the unchanged tool can pass back as knowledge_base_ids.
+func (p *Provider) knowledgeBases(ctx context.Context, agent Record) ([]types.KnowledgeBaseRef, error) {
+	if !agent.Bool("knowledge_enabled") {
+		return nil, nil
+	}
+	var refs []types.KnowledgeBaseRef
+	for _, id := range agent.Strings("knowledge_bases") {
+		rec, err := p.client.First(ctx, knowledgeBasesCollection, textEquals("id", id), "")
+		if err != nil {
+			return nil, fmt.Errorf("knowledge base %s: %w", id, err)
+		}
+		ref := types.KnowledgeBaseRef{
+			ID:           knowledgeRefID(rec.String("id")),
+			Name:         rec.String("name"),
+			Description:  rec.String("description"),
+			Provider:     rec.String("provider"),
+			ExternalKBID: rec.String("external_kb_id"),
+			Status:       rec.String("status"),
+		}
+		if threshold, ok := rec.Float("retrieval_threshold"); ok {
+			ref.RetrievalThreshold = &threshold
+		}
+		refs = append(refs, ref)
+	}
+	return refs, nil
+}
+
+func knowledgeRefID(recordID string) uint {
+	sum := fnv.New64a()
+	_, _ = sum.Write([]byte(recordID))
+	n := sum.Sum64()
+	id := uint(n)
+	if id == 0 {
+		id = uint(n >> 32)
+	}
+	if id == 0 {
+		id = 1
+	}
+	return id
 }
 
 // MergeStage lays a command's provider config over the viper section for that provider.
@@ -291,6 +346,16 @@ func cloneValue(v any) any {
 	default:
 		return v
 	}
+}
+
+// memorySection follows memory_mode. long uses the system mem0 config.
+// none and short do not open a long-memory provider.
+func memorySection(mode string) (string, map[string]any) {
+	if normalizeMemoryMode(mode) != "long" {
+		return "nomemo", map[string]any{}
+	}
+	_, cfg := mergeSection("memory", "mem0", nil)
+	return "mem0", cfg
 }
 
 func normalizeMemoryMode(mode string) string {
@@ -558,6 +623,9 @@ func (p *Provider) retryStartup(ctx context.Context, onSystemConfig func(map[str
 }
 
 func (p *Provider) startup(ctx context.Context, onSystemConfig func(map[string]interface{})) error {
+	if err := p.publishRedisAvailable(ctx); err != nil {
+		return err
+	}
 	cfg, err := p.LoadSystemConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("load settings: %w", err)
@@ -566,6 +634,29 @@ func (p *Provider) startup(ctx context.Context, onSystemConfig func(map[string]i
 		onSystemConfig(cfg)
 	}
 	return p.markAllDevicesOffline(ctx)
+}
+
+// publishRedisAvailable records whether Redis is on so the console can disable short memory.
+// The value is copied from redis.enable. A later settings merge must not turn the client on.
+func (p *Provider) publishRedisAvailable(ctx context.Context) error {
+	enabled := store.GetBool("redis.enable")
+	value := map[string]any{"enabled": enabled}
+	rec, err := p.client.First(ctx, settingsCollection, textEquals("key", redisAvailableKey), "")
+	if errors.Is(err, ErrNotFound) {
+		_, err = p.client.Create(ctx, settingsCollection, map[string]any{
+			"key":   redisAvailableKey,
+			"value": value,
+		})
+		return err
+	}
+	if err != nil {
+		return err
+	}
+	current := rec.Object("value")
+	if current != nil && current["enabled"] == enabled {
+		return nil
+	}
+	return p.client.Update(ctx, settingsCollection, rec.String("id"), map[string]any{"value": value})
 }
 
 // markAllDevicesOffline clears the online flag that a previous run may have left behind.
