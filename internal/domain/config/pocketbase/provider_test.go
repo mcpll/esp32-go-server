@@ -43,8 +43,8 @@ func seedItalianAgent(fake *fakePB) map[string]any {
 		"asr_config":   map[string]any{"language": "it", "auto_end": false},
 		"llm_provider": "aliyun",
 		"llm_config":   map[string]any{"model_name": "qwen3.8-flash", "max_tokens": float64(300)},
-		"tts_provider": "aliyun_qwen",
-		"tts_config":   map[string]any{"voice": "Cherry", "language_type": "Italian"},
+		"tts_provider": "openai",
+		"tts_config":   map[string]any{"voice": "im_nicola"},
 		"memory_mode":  "none",
 		"openclaw": map[string]any{
 			"allowed":        false,
@@ -220,7 +220,10 @@ func TestGetUserConfigMergesAgentOntoViperSections(t *testing.T) {
 	viper.Set("asr.aliyun_qwen3", map[string]any{"language": "zh", "auto_end": true, "api_key": "secret", "sample_rate": 16000})
 	viper.Set("llm.provider", "other")
 	viper.Set("llm.aliyun", map[string]any{"api_key": "llm-secret", "model_name": "old", "max_tokens": 100})
-	viper.Set("tts.aliyun_qwen", map[string]any{"api_key": "tts-secret", "voice": "Old"})
+	viper.Set("tts.openai", map[string]any{
+		"api_url": "http://kokoro:8880/v1/audio/speech", "model": "kokoro",
+		"voice": "Old", "response_format": "pcm", "api_key": "",
+	})
 	viper.Set("memory.provider", "mem0")
 	viper.Set("memory.mem0", map[string]any{"api_key": "mem-secret"})
 	viper.Set("vad.provider", "silero_vad")
@@ -253,7 +256,7 @@ func TestGetUserConfigMergesAgentOntoViperSections(t *testing.T) {
 	if cfg.Llm.Provider != "aliyun" || cfg.Llm.Config["model_name"] != "qwen3.8-flash" || cfg.Llm.Config["api_key"] != "llm-secret" {
 		t.Fatalf("llm = %+v", cfg.Llm)
 	}
-	if cfg.Tts.Provider != "aliyun_qwen" || cfg.Tts.Config["voice"] != "Cherry" || cfg.Tts.Config["language_type"] != "Italian" || cfg.Tts.Config["api_key"] != "tts-secret" {
+	if cfg.Tts.Provider != "openai" || cfg.Tts.Config["voice"] != "im_nicola" || cfg.Tts.Config["model"] != "kokoro" || cfg.Tts.Config["api_url"] != "http://kokoro:8880/v1/audio/speech" {
 		t.Fatalf("tts = %+v", cfg.Tts)
 	}
 	if cfg.Memory.Provider != "nomemo" || len(cfg.Memory.Config) != 0 {

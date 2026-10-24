@@ -30,6 +30,12 @@ const FIELDS: Record<Stage, Record<string, readonly Field[]>> = {
     ],
   },
   tts: {
+    openai: [
+      { path: 'api_url', label: 'API URL', kind: 'text' },
+      { path: 'model', label: 'Model', kind: 'text' },
+      { path: 'voice', label: 'Voice', kind: 'text' },
+      { path: 'response_format', label: 'Format', kind: 'text' },
+    ],
     aliyun_qwen: [
       { path: 'model', label: 'Model', kind: 'text' },
       { path: 'voice', label: 'Voice', kind: 'text' },

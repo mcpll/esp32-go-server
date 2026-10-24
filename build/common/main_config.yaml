@@ -173,16 +173,17 @@ asr:
 
 # Text to speech (TTS). The agent record picks the provider, voice and language.
 tts:
-  provider: "aliyun_qwen"  # TTS provider: aliyun_qwen/xiaozhi/doubao/doubao_ws/cosyvoice/edge/edge_offline/xunfei/xunfei_super_tts
+  provider: "openai"  # TTS provider: openai/aliyun_qwen/xiaozhi/doubao/doubao_ws/cosyvoice/edge/edge_offline/xunfei/xunfei_super_tts
   # Aliyun Qwen TTS (DashScope)
   aliyun_qwen:
     api_key: ""
-  openai:  # OpenAI-compatible TTS service, SiliconFlow here
-    api_key: "xxxx" # api key
-    api_url: "https://api.siliconflow.cn/v1/audio/speech"
-    model: "FunAudioLLM/CosyVoice2-0.5B"
-    voice: "FunAudioLLM/CosyVoice2-0.5B:alex"
-    response_format: "mp3"
+  # Local Kokoro via Compose --profile tts (OpenAI speech API, no key).
+  openai:
+    api_key: ""
+    api_url: "http://kokoro:8880/v1/audio/speech"
+    model: "kokoro"
+    voice: "im_nicola"
+    response_format: "pcm"
     speed: 1.0
     stream: true
   # Doubao TTS (HTTP)

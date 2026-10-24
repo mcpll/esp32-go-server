@@ -113,7 +113,15 @@ asr:
     auto_end: true
 
 tts:
-  provider: "aliyun_qwen"
+  provider: "openai"
+  openai:
+    api_key: ""
+    api_url: "http://kokoro:8880/v1/audio/speech"
+    model: "kokoro"
+    voice: "im_nicola"
+    response_format: "pcm"
+    speed: 1.0
+    stream: true
   aliyun_qwen:
     api_key: "placeholder"
   edge:

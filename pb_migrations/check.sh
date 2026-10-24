@@ -44,7 +44,7 @@ AGENT=$(get agents "$SU" | jq '.items[0]')
 echo "$AGENT" | jq -e '
   .asr_provider == "aliyun_qwen3" and .asr_config.language == "it" and .asr_config.auto_end == false
   and .llm_provider == "aliyun" and .llm_config.model_name == "qwen3.8-flash" and .llm_config.thinking.mode == "disabled" and .llm_config.max_tokens == 300
-  and .tts_provider == "aliyun_qwen" and .tts_config.language_type == "Italian" and (.tts_config.voice | length > 0)
+  and .tts_provider == "openai" and .tts_config.voice == "im_nicola"
   and (.prompt | length > 0) and .memory_mode == "none" and .voiceprint_enabled == false and .knowledge_enabled == false
   and (.openclaw.enter_keywords | length > 0) and (.openclaw.exit_keywords | length > 0)' >/dev/null || fail "seed agent mismatch: $AGENT"
 [ "$(total settings "$SU")" -ge 10 ] || fail "settings not seeded"

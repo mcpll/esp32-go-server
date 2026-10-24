@@ -1,10 +1,11 @@
 # Personal install: PocketBase (console) and the device server.
-# Redis and the voice server stay off unless their profiles are named.
+# Redis, the voice server, and local Kokoro TTS stay off unless their profiles are named.
 #
 #   cp .env.example .env    # then fill the values
 #   docker compose up --build -d
 #   docker compose --profile redis up --build -d
 #   docker compose --profile voice up --build -d
+#   docker compose --profile tts up --build -d
 #   docker compose down -v  # delete data
 name: esp32
 
@@ -39,6 +40,9 @@ services:
       pocketbase:
         condition: service_healthy
       redis:
+        condition: service_healthy
+        required: false
+      kokoro:
         condition: service_healthy
         required: false
     environment:
@@ -106,6 +110,21 @@ services:
       - "8082:8080"
     volumes:
       - asr_data:/app/data
+
+  # Local Kokoro-82M TTS (OpenAI speech API). CPU-only; heavy on Pi — opt in with --profile tts.
+  # Seeded agent TTS points at http://kokoro:8880; without this profile that URL is unreachable.
+  kokoro:
+    profiles: ["tts"]
+    image: ghcr.io/remsky/kokoro-fastapi-cpu
+    restart: unless-stopped
+    ports:
+      - "8880:8880"
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://127.0.0.1:8880/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
 
 volumes:
   pb_data:

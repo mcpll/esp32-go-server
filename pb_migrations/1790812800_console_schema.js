@@ -124,11 +124,9 @@ migrate((app) => {
     max_tokens: 300,
     thinking: { mode: "disabled" },
   })
-  agent.set("tts_provider", "aliyun_qwen")
+  agent.set("tts_provider", "openai")
   agent.set("tts_config", {
-    model: "qwen3-tts-flash",
-    voice: "Cherry",
-    language_type: "Italian",
+    voice: "im_nicola",
   })
   agent.set("memory_mode", "none")
   agent.set("voiceprint_enabled", false)
