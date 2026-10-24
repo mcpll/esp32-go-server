@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { bindDevice, fetchAgents, fetchDevices, setDeviceActivated } from '@/lib/api'
+import { deleteDevice } from '@/lib/deleteDevice'
 import { agentKeys, deviceKeys } from '@/lib/queryKeys'
 
 export function useDeviceScreen() {
@@ -34,6 +35,19 @@ export function useSetDeviceActivated() {
   return useMutation({
     mutationFn: setDeviceActivated,
     onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: deviceKeys.all }),
+        queryClient.invalidateQueries({ queryKey: deviceKeys.screen }),
+      ])
+    },
+  })
+}
+
+export function useDeleteDevice() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: deleteDevice,
+    onSettled: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: deviceKeys.all }),
         queryClient.invalidateQueries({ queryKey: deviceKeys.screen }),
