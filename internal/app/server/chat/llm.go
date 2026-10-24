@@ -335,7 +335,7 @@ func (l *LLMManager) handleLLMWithContextAndTools(
 		l.clientState.DeviceConfig.Llm.Config,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("acquire LLM resource: %w", err)
+		return nil, fmt.Errorf("failed to acquire LLM resource: %w", err)
 	}
 
 	// Get provider
@@ -347,7 +347,7 @@ func (l *LLMManager) handleLLMWithContextAndTools(
 	pipeline, err := l.openOutputPipeline(ctx)
 	if err != nil {
 		pool.Release(llmWrapper)
-		return nil, fmt.Errorf("create LLM output transform pipeline: %w", err)
+		return nil, fmt.Errorf("failed to create the LLM output transform pipeline: %w", err)
 	}
 
 	// Create response channel
@@ -992,7 +992,7 @@ func (l *LLMManager) handleLLMResponse(ctx context.Context, userMessage *schema.
 						if err != nil {
 							log.Errorf("Failed to handle tool call response: %v", err)
 							result.ok = true
-							return result, fmt.Errorf("handle tool call response: %v", err)
+							return result, fmt.Errorf("failed to handle the tool-call response: %v", err)
 						}
 						result.suppressProtocolTtsStop = toolSummary.hasMediaOutput
 						if !toolSummary.invokeToolSuccess && strings.TrimSpace(llmResponse.Text) != "" {
@@ -1058,7 +1058,7 @@ func (l *LLMManager) DoLLmRequest(ctx context.Context, userMessage *schema.Messa
 	)
 	if err != nil {
 		log.Errorf("Failed to send LLM request with tools, seesionID: %s, error: %v", l.clientState.SessionID, err)
-		return fmt.Errorf("send LLM request with tools: %v", err)
+		return fmt.Errorf("failed to send the LLM request with tools: %v", err)
 	}
 
 	log.Debugf("DoLLmRequest goroutine started - SessionID: %s, context status: %v", l.clientState.SessionID, ctx.Err())
@@ -1176,10 +1176,10 @@ func (l *LLMManager) GetMessages(ctx context.Context, userMessage *schema.Messag
 
 	// Append current date/time
 	now := time.Now()
-	systemPrompt += fmt.Sprintf("\nCurrent date and time: %s %s", now.Format("2006-01-02 15:04:05"), now.Format("Monday"))
+	systemPrompt += fmt.Sprintf("\nCurrent time and date: %s %s", now.Format("2006-01-02 15:04:05"), now.Format("Monday"))
 
 	if memoryMode == MemoryModeLong && l.clientState.MemoryContext != "" {
-		systemPrompt += fmt.Sprintf("\nUser profile: \n%s", l.clientState.MemoryContext)
+		systemPrompt += fmt.Sprintf("\nInformazioni personali:\n%s", l.clientState.MemoryContext)
 	}
 
 	log.Debugf("speakerResult: %+v, voiceIdentify: %+v", speakerResult, l.clientState.DeviceConfig.VoiceIdentify)
@@ -1192,7 +1192,7 @@ func (l *LLMManager) GetMessages(ctx context.Context, userMessage *schema.Messag
 			if speakerGroupInfo, found := l.clientState.DeviceConfig.VoiceIdentify[speakerResult.SpeakerName]; found {
 				// If a matching speakerGroup is found, fold its description into systemPrompt
 				if speakerGroupInfo.Prompt != "" {
-					systemPrompt += fmt.Sprintf("\nRecognized speaker: \n%s", speakerGroupInfo.Prompt)
+					systemPrompt += fmt.Sprintf("\nIdentified speaker:\n%s", speakerGroupInfo.Prompt)
 				}
 			}
 		}
@@ -1206,7 +1206,7 @@ func (l *LLMManager) GetMessages(ctx context.Context, userMessage *schema.Messag
 		}
 		log.Debugf("Memory search succeeded, input: %s, memory: %s", userMessage.Content, memoryContext)
 		if memoryContext != "" {
-			systemPrompt += fmt.Sprintf("\nRelated history: \n%s", memoryContext)
+			systemPrompt += fmt.Sprintf("\nMemorie correlate:\n%s", memoryContext)
 		}
 	}
 

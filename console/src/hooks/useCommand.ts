@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createCommand, fetchCommand } from '@/lib/api'
 import { pb } from '@/lib/client'
 import { readCommand, type Command } from '@/lib/commands'
@@ -17,7 +17,7 @@ export function useCommand() {
     }
   }, [])
 
-  async function send(body: JsonObject): Promise<void> {
+  const send = useCallback(async (body: JsonObject): Promise<void> => {
     setSending(true)
     setError(null)
     try {
@@ -40,7 +40,7 @@ export function useCommand() {
     } finally {
       setSending(false)
     }
-  }
+  }, [])
 
   return { command, error, sending, send }
 }

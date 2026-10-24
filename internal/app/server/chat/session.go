@@ -298,13 +298,13 @@ func (s *ChatSession) Start(pctx context.Context) error {
 	return nil
 }
 
-// Load chat history into memory
+// Load chat history into memory.
+// Redis history is short memory only, and only when Redis is enabled.
+// The config provider type does not choose this path.
 func (s *ChatSession) initHistoryMessages() error {
-	var historyMessages []*schema.Message
-	var err error
-
-	if s.clientState.GetMemoryMode() == MemoryModeNone {
-		log.Debugf("Device %s memory mode=none, skip loading history messages", s.clientState.DeviceID)
+	mode := s.clientState.GetMemoryMode()
+	if mode != MemoryModeShort {
+		log.Debugf("Device %s memory mode=%s, skip loading Redis history", s.clientState.DeviceID, mode)
 		return nil
 	}
 
@@ -314,13 +314,7 @@ func (s *ChatSession) initHistoryMessages() error {
 		return nil
 	}
 
-	// Short memory lives in Redis and only exists when Redis is enabled
-	if !viper.GetBool("redis.enable") {
-		log.Debugf("Redis disabled, skip loading history messages")
-		return nil
-	}
-
-	historyMessages, err = llm_memory.Get().GetMessages(
+	historyMessages, err := llm_memory.Get().GetMessages(
 		s.ctx,
 		s.clientState.DeviceID,
 		s.clientState.AgentID,

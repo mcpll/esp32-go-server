@@ -10,8 +10,6 @@ import (
 	"xiaozhi-esp32-server-golang/internal/domain/eventbus"
 	"xiaozhi-esp32-server-golang/internal/domain/memory/llm_memory"
 	log "xiaozhi-esp32-server-golang/logger"
-
-	"github.com/spf13/viper"
 )
 
 var (
@@ -190,11 +188,12 @@ func (w *MessageWorker) handleAddMessage(event *eventbus.AddMessageEvent) {
 	}
 }
 
-// saveShortMemory appends the message to the Redis message list used as LLM context.
-// It only runs when Redis is enabled and the agent's memory mode is not none.
+// saveShortMemory appends the message to the Redis list used as LLM context.
+// Short mode is the only mode that uses it. GetMemoryMode reports none when
+// Redis is off, so this does not follow config_provider.type.
 func (w *MessageWorker) saveShortMemory(event *eventbus.AddMessageEvent) {
 	clientState := event.ClientState
-	if !viper.GetBool("redis.enable") || clientState.GetMemoryMode() == data_client.MemoryModeNone {
+	if clientState.GetMemoryMode() != data_client.MemoryModeShort {
 		return
 	}
 	llm_memory.Get().AddMessage(
