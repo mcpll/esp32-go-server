@@ -128,6 +128,8 @@ describe('agent update', () => {
         enterPhrases: 'apri openclaw',
         exitPhrases: 'chiudi openclaw',
       },
+      voiceprintEnabled: true,
+      speakerChatMode: 'identified_only',
     })
     expect(update).toEqual({
       name: 'Italiano',
@@ -154,6 +156,8 @@ describe('agent update', () => {
         enter_keywords: ['apri openclaw'],
         exit_keywords: ['chiudi openclaw'],
       },
+      voiceprint_enabled: true,
+      speaker_chat_mode: 'identified_only',
     })
   })
 
@@ -170,6 +174,8 @@ describe('agent update', () => {
         enterPhrases: ' apri openclaw \nentra in openclaw\n',
         exitPhrases: 'chiudi openclaw\n\nesci da openclaw',
       },
+      voiceprintEnabled: false,
+      speakerChatMode: 'off',
     })
     expect(update.openclaw).toEqual({
       allowed: true,

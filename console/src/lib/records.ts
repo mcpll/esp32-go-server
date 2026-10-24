@@ -2,6 +2,7 @@ import { asJsonObject, isJsonObject, type JsonObject } from '@/lib/json'
 import { readMemoryMode, type MemoryMode } from '@/lib/memoryMode'
 import { readOpenClaw, type OpenClawConfig } from '@/lib/openclawForm'
 import { stripSecrets } from '@/lib/providerForm'
+import { normalizeSpeakerChatMode, type SpeakerChatMode } from '@/lib/speakers'
 
 export type Agent = {
   id: string
@@ -15,6 +16,8 @@ export type Agent = {
   ttsProvider: string
   ttsConfig: JsonObject
   openclaw: OpenClawConfig
+  voiceprintEnabled: boolean
+  speakerChatMode: SpeakerChatMode
 }
 
 export type Device = {
@@ -42,6 +45,8 @@ export function readAgent(input: unknown): Agent {
     ttsProvider: requiredString(record, 'tts_provider', 'Agent'),
     ttsConfig: stripSecrets(asJsonObject(record.tts_config, 'tts_config')),
     openclaw: readOpenClaw(record.openclaw),
+    voiceprintEnabled: optionalBool(record, 'voiceprint_enabled'),
+    speakerChatMode: normalizeSpeakerChatMode(record.speaker_chat_mode),
   }
 }
 
@@ -93,6 +98,13 @@ function optionalString(record: { [key: string]: unknown }, key: string): string
 
 function requiredBool(record: { [key: string]: unknown }, key: string): boolean {
   const value = record[key]
+  if (typeof value !== 'boolean') throw new Error(`${key} must be true or false`)
+  return value
+}
+
+function optionalBool(record: { [key: string]: unknown }, key: string): boolean {
+  const value = record[key]
+  if (value === undefined || value === null) return false
   if (typeof value !== 'boolean') throw new Error(`${key} must be true or false`)
   return value
 }

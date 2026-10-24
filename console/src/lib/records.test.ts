@@ -37,6 +37,8 @@ describe('record parsing', () => {
         enterKeywords: ['apri openclaw'],
         exitKeywords: ['chiudi openclaw'],
       },
+      voiceprintEnabled: false,
+      speakerChatMode: 'off',
     })
   })
 

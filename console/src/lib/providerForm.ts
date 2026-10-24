@@ -1,6 +1,7 @@
 import { asJsonObject, isJsonObject, type JsonObject, type JsonValue } from '@/lib/json'
 import type { MemoryMode } from '@/lib/memoryMode'
 import { openClawUpdate, type OpenClawDraft, type OpenClawUpdate } from '@/lib/openclawForm'
+import type { SpeakerChatMode } from '@/lib/speakers'
 
 const SECRET_KEYS = new Set(['api_key', 'apikey', 'api_secret'])
 
@@ -134,6 +135,8 @@ export type AgentDraft = {
   llm: ProviderDraft
   tts: ProviderDraft
   openclaw: OpenClawDraft
+  voiceprintEnabled: boolean
+  speakerChatMode: SpeakerChatMode
 }
 
 export type AgentUpdate = {
@@ -147,6 +150,8 @@ export type AgentUpdate = {
   tts_provider: string
   tts_config: JsonObject
   openclaw: OpenClawUpdate
+  voiceprint_enabled: boolean
+  speaker_chat_mode: SpeakerChatMode
 }
 
 export function agentUpdate(draft: AgentDraft): AgentUpdate {
@@ -165,6 +170,8 @@ export function agentUpdate(draft: AgentDraft): AgentUpdate {
     tts_provider: requiredProvider(draft.tts, 'TTS'),
     tts_config: configFromDraft('tts', draft.tts),
     openclaw: openClawUpdate(draft.openclaw),
+    voiceprint_enabled: draft.voiceprintEnabled,
+    speaker_chat_mode: draft.speakerChatMode,
   }
 }
 
