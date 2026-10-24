@@ -1,16 +1,29 @@
+import { actionClass } from '@/components/classes'
 import { DeviceTools } from '@/components/DeviceTools'
 import { SendMessage } from '@/components/SendMessage'
+import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { useSetDeviceActivated } from '@/hooks/useDevices'
+import { useDeleteDevice, useSetDeviceActivated } from '@/hooks/useDevices'
+import { deviceRemoveConfirmMessage } from '@/lib/deleteDevicePreflight'
 import { errorMessage } from '@/lib/errors'
 import type { Device } from '@/lib/records'
 import { cn } from '@/lib/utils'
 
 export function DeviceRow({ device }: { device: Device }) {
   const activate = useSetDeviceActivated()
-  const message = activate.error === null ? null : errorMessage(activate.error)
+  const remove = useDeleteDevice()
+  const busy = activate.isPending || remove.isPending
+  const activateMessage = activate.error === null ? null : errorMessage(activate.error)
+  const removeMessage = remove.error === null ? null : errorMessage(remove.error)
+  const message = removeMessage ?? activateMessage
   const switchId = `activated-${device.id}`
+
+  function onRemove() {
+    const ok = window.confirm(deviceRemoveConfirmMessage(device))
+    if (!ok) return
+    remove.mutate(device.id)
+  }
 
   return (
     <div className="grid gap-3 rounded-2xl border border-border bg-muted/50 px-4 py-3">
@@ -30,7 +43,7 @@ export function DeviceRow({ device }: { device: Device }) {
         <Switch
           id={switchId}
           checked={device.activated}
-          disabled={activate.isPending}
+          disabled={busy}
           onCheckedChange={(checked) =>
             activate.mutate({ id: device.id, activated: checked, agentId: device.agentId })
           }
@@ -43,6 +56,15 @@ export function DeviceRow({ device }: { device: Device }) {
       ) : null}
       <SendMessage device={device} />
       <DeviceTools device={device} />
+      <Button
+        className={actionClass}
+        type="button"
+        variant="destructive"
+        disabled={busy}
+        onClick={() => onRemove()}
+      >
+        {remove.isPending ? 'Removing…' : 'Remove'}
+      </Button>
     </div>
   )
 }
