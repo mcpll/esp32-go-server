@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { actionClass, areaClass, controlClass } from '@/components/classes'
+import { McpAccessPoint } from '@/components/McpAccessPoint'
 import { MemoryModeField } from '@/components/MemoryModeField'
 import { OpenClawBlock } from '@/components/OpenClawBlock'
 import { StageEditor } from '@/components/StageEditor'
@@ -91,6 +92,7 @@ export function AgentForm({ id }: { id: string }) {
             />
           </div>
           <MemoryModeField mode={memoryMode} redisEnabled={redisEnabled} onChange={setMemoryMode} />
+          <McpAccessPoint agentId={agent.id} />
           <OpenClawBlock draft={openclaw} onChange={setOpenclaw} />
         </section>
         <section className="flex flex-col gap-4 border-t border-border px-6 py-6 lg:min-h-0 lg:overflow-y-auto lg:border-t-0">

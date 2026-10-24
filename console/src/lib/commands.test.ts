@@ -3,8 +3,14 @@ import {
   commandBody,
   commandStatusText,
   injectPayload,
+  mcpCallPayload,
+  mcpEndpointPayload,
+  mcpToolsPayload,
   providerTestPayload,
+  readCallResult,
   readCommand,
+  readMcpEndpoint,
+  readToolList,
 } from '@/lib/commands'
 
 describe('commands', () => {
@@ -75,5 +81,85 @@ describe('commands', () => {
 
   it('rejects a command whose status is not one of the four', () => {
     expect(() => readCommand({ id: 'c1', status: 'lost' })).toThrow(/status/)
+  })
+
+  it('asks the device for its tools', () => {
+    expect(
+      commandBody({
+        type: 'mcp_tools',
+        deviceId: 'd1',
+        payload: mcpToolsPayload('AA:BB:CC:DD:EE:01'),
+      }),
+    ).toEqual({
+      type: 'mcp_tools',
+      device: 'd1',
+      status: 'pending',
+      payload: { device: 'AA:BB:CC:DD:EE:01' },
+    })
+  })
+
+  it('calls one tool with the arguments typed in the console', () => {
+    expect(
+      commandBody({
+        type: 'mcp_call',
+        deviceId: 'd1',
+        payload: mcpCallPayload('AA:BB:CC:DD:EE:01', 'set_volume', { volume: 40 }),
+      }),
+    ).toEqual({
+      type: 'mcp_call',
+      device: 'd1',
+      status: 'pending',
+      payload: {
+        device: 'AA:BB:CC:DD:EE:01',
+        tool: 'set_volume',
+        arguments: { volume: 40 },
+      },
+    })
+  })
+
+  it('asks for the agent access point without putting the token in the console', () => {
+    expect(
+      commandBody({
+        type: 'mcp_endpoint',
+        agentId: 'k7m2n9p4q1r8s3t',
+        payload: mcpEndpointPayload('k7m2n9p4q1r8s3t'),
+      }),
+    ).toEqual({
+      type: 'mcp_endpoint',
+      agent: 'k7m2n9p4q1r8s3t',
+      status: 'pending',
+      payload: { agent: 'k7m2n9p4q1r8s3t' },
+    })
+  })
+
+  it('reads the tool list, a call result, and the access point', () => {
+    const tools = readToolList({
+      tools: [
+        {
+          name: 'set_volume',
+          description: 'Set the speaker volume',
+          input_schema: { type: 'object', properties: { volume: { type: 'number' } } },
+        },
+      ],
+    })
+    expect(tools).toEqual([
+      {
+        name: 'set_volume',
+        description: 'Set the speaker volume',
+        inputSchema: { type: 'object', properties: { volume: { type: 'number' } } },
+      },
+    ])
+    expect(readCallResult({ result: 'volume set to 40' })).toBe('volume set to 40')
+    expect(
+      readMcpEndpoint({
+        url: 'wss://eye.example/mcp?token=signed',
+        connected: true,
+        tools_count: 1,
+      }),
+    ).toEqual({
+      url: 'wss://eye.example/mcp?token=signed',
+      connected: true,
+      toolsCount: 1,
+    })
   })
 })
