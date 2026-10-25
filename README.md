@@ -112,6 +112,8 @@ Optional:
 |---|---|
 | `MQTT_SERVER_SIGNATURE_KEY` | Only when `mqtt_server.enable_auth` is on |
 | `MEM0_API_KEY` | Long memory (`memory_mode: long`) |
+| `OPENROUTER_API_KEY` | When an agent uses `llm_provider: openrouter` |
+| `GROQ_API_KEY` | When an agent uses `asr_provider: groq_whisper` |
 | `REDIS_ENABLE` | `true` to use the Redis profile for short memory |
 | `REDIS_HOST` | `redis` on the Compose network |
 | `REDIS_PASSWORD` | Overrides the password in `config/config.yaml` |

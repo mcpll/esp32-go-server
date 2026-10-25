@@ -27,6 +27,8 @@ func ApplyEnv() {
 	setFromEnv("MQTT_SERVER_SIGNATURE_KEY", "mqtt_server.signature_key")
 	setFromEnv("VISION_TOKEN", "vision.token")
 	applyDashScope()
+	applyOpenRouter()
+	applyGroq()
 	applyMem0()
 	applyRedis()
 }
@@ -41,6 +43,16 @@ func applyDashScope() {
 	viper.Set("asr.aliyun_qwen3.api_key", key)
 	viper.Set("llm.aliyun.api_key", key)
 	viper.Set("tts.aliyun_qwen.api_key", key)
+}
+
+// applyOpenRouter copies OPENROUTER_API_KEY onto llm.openrouter when set.
+func applyOpenRouter() {
+	setFromEnv("OPENROUTER_API_KEY", "llm.openrouter.api_key")
+}
+
+// applyGroq copies GROQ_API_KEY onto asr.groq_whisper when set.
+func applyGroq() {
+	setFromEnv("GROQ_API_KEY", "asr.groq_whisper.api_key")
 }
 
 func applyMem0() {

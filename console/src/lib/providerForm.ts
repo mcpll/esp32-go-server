@@ -19,6 +19,11 @@ const FIELDS: Record<Stage, Record<string, readonly Field[]>> = {
       { path: 'language', label: 'Language', kind: 'text' },
       { path: 'auto_end', label: 'Auto end', kind: 'bool' },
     ],
+    groq_whisper: [
+      { path: 'api_url', label: 'API URL', kind: 'text' },
+      { path: 'model', label: 'Model', kind: 'text' },
+      { path: 'language', label: 'Language', kind: 'text' },
+    ],
   },
   llm: {
     aliyun: [

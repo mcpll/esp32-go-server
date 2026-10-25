@@ -66,7 +66,16 @@ func NewAsrProvider(asrType string, config map[string]interface{}) (AsrProvider,
 			log.Info("Xunfei ASR adapter created successfully")
 		}
 		return provider, err
+	case constants.AsrTypeGroqWhisper:
+		log.Info("using Groq Whisper ASR provider")
+		provider, err := NewGroqWhisperAdapter(config)
+		if err != nil {
+			log.Errorf("failed to create Groq Whisper ASR adapter: %v", err)
+		} else {
+			log.Info("Groq Whisper ASR adapter created successfully")
+		}
+		return provider, err
 	default:
-		return nil, fmt.Errorf("不支持的ASR引擎类型: %s，目前仅支持 'funasr', 'aliyun_funasr', 'doubao', 'aliyun_qwen3', 'xunfei'", asrType)
+		return nil, fmt.Errorf("unsupported ASR engine type: %s (funasr, aliyun_funasr, doubao, aliyun_qwen3, xunfei, groq_whisper)", asrType)
 	}
 }

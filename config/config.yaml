@@ -89,7 +89,7 @@ resource_pools:
 # Pool stats for the console Status screen. false sends nothing.
 # true overwrites the pool_stats record (key "main") every 5s.
 pool_stats:
-  report_enabled: false
+  report_enabled: true
 
 # Voice activity detection (VAD)
 vad:
@@ -119,10 +119,21 @@ vad:
 
 # Automatic speech recognition (ASR). The agent record picks the provider and overrides these keys.
 asr:
-  provider: "aliyun_qwen3"  # ASR provider: funasr / aliyun_funasr / doubao / aliyun_qwen3 / xunfei
-  # Aliyun Qwen3 ASR. The api_key falls back to the DASHSCOPE_API_KEY env var.
+  provider: "aliyun_qwen3"  # ASR provider: funasr / aliyun_funasr / doubao / aliyun_qwen3 / xunfei / groq_whisper
+  # Aliyun Qwen3 ASR (MaaS ap-southeast-1). api_key from DASHSCOPE_API_KEY.
   aliyun_qwen3:
     api_key: ""
+    model: "qwen3-asr-flash-realtime-2026-02-10"
+    ws_url: "wss://ws-xj8m4jniuld7m7hf.ap-southeast-1.maas.aliyuncs.com/api-ws/v1/realtime"
+  # Groq Whisper (OpenAI-compatible transcriptions). api_key from GROQ_API_KEY.
+  groq_whisper:
+    api_key: ""
+    api_url: "https://api.groq.com/openai/v1/audio/transcriptions"
+    model: "whisper-large-v3-turbo"
+    language: "it"
+    response_format: "json"
+    temperature: 0
+    timeout: 30
   # FunASR
   funasr:
     host: "127.0.0.1"          # FunASR host
@@ -280,6 +291,13 @@ llm:
     type: "openai"                               # interface type
     api_key: ""                                  # API key
     base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"  # API base URL
+  # OpenRouter (OpenAI-compatible). api_key from OPENROUTER_API_KEY.
+  openrouter:
+    type: "openai"
+    api_key: ""
+    base_url: "https://openrouter.ai/api/v1"
+    model_name: "deepseek/deepseek-v4.1-flash"
+    max_tokens: 300
   # DeepSeek V3 (SiliconFlow)
   deepseek:
     type: "openai"                               # interface type
