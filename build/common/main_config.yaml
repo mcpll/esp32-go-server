@@ -119,10 +119,21 @@ vad:
 
 # Automatic speech recognition (ASR). The agent record picks the provider and overrides these keys.
 asr:
-  provider: "aliyun_qwen3"  # ASR provider: funasr / aliyun_funasr / doubao / aliyun_qwen3 / xunfei
-  # Aliyun Qwen3 ASR. The api_key falls back to the DASHSCOPE_API_KEY env var.
+  provider: "aliyun_qwen3"  # ASR provider: funasr / aliyun_funasr / doubao / aliyun_qwen3 / xunfei / groq_whisper
+  # Aliyun Qwen3 ASR (MaaS ap-southeast-1). api_key from DASHSCOPE_API_KEY.
   aliyun_qwen3:
     api_key: ""
+    model: "qwen3-asr-flash-realtime-2026-02-10"
+    ws_url: "wss://ws-xj8m4jniuld7m7hf.ap-southeast-1.maas.aliyuncs.com/api-ws/v1/realtime"
+  # Groq Whisper (OpenAI-compatible transcriptions). api_key from GROQ_API_KEY.
+  groq_whisper:
+    api_key: ""
+    api_url: "https://api.groq.com/openai/v1/audio/transcriptions"
+    model: "whisper-large-v3-turbo"
+    language: "it"
+    response_format: "json"
+    temperature: 0
+    timeout: 30
   # FunASR
   funasr:
     host: "127.0.0.1"          # FunASR host
@@ -173,16 +184,17 @@ asr:
 
 # Text to speech (TTS). The agent record picks the provider, voice and language.
 tts:
-  provider: "aliyun_qwen"  # TTS provider: aliyun_qwen/xiaozhi/doubao/doubao_ws/cosyvoice/edge/edge_offline/xunfei/xunfei_super_tts
+  provider: "openai"  # TTS provider: openai/aliyun_qwen/xiaozhi/doubao/doubao_ws/cosyvoice/edge/edge_offline/xunfei/xunfei_super_tts
   # Aliyun Qwen TTS (DashScope)
   aliyun_qwen:
     api_key: ""
-  openai:  # OpenAI-compatible TTS service, SiliconFlow here
-    api_key: "xxxx" # api key
-    api_url: "https://api.siliconflow.cn/v1/audio/speech"
-    model: "FunAudioLLM/CosyVoice2-0.5B"
-    voice: "FunAudioLLM/CosyVoice2-0.5B:alex"
-    response_format: "mp3"
+  # Local Kokoro via Compose --profile tts (OpenAI speech API, no key).
+  openai:
+    api_key: ""
+    api_url: "http://kokoro:8880/v1/audio/speech"
+    model: "kokoro"
+    voice: "im_nicola"
+    response_format: "pcm"
     speed: 1.0
     stream: true
   # Doubao TTS (HTTP)
@@ -279,6 +291,13 @@ llm:
     type: "openai"                               # interface type
     api_key: ""                                  # API key
     base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"  # API base URL
+  # OpenRouter (OpenAI-compatible). api_key from OPENROUTER_API_KEY.
+  openrouter:
+    type: "openai"
+    api_key: ""
+    base_url: "https://openrouter.ai/api/v1"
+    model_name: "deepseek/deepseek-v4.1-flash"
+    max_tokens: 300
   # DeepSeek V3 (SiliconFlow)
   deepseek:
     type: "openai"                               # interface type

@@ -20,6 +20,7 @@ The console is the app under `console/`, served from PocketBase `pb_public/`. It
 | OTA firmware delivery | Not implemented | — | — |
 | `settings_reload` command | Force reload of all settings | Saving a settings block already reloads via PocketBase realtime; no button for the command | Create a `commands` record `{ "type": "settings_reload", "status": "pending", "payload": {} }` |
 | Secrets | WebSocket token, MQTT keys, ASR/LLM/TTS keys, endpoint token | Never shown or stored (by design) | `.env` / `config.yaml` — see README Environment |
+| Local Kokoro TTS | OpenAI-compatible speech on Compose network | Agent TTS provider `openai` (known fields: URL, model, voice, format) | `docker compose --profile tts` — image `ghcr.io/remsky/kokoro-fastapi-cpu`, no API key |
 | Pool stats emission | Server overwrites the `pool_stats` record every 5 s | Status screen reads the record | Set `pool_stats.report_enabled` true in server config; when false, Status stays empty |
 | Redis availability flag | Console learns whether Short memory is allowed | Read-only from settings | Server writes `redis_available` when Redis is enabled |
 

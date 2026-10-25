@@ -30,6 +30,34 @@ describe('provider drafts', () => {
     })
   })
 
+  it('round-trips the seeded Kokoro openai TTS config and drops API keys', () => {
+    const input = {
+      api_url: 'http://kokoro:8880/v1/audio/speech',
+      model: 'kokoro',
+      voice: 'im_nicola',
+      response_format: 'pcm',
+      stream: true,
+      api_key: 'should-drop',
+    }
+    const draft = draftFromConfig('tts', 'openai', input)
+    expect(draft.kind).toBe('known')
+    if (draft.kind !== 'known') return
+    expect(draft.values).toEqual({
+      api_url: 'http://kokoro:8880/v1/audio/speech',
+      model: 'kokoro',
+      voice: 'im_nicola',
+      response_format: 'pcm',
+    })
+    expect(JSON.parse(draft.restText)).toEqual({ stream: true })
+    expect(configFromDraft('tts', draft)).toEqual({
+      api_url: 'http://kokoro:8880/v1/audio/speech',
+      model: 'kokoro',
+      voice: 'im_nicola',
+      response_format: 'pcm',
+      stream: true,
+    })
+  })
+
   it('round-trips the seeded LLM config, including thinking mode', () => {
     const input = {
       type: 'openai',

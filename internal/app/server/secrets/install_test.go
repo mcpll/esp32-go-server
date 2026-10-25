@@ -25,6 +25,8 @@ func TestInstallDocsListEnvAndBinding(t *testing.T) {
 	optional := []string{
 		"MQTT_SERVER_SIGNATURE_KEY",
 		"MEM0_API_KEY",
+		"OPENROUTER_API_KEY",
+		"GROQ_API_KEY",
 		"REDIS_ENABLE",
 		"REDIS_HOST",
 		"REDIS_PASSWORD",

@@ -59,6 +59,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      kokoro:
+        condition: service_healthy
+        required: false
     # The server logs in to PocketBase with the same superuser the admin UI uses.
     environment:
       POCKETBASE_URL: http://pocketbase:8090
@@ -72,6 +75,19 @@ services:
       - "8989:8989"
       - "2883:2883"
       - "8990:8990/udp"
+
+  kokoro:
+    profiles: ["tts"]
+    platform: *platform
+    image: ghcr.io/remsky/kokoro-fastapi-cpu
+    ports:
+      - "8880:8880"
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://127.0.0.1:8880/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
 
   # Runs pb_migrations/check.sh against throwaway data folders; does not touch pb_data.
   check:

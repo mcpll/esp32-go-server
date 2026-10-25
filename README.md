@@ -2,7 +2,7 @@
 
 A personal Italian voice server for Xiaozhi ESP32 devices, built as a fork of [hackers365/xiaozhi-esp32-server-golang](https://github.com/hackers365/xiaozhi-esp32-server-golang) (MIT).
 
-> **Status: personal install.** The upstream code is imported at commit [`21f1a2e`](https://github.com/hackers365/xiaozhi-esp32-server-golang/commit/21f1a2e71ff383723f1464ea9b137016e6feab8d) with its history. Docker Compose runs PocketBase (the console) and the device server. Redis and the voice server are optional profiles.
+> **Status: personal install.** The upstream code is imported at commit [`21f1a2e`](https://github.com/hackers365/xiaozhi-esp32-server-golang/commit/21f1a2e71ff383723f1464ea9b137016e6feab8d) with its history. Docker Compose runs PocketBase (the console) and the device server. Redis, the voice server, and local Kokoro TTS are optional profiles.
 
 ## Fork of upstream
 
@@ -37,9 +37,9 @@ What you can do with this install. Columns: **Console** = React UI at PocketBase
 | Settings | MQTT, OTA URLs, global MCP, voiceprint server, knowledge providers JSON, vision, chat, VAD | Settings | Next session / check-in uses most keys | Secrets never live in Settings |
 | Knowledge (RAG) | Answer from uploaded documents when knowledge is on | Providers JSON in Settings only | Spoken Q&A when enabled | Upload / sync via PocketBase or `commands` — see coverage doc |
 | Status | Pool resource counters | Status screen | — | Enable with `pool_stats.report_enabled` in server config |
-| Hold-to-talk dialogue | ASR → LLM → TTS in Italian | — | Primary product path | Seeded DashScope stack; needs `DASHSCOPE_API_KEY` |
+| Hold-to-talk dialogue | ASR → LLM → TTS in Italian | — | Primary product path | Seeded ASR/LLM need `DASHSCOPE_API_KEY`; TTS defaults to Kokoro (`--profile tts`) |
 | OTA check-in | Activation code, WebSocket URL and token | OTA URLs in Settings | Device polls `/xiaozhi/ota/` | Firmware delivery is not implemented |
-| Deploy | PocketBase + server (optional Redis, voice) | Served by PocketBase | — | `docker compose up` — see [Install](#install) |
+| Deploy | PocketBase + server (optional Redis, voice, Kokoro TTS) | Served by PocketBase | — | `docker compose up` — see [Install](#install) |
 
 ## What changes from upstream
 
@@ -68,11 +68,14 @@ Optional profiles stay off unless you name them:
 ```sh
 docker compose --profile redis up --build -d
 docker compose --profile voice up --build -d
+docker compose --profile tts up --build -d
 ```
 
 `redis` starts Redis for short memory. Set `REDIS_ENABLE=true` and `REDIS_HOST=redis`. `REDIS_PASSWORD` overrides the password in `config/config.yaml` (`ticket_dev` when unset) on both the server and the Redis container. `REDIS_PORT` overrides `6379`.
 
 `voice` starts Qdrant (`qdrant/qdrant:v1.15.4`) and the upstream voice server image `ghcr.io/hackers365/voice_server:0.1.2`. This repository does not build that image. In the console, under Settings, set `voice_identify.enable` and `voice_identify.base_url` to `http://voice-server:8080`. Confirm the upstream image has an arm64 build before using the profile on a Pi.
+
+`tts` starts Kokoro-82M (`ghcr.io/remsky/kokoro-fastapi-cpu`) on the Compose network at `http://kokoro:8880`. The seeded agent uses the OpenAI TTS provider pointed at that URL (`model: kokoro`, voice `im_nicola`, PCM). No API key. The image is CPU-only and can be heavy on a Pi, so it is opt-in. Without the profile, hold-to-talk still needs a reachable TTS (or switch the agent TTS in the console).
 
 `docker compose up --build` builds the host architecture. To build both:
 
@@ -93,7 +96,7 @@ Required. Compose stops when one of these is missing. The server also refuses a 
 | `ENDPOINT_AUTH_TOKEN` | Signs MCP and OpenClaw endpoint JWTs |
 | `MQTT_SERVER_PASSWORD` | Embedded broker password |
 | `VISION_TOKEN` | Vision endpoint token |
-| `DASHSCOPE_API_KEY` | DashScope key for the seeded Italian ASR, LLM and TTS. The stack boots with it empty; a voice turn needs it |
+| `DASHSCOPE_API_KEY` | DashScope key for the seeded Italian ASR and LLM. The stack boots with it empty; a voice turn needs it. Seeded TTS is local Kokoro (`--profile tts`), not DashScope |
 
 Compose sets these on the server, so you do not put them in `.env` unless you run the binary outside Compose:
 
@@ -109,6 +112,8 @@ Optional:
 |---|---|
 | `MQTT_SERVER_SIGNATURE_KEY` | Only when `mqtt_server.enable_auth` is on |
 | `MEM0_API_KEY` | Long memory (`memory_mode: long`) |
+| `OPENROUTER_API_KEY` | When an agent uses `llm_provider: openrouter` |
+| `GROQ_API_KEY` | When an agent uses `asr_provider: groq_whisper` |
 | `REDIS_ENABLE` | `true` to use the Redis profile for short memory |
 | `REDIS_HOST` | `redis` on the Compose network |
 | `REDIS_PASSWORD` | Overrides the password in `config/config.yaml` |
@@ -167,6 +172,7 @@ Log in with `ADMIN_EMAIL` and `ADMIN_PASSWORD`. While logged out, only the login
 ## Roadmap
 
 - Spec: [#8](https://github.com/mcpll/esp32-go-server/issues/8) (slices through deploy and voiceprint console are on `main`)
+- Local Kokoro TTS: [#53](https://github.com/mcpll/esp32-go-server/issues/53) (`docker compose --profile tts`)
 - Remaining gaps vs the console: [`docs/console-coverage.md`](docs/console-coverage.md)
 - Research notes: [`docs/research/`](docs/research/)
 

@@ -100,7 +100,17 @@ vad:
 asr:
   provider: "aliyun_qwen3"
   aliyun_qwen3:
+    model: "qwen3-asr-flash-realtime-2026-02-10"
     api_key: "placeholder"
+    ws_url: "wss://ws-xj8m4jniuld7m7hf.ap-southeast-1.maas.aliyuncs.com/api-ws/v1/realtime"
+  groq_whisper:
+    api_key: "placeholder"
+    api_url: "https://api.groq.com/openai/v1/audio/transcriptions"
+    model: "whisper-large-v3-turbo"
+    language: "it"
+    response_format: "json"
+    temperature: 0
+    timeout: 30
   funasr:
     host: "127.0.0.1"
     port: "10096"
@@ -113,7 +123,15 @@ asr:
     auto_end: true
 
 tts:
-  provider: "aliyun_qwen"
+  provider: "openai"
+  openai:
+    api_key: ""
+    api_url: "http://kokoro:8880/v1/audio/speech"
+    model: "kokoro"
+    voice: "im_nicola"
+    response_format: "pcm"
+    speed: 1.0
+    stream: true
   aliyun_qwen:
     api_key: "placeholder"
   edge:
